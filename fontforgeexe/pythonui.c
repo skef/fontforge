@@ -49,6 +49,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include "ffpython.h"
+#include "gdraw/gtkbridge.h"
 
 static struct python_menu_info {
     PyObject *func;
@@ -345,6 +346,59 @@ Py_RETURN_NONE;
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+
+static PyObject *PyFFFont_raiseTestWindow(PyFF_Font *self, PyObject *UNUSED(args)) {
+        FontView *fv = (FontView *) self->fv;
+
+        /*PyErr_Format(PyExc_EnvironmentError, "FontForge not compiled with GTK extension");
+        return( NULL );*/
+
+        /*if ( no_windowing_ui ) {
+                PyErr_Format(PyExc_EnvironmentError, "No user interface");
+                return( NULL );
+        }*/
+
+        gtkb_AddWindow(fv->gw);
+        /*gboolean may_block = false;
+        GMainContext *con = g_main_context_default();
+        while (g_main_context_pending(con))
+                g_main_context_iteration( con, may_block ); */
+
+/*      if ( !PyArg_ParseTuple(args,"O",&w) ) 
+                return (NULL);
+        printf("%s", Py_TYPE(w)->tp_name);
+*/
+        Py_RETURN( self );
+}
+
+#else
+
+#define EMPTY_METHOD                            \
+    {                                           \
+    PyObject *result = NULL;                    \
+    /* Boilerplate to return "None" */          \
+    Py_INCREF(Py_None);                         \
+    result = Py_None;                           \
+    return result;                              \
+}
+                                                                        \
+static PyObject *PyFFFont_raiseTestWindow(PyFF_Font *self, PyObject *args)
+{ EMPTY_METHOD; }
+
+#endif
+
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+PyMethodDef PyFF_FontUI_methods[] = {
+   { "raiseTestWindow", (PyCFunction) PyFFFont_raiseTestWindow, METH_VARARGS, "Raises test window from C" },
+   
+   PYMETHODDEF_EMPTY /* Sentinel */
+};
+
 // This was used to add pycontrib/gdraw related interfaces to the fontforge
 // module. It is left as a hook for possible future extension.
 PyMethodDef module_fontforge_ui_methods[] = {
@@ -375,6 +429,7 @@ void PythonUI_Init(void) {
     TRACE("PythonUI_Init()\n"); 
     FfPy_Replace_MenuItemStub(PyFF_registerMenuItem);
 
+    copyUIMethodsToBaseTable( PyFF_FontUI_methods,         PyFF_Font_methods );
     copyUIMethodsToBaseTable( module_fontforge_ui_methods, module_fontforge_methods );
 }
 #endif

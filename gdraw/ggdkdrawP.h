@@ -226,6 +226,10 @@ typedef struct ggdkdisplay { /* :GDisplay */
     GdkScreen  *screen;
     GdkWindow  *root;
 
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+    FFGtkBState *gtkb_state;
+#endif
+
     PangoContext *pangoc_context;
 } GGDKDisplay;
 

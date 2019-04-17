@@ -33,6 +33,7 @@
 #include "gresource.h"
 #include "gkeysym.h"
 #include "ustring.h"
+#include "gtkbridge.h"
 #include <assert.h>
 #include <string.h>
 #include <math.h>
@@ -400,6 +401,16 @@ static void _GGDKDraw_CenterWindowOnScreen(GGDKWindow gw) {
     gdk_window_move(gw->w, gw->pos.x, gw->pos.y);
 }
 
+static GdkPixbuf *_GGDKDraw_IconToPixbuf(GGDKWindow icon) {
+    GdkPixbuf *ret;
+#ifndef GGDKDRAW_GDK_2
+    ret = gdk_pixbuf_get_from_surface(icon->cs, 0, 0, icon->pos.width, icon->pos.height);
+#else
+    ret = _GGDKDraw_Cairo2Pixbuf(icon->cs);
+#endif
+    return ret;
+}
+
 static GWindow _GGDKDraw_CreateWindow(GGDKDisplay *gdisp, GGDKWindow gw, GRect *pos,
                                       int (*eh)(GWindow, GEvent *), void *user_data, GWindowAttrs *wattrs) {
 
@@ -548,11 +559,7 @@ static GWindow _GGDKDraw_CreateWindow(GGDKDisplay *gdisp, GGDKWindow gw, GRect *
             icon = (GGDKWindow) wattrs->icon;
         }
         if (icon != NULL) {
-#ifndef GGDKDRAW_GDK_2
-            GdkPixbuf *pb = gdk_pixbuf_get_from_surface(icon->cs, 0, 0, icon->pos.width, icon->pos.height);
-#else
-            GdkPixbuf *pb = _GGDKDraw_Cairo2Pixbuf(icon->cs);
-#endif
+            GdkPixbuf *pb = _GGDKDraw_IconToPixbuf(icon);
             if (pb != NULL) {
                 GList_Glib ent = {.data = pb};
                 gdk_window_set_icon_list(nw->w, &ent);
@@ -797,6 +804,16 @@ static bool _GGDKDraw_FilterByModal(GdkEvent *event, GGDKWindow gw) {
     GGDKWindow gww = gw;
     GPtrArray *stack = gw->display->transient_stack;
 
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+    if ( gtkb_Grabbed(gww->display->gtkb_state) ) {
+        // If gtk has an active grab, push the (already filtered)
+        // event up to it. 
+        gtkb_ProcessEvent(gww->display->gtkb_state, event);
+        // Keep the "beep" (XXX?)
+        gww = NULL;
+    }
+#endif
+
     if (gww && gw->display->restrict_count == 0) {
         return false;
     }
@@ -883,6 +900,10 @@ static void _GGDKDraw_DispatchEvent(GdkEvent *event, gpointer data) {
         return;
     } else if ((gw = g_object_get_data(G_OBJECT(w), "GGDKWindow")) == NULL) {
         //Log(LOGDEBUG, "MISSING GW!");
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+        // If the target window is not GGDKDraw's, pass the event onto GTK
+        gtkb_ProcessEvent(gdisp->gtkb_state, event);
+#endif
         return;
     } else if (_GGDKDraw_WindowOrParentsDying(gw) || gdk_window_is_destroyed(w)) {
         Log(LOGDEBUG, "DYING! %p", w);
@@ -1246,6 +1267,9 @@ static void GGDKDrawSetDefaultIcon(GWindow icon) {
     GGDKWindow gicon = (GGDKWindow)icon;
     if (gicon->is_pixmap) {
         gicon->display->default_icon = gicon;
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+        gtkb_SetDefaultIcon(gicon->display->gtkb_state, _GGDKDraw_IconToPixbuf(gicon));
+#endif
     }
 }
 
@@ -1632,6 +1656,10 @@ static void GGDKDrawSetTransientFor(GWindow transient, GWindow owner) {
                 g_ptr_array_remove_index(gw->display->transient_stack, i);
                 if (gw->restrict_input_to_me) {
                     gdisp->restrict_count--;
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+                    if (gdisp->restrict_count == 0)
+                        gtkb_Grab(gdisp->gtkb_state, false);
+#endif
                 }
                 break;
             }
@@ -1644,6 +1672,10 @@ static void GGDKDrawSetTransientFor(GWindow transient, GWindow owner) {
         gw->istransient = true;
         g_ptr_array_add(gdisp->transient_stack, gw);
         if (gw->restrict_input_to_me) {
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+            if (gdisp->restrict_count == 0)
+                gtkb_Grab(gdisp->gtkb_state, true);
+#endif
             gdisp->restrict_count++;
         }
     } else {
@@ -2634,6 +2666,17 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 
     _GDraw_InitError((GDisplay *) gdisp);
 
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+    // XXX These calls may be preferable to the settings in
+    // _GGDKDraw_CreateWindow, but using both should be OK
+    // as long as the same strings are used
+    gdk_set_program_class(GResourceProgramName);
+    // GTK derives the WM_CLASS from this
+    g_set_prgname(GResourceProgramName);
+
+    gdisp->gtkb_state = gtkb_CreateState();
+#endif
+
     //DEBUG
     if (getenv("GGDK_DEBUG")) {
 G_GNUC_BEGIN_IGNORE_DEPRECATIONS
@@ -2648,6 +2691,11 @@ void _GGDKDraw_DestroyDisplay(GDisplay *disp) {
 
     // Indicate we're dying...
     gdisp->is_dying = true;
+
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+    gtkb_DestroyState(gdisp->gtkb_state);
+    gdisp->gtkb_state = NULL;
+#endif
 
     // Destroy remaining windows
     if (g_hash_table_size(gdisp->windows) > 0) {

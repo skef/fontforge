@@ -1104,7 +1104,11 @@ int fontforge_main( int argc, char **argv ) {
 					/* If there is no UI, there is always a script */
 			                /*  and we will never return from the above */
 #ifdef FONTFORGE_CAN_USE_GDK
+#ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
+    gtk_init(&argc, &argv);
+#else
     gdk_init(&argc, &argv);
+#endif
 #endif
     if ( load_prefs==NULL ||
 	    (strcasecmp(load_prefs,"Always")!=0 &&	/* Already loaded */

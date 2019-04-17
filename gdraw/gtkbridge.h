@@ -1,4 +1,4 @@
-/* Copyright (C) 2016 by Jeremy Tan */
+/* Copyright (C) 2019 by Skef Iterum */
 /*
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -25,26 +25,18 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _FFGDK_H
-#define _FFGDK_H
-
-#include "fontforge-config.h"
-#ifdef FONTFORGE_CAN_USE_GDK
-
-// As gdk #includes glib, we must apply the same name mangling here.
-#define GTimer GTimer_GTK
-#define GList  GList_Glib
-#define GMenuItem GMenuItem_GIO
-#include <gdk/gdk.h>
-#include <gdk/gdkkeysyms.h>
 #ifdef FONTFORGE_CAN_USE_GTK_BRIDGE
-#include <gtk/gtk.h>
-struct ffgtkb_state;
-typedef struct ffgtkb_state FFGtkBState;
-#endif // FONTFORGE_CAN_USE_GTK_BRIDGE
-#undef GMenuItem
-#undef GList
-#undef GTimer
 
-#endif // FONTFORGE_CAN_USE_GDK
-#endif // _FFGDK_H
+#include <ffgdk.h>
+#include <gdk-pixbuf/gdk-pixbuf.h>
+
+extern FFGtkBState *gtkb_CreateState();
+extern void gtkb_DestroyState(FFGtkBState *state);
+extern void gtkb_ProcessEvent(FFGtkBState *state, GdkEvent *event);
+extern bool gtkb_Grabbed(FFGtkBState *state);
+extern void gtkb_Grab(FFGtkBState *state, bool grab);
+extern void gtkb_AddWindow(GWindow fv);
+extern void _gtkb_AddWindow(FFGtkBState *state, GdkWindow *gw);
+extern void gtkb_SetDefaultIcon(FFGtkBState *state, GdkPixbuf *pb);
+
+#endif // FONTFORGE_CAN_USE_GTK_BRIDGE
