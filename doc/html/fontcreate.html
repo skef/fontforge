@@ -1,0 +1,97 @@
+<HTML>
+<HEAD>
+  <!-- Created with AOLpress/2.0 -->
+  <!-- AP: Created on: 6-Dec-2000 -->
+  <TITLE>Creating and Opening Fonts</TITLE>
+  <LINK REL="icon" href="fftype16.png">
+  <LINK REL="stylesheet" TYPE="text/css" HREF="FontForge.css">
+</HEAD>
+<BODY>
+<DIV class="quote">
+<SMALL>NOBLEMAN:</SMALL> Now this is what I call
+workmanship. There is nothing on earth more exquisite than a bonny book,
+with well-placed columns of rich black writing in beautiful borders, and
+illuminated pictures cunningly inset. But nowadays, instead of looking at
+books, people read them. A book might as well be one of those orders for
+bacon and bran that you are scribbling.
+<DIV class="attribution">
+— George Bernard Shaw, 1924<BR>
+Saint Joan, Scene IV
+</DIV>
+<H2 id="FontCreate">Creating a Font</H2>
+
+XXX dialog picture
+
+You can “start fresh” and create a new font database in FontForge in
+three ways:
+<UL>
+<LI> If you start the program without specifying a font file FontForge
+will bring up the XXX Open Font dialog. Pressing <CODE>New</CODE>
+in the bottom center of that dialog will create a new database.
+<LI> If another font is already open, you can choose the <CODE>New</CODE>
+command from the <CODE>File</CODE> menu (or type <CODE>Ctrl-n</CODE>).
+<LI> You can start FontForge with the command-line argument “<CODE>-new</CODE>”. 
+</UL>
+
+<P> <IMG SRC="newfont.png" WIDTH="419" HEIGHT="189">
+
+<P> Every font should have a name and some other basic information, which you
+can add with the <CODE><A HREF="fontinfo.html">Font Info</A></CODE> command 
+from the <CODE>Element</CODE> menu. Among many other things you can use this
+dialog to set the copyright message and change the ascent and descent. The
+ideal values metrics depend on the type of font you eventually plan to generate,
+but 1024 and 2048 are good sums for TrueType and OpenType fonts. 
+
+<P> <IMG SRC="fontinfo.png" WIDTH="614" HEIGHT="548">
+
+<P> You may also wish to use <CODE>Encoding-&gt;Reencode</CODE> to change what
+characters are available in your font. FontForge generally creates new fonts
+with an ISO-8859-1, which contains (most of) the characters needed for Western
+Europe (the latin letters, some accented letters, digits, and symbols). Unicode
+BMP and Unicode Full are other good choices, although these can lead to a lot
+of scrolling. 
+
+XXX H3 saving
+
+<H2 id="FontCreate">Opening a Font</H2>
+
+There are also three ways of opening an existing font, which can be in FontForge's
+own “sfd” database format or a format like OpenType, TrueType, or a Postscript font:
+<UL>
+<LI> If you start the program without specifying a font file FontForge
+will bring up the XXX Open Font dialog. Here you can navigate to the file
+or type the name in directly and then press <CODE>OK</CODE> to open that
+file. 
+<LI> If another font is already open, you can choose the <CODE>Open</CODE>
+command from the <CODE>File</CODE> menu (or type <CODE>Ctrl-o</CODE>).
+<LI> You can start FontForge from the command line with the full path to the
+file, as in “<CODE>fontforge Ambrosia.sfd</CODE>”.
+</UL>
+
+<P> XXX FontForge can open fonts of many (but not all) formats, allowing
+them to be altered, enhanced, and converted. Some fonts may contain features
+or elements not recognized by FontForge even though other parts of the file
+are. (XXX intellectual property note.)
+
+<H2 id="Navigating">Navigating to a glyph</H2>
+
+<P> The font view provides one way of navigating around the glyphs in a font.
+Simple scroll around it until you find the glyph you need and then double click
+on it to open a window looking at that glyph.
+
+<P> Also, typing a glyph (with a one-character name) will move to that glyph.
+
+<P> However some fonts are huge (Chinese, Japanese and Korean fonts have thousands
+or even tens of thousands of glyphs) and scrolling around the font view is
+a an inefficient way of finding your glyph. <CODE>View-&gt;Goto</CODE> provides
+a simple dialog which will allow you to move directly to any glyph for which
+you know the name (or encoding). If your font is a Unicode font, then this
+dialog will also allow you to find glyphs by block name (ie. Hebrew rather
+than Alef).
+
+<P> The simplest way to navigate, once a character is opened in an Outline or
+Bitmap view, is just to go to the next or previous glyph.  And
+<CODE>View-&gt;Next Char</CODE> and <CODE>View-&gt;Prev Char</CODE> will do
+exactly that.
+
+</BODY></HTML>

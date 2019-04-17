@@ -1,0 +1,424 @@
+<HTML>
+<HEAD>
+  <!-- Created with AOLpress/2.0 -->
+  <!-- AP: Created on: 6-Dec-2000 -->
+  <TITLE>Creating and Opening Fonts</TITLE>
+  <LINK REL="icon" href="fftype16.png">
+  <LINK REL="stylesheet" TYPE="text/css" HREF="FontForge.css">
+</HEAD>
+<BODY>
+
+<H2 id="CharCreate">Creating a glyph</H2>
+
+<P> Once you have opened a font you are ready to start editing glyphs. 
+In the Font View of the font you created scroll to the entry for "C"
+and double-click on it. You should now have an empty Outline Glyph window:
+
+<P> <IMG SRC="C1.png" WIDTH="272" HEIGHT="283">
+
+<P> The outline glyph window contains two palettes snuggled up on the left side
+of the window. The top palette contains a set of editing tools, and the bottom
+palette is for managing drawing layers. They can be added, deleted (not all!),
+shown or hidden, for example.
+
+<P> Cubic layers (indicated by a “C”) use third-order Bezier splines like many
+OpenType fonts. Quadratic layers (indicated by a “Q”) use second-degree
+splines. The latter are harder to edit but mathematically easier and simpler to
+control and are used in TrueType fonts.
+
+<P> The foreground layer (indicated by an ”F”) contains the outline that will
+become part of the font.  The background layer (“B”) can contain images or line
+drawings that help you draw this particular glyph. The guide layer (“#”)
+contains lines that are useful on a font-wide basis (such as the x-height).
+All layers should be empty to start with.
+
+<P> The window also shows the glyph's internal coordinate system via the x and
+y axes drawn in light grey. A line representing the glyph's advance width is
+drawn in black at the right edge of the window. To start with FontForge assigns
+an advance width of one em to the advance width of a new glyph.
+
+<P> For purposes of demonstation we will assume you already have a bitmap image
+of your “c” glyph.  Select the <A NAME="Import">Import</A> command from the
+File menu and import that image. It will be placed in the background layer and
+scaled so that it is as high as the em-square.
+
+<P> <IMG SRC="C2.png" WIDTH="272" HEIGHT="283">
+
+<P> Select the background layer as editable from the layers palette, move the
+mouse pointer to one of the edges of the image, hold down the shift key,
+depress and drag the corner until the image is an appropriate size. Then move
+the pointer onto the dark part of the image and depress the mouse and drag
+until the image is properly positioned as a lower-case character.  (In this
+illustration we are sizing and positioning “by eye”. It is more common, and
+advisable, to decide on an x-height for your font and add a guideline for it.)
+
+<P> <IMG SRC="C3.png" WIDTH="272" HEIGHT="283">
+
+<P> If you have downloaded the
+<A HREF="http://sourceforge.net/projects/autotrace/">autotrace program</A>
+you can invoke <CODE>Element-&gt;AutoTrace</CODE> to generate an outline
+from the image. Otherwise you must add the contours yourself. Change
+the active layer to be the foreground, and go to the tools palette and select
+the round (or curve) point. Then move the pointer to the edge of the image
+and add a point. It is generally best to add points at places where the
+curve is horizontal or vertical, at corners, or where the curve changes
+inflection (A change of inflection occurs in a curve like "S" where the curve
+changes from being open to the left to being open on the right.
+
+<P> <IMG SRC="C4.png" WIDTH="272" HEIGHT="283">
+
+<P> It is best to enter a curve in a clockwise fashion, so the next point
+should be added up at the top of the image on the flat section. Because the
+shape becomes flat here, a curve point is not appropriate. A tangent point
+makes a nice transition from curves to straight lines because the curve leaves
+the point with the same slope the line had when it entered. So we choose the 
+tangent point from the tools pallete — it is the little triangle — and add
+the point. 
+
+<P> <IMG SRC="C5.png" WIDTH="272" HEIGHT="283">
+
+<P> At the moment this "curve" doesn't much match the image; don't worry about
+that, we'll fix it later.  Note that we now have a control point attached to
+the tangent point (the little blue x). The next point needs to go where the
+image changes direction abruptly. Neither a curve nor a tangent point is
+appropriate here, instead we must use a corner point — represented by the
+little square on the tools palette. 
+
+<P> <IMG SRC="C6.png" WIDTH="272" HEIGHT="283">
+
+<P> As you see the old curve now follows the image a bit more closely. We
+continue adding points until we are ready to close the path.
+
+<P> <IMG SRC="C7.png" WIDTH="272" HEIGHT="283">
+
+<P> Then we close the path just by adding a new point on top of the old start
+point
+
+<P> <IMG SRC="C8.png" WIDTH="272" HEIGHT="283">
+
+<P> Now that the contour is closed, our job is to the curve follow the edges in
+the mage. To do this we adjust the control points — the blue “x”es.  Move these
+points around until the curve looks right.
+
+<P> <IMG SRC="C9.png" WIDTH="266" HEIGHT="279">
+
+<P> Finally we set the width. Again with the pointer tool, move the mouse to the
+width line on the right edge of the screen, depress and drag the line back
+to a reasonable location.
+
+<P> <IMG SRC="C10.png" WIDTH="266" HEIGHT="279">
+
+<P> Spacing a font well — that is, setting the left and right side bearings for
+each glyph so that all likely sequences look even and natural — is an art in
+itself. However, it is an art that depends very much on the individual glyphs,
+so it is best to set a rough value until you have added enough glyphs to work
+with. There is more on this process in XXX. 
+
+<P> If you are mathematically inclined you may be interested in the coordinates
+that fontforge shows in the upper left of the window. In many cases you can draw
+glyphs quite happily without bothering about these, but for those who are
+interested here is some basic info:
+
+<UL>
+  <LI>
+    Each glyph has its own coordinate system.
+  <LI>
+    The vertical origin is the font's baseline (the line on which most latin
+    letters rest)
+  <LI>
+    The horizontal origin is the place where drawing the glyph will commence.
+    In the example above what gets drawn initially is empty space, that is fairly
+    common, and that empty space (the distance from the origin to the left edge
+    of the glyph) is called the left side bearing.
+  <LI>
+    The units of the coordinate system are determined by the em-size of the font.
+    This is the sum of the font's ascent and descent. In the example above the
+    font's ascent is 800 and descent is 200, and the ascent line (the one just
+    above the top of the "C") is 800 units from the baseline, while the descent
+    line is 200 units below.
+  <LI>
+    So a position of 282,408 (as above) means that the cursor is 282 units right
+    of the horizontal origin and 408 units above the baseline (or roughly halfway
+    between baseline and ascent).
+</UL>
+
+<H2>Spiro</H2>
+
+<P> FontForge can also be compiled with support for a separate system of
+Clothoid splines called “Spiro”, which is described in this <A HREF="XXX">separate tutorial</A>.
+
+<H2 id="Import-Outline">Importing Outline Glyphs</H2>
+
+<P> You may prefer to your glyph outlines in some other
+vector design program (Illustrator, FreeHand, Inkscape, and so on) and then
+importing them into FontForge. How to use these other programs is beyond the
+scope of this documentation, but whatever you choose should be able to export
+a spline or “vector” format that FontForge can import. Today this is most
+likely the SVG format, but encapuslated Postscript (“eps”) is another option.
+
+<P> <IMG SRC="emptyfont-A-sel.png" WIDTH="423" HEIGHT="234" ALIGN="Right">
+
+To import the splines open the relevant glyph in Outline View select <CODE>File-&gt;Import</CODE>.
+
+<P> <IMG SRC="import.png" WIDTH="298" HEIGHT="383" ALIGN="Left">
+
+<P> This will bring up the import dialog, which starts with a filter that
+displays only image files. Change the “Format” to the one you chose, find and
+select the file you exported from the other program, and click <CODE>OK</CODE>.
+You should now have the outlines of a glyph in the fontforge editing
+window, but it may be the wrong size or in the wrong place.
+
+<P> <IMG SRC="floating-A.png" WIDTH="121" HEIGHT="162" ALIGN="Right">
+
+<P> If necessary use <CODE>Edit-&gt;Select-&gt;Select All</CODE> to select all
+the points in the image, depress the mouse on one of those points, and drag the
+entire image — in this case down to the base line, and perhaps a little over to
+the left.
+
+<H3>The Transform Dialog XXX</H3>
+
+To make the shape larger make sure that all points are still selected and then
+invoke <CODE>Element-&gt;Transform-&gt;Transform</CODE>. Select Scale Uniformly
+from one of the pulldown lists in the Transform dialog. For this case scaling
+by 140% or so is about right. However, the glyphs of most fonts should be sized
+precisely, not by eye-balling. If you design your glyphs in a uniform way in
+the program you chose you will be able to use a uniform scale factor for all of
+them, probably calculated by measuring the imported height of one, and dividing
+the desired height, in em-units, by that number.
+
+<P> In Inkscape the following approach will simplify the process:
+
+<OL>
+  <LI>
+    Open Inkscape
+  <LI>
+    From the File menu, select Document Properties.
+  <LI>
+    Set units to pixels (px) and document dimensions to 1000 x 1000, click OK<BR>
+    <SMALL>Or if your font has a different number of units per em use that, but
+    1000 is fontforge's default)</SMALL>
+  <LI>
+    Set a horizontal guide at 200px<BR>
+    Use this as your baseline.
+  <LI>
+    Draw a glyph - the hardest part! :-)
+  <LI>
+    Save the drawing as an SVG file
+  <LI>
+    Open FontForge
+  <LI>
+    From the File menu, select Import, chose SVG, find your drawing, click OK
+  <LI>
+    From the Element menu select Transform, set the Y value to -200, click OK
+</OL>
+
+<H2 id="XXX">Consistent Contour Directions (for Another Letter)</H2>
+
+<P> In the previous example the tracing image of the letter initially filled
+the canvas of the window, so that it needed to be scaled once in the program.
+This step can be avoided by adding space to the image before importing it.  If
+your images are exactly one em high then FontForge will scale them
+automatically to be the right size. In the following examples all the images
+have exactly the right amount of white-space around them to fit perfectly in an
+em.
+
+<P> For the next example we will trace an “o”, after opening that glyph in
+an Outline View and importing “o_Ambrosia.png” into it.
+
+<DIV CLASS="illustration">
+<IMG SRC="o1.png" WIDTH="190" HEIGHT="287">
+</DIV>
+<DIV CLASS="illustration">
+<IMG SRC="o2.png" WIDTH="190" HEIGHT="287">
+</DIV>
+<DIV CLASS="illustration">
+<IMG SRC="o3.png" WIDTH="190" HEIGHT="287">
+</DIV>
+<DIV CLASS="illustration">
+<IMG SRC="o4.png" WIDTH="190" HEIGHT="287">
+</DIV>
+
+<P> Notice that the first outline is clockwise and the second
+counter-clockwise. This change in drawing direction is important. Both OpenType
+and TrueType require that the outer boundary of a glyph be drawn in a certain
+direction (although they happen to be opposite from each other, which is a mild
+annoyance). Within FontForge all outer boundaries must be drawn clockwise,
+while all inner boundaries must be drawn counter-clockwise.
+
+<H2 id="consistent-stems">Creating Consistent Letters</H2>
+
+<P> Many Latin, Greek, and Cyrillic (LCG) fonts have serifs, special
+terminators at the end of stems. And glyphs in a typical LGC fonts only make
+use of a small number of stem widths, and apply those widths consistently. The
+vertical stems of "l" and "i", for example, are generally the same width.
+
+<P> FontForge does not have a means of enforcing this consistency, but it does
+have various commands to help you check for it and to find discrepancies.
+
+<P> Let us start with the letter "l" and go through the now-familiar process of
+importing a bitmap and defining its outline, with some consistency checks along
+the way.
+
+<DIV class="illustration">
+<IMG SRC="l1.png" WIDTH="35" HEIGHT="153">
+<DIV class="caption">
+Start by importing the tracing image
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="l2.png" WIDTH="134" HEIGHT="101">
+<DIV class="caption">
+Use the magnify tool to examine the bottom serif, and note that it is symmetric left to right.
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="l3.png" WIDTH="134" HEIGHT="101">
+<DIV class="caption">
+Outline the right half of the serif
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="l4.png" WIDTH="134" HEIGHT="101">
+<DIV class="caption">
+Select the outline, invoke <CODE>Edit -&gt; Copy</CODE> then <CODE>Edit
+-&gt; Paste</CODE> and finally <CODE>Element -&gt; Transform</CODE>
+<CODE>-&gt; Transform</CODE> to bring up the Transform dialog. Select 
+<CODE>Flip</CODE> from the pull down list and check <CODE>Horizontal</CODE>
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="l5.png" WIDTH="134" HEIGHT="101">
+<DIV class="caption">
+Drag the flipped serif over to the left until it snuggles up against
+the left edge of the glyph
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="l6.png" WIDTH="134" HEIGHT="101">
+<IMG SRC="l7.png" WIDTH="134" HEIGHT="101">
+<DIV class="caption">
+Deselect the path, and select one end point and drag it until
+it is on top of the end point of the other half
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="l8.png" WIDTH="35" HEIGHT="153">
+<DIV class="caption">
+Finish tracing the rest of the glyph
+</DIV>
+</DIV>
+
+<P> At this point we can do two more useful things: measure the stem width, and
+mark the height of the “l” for future reference. 
+
+<DIV class="illustration">
+<IMG SRC="l9.png" WIDTH="134" HEIGHT="101">
+<DIV class="caption">
+Select the ruler tool from the tool palette, and drag it from one edge
+of the stem to the other. A little window pops up showing the width is 58
+units, the drag direction is 180 degrees, and the drag was -58 units
+horizontally, and 0 units vertically.
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="l10.png" WIDTH="134" HEIGHT="101">
+<DIV class="caption">
+</DIV>
+Go to the layers palette and select the Guide radio box (this makes the
+guide layer editable). Then draw a line at the top of the “l”, this line
+will be visible in all glyphs and marks the ascent height of this font.
+</DIV>
+
+<H3>Copying Glyphs</H3>
+
+<P> Now let's do “i”. This glyph looks very much like a short “l” with a dot
+on top. So let's copy the “l” into the “i”; this will automatically give
+us the right stem width and the correct advance width. The copy may be done
+either from the font view — by selecting the square with the “l” in it and
+pressing <CODE>Edit-&gt;Copy</CODE> — or from the outline view — using
+<CODE>Edit-&gt;Select-&gt;Select All</CODE> and
+<CODE>Edit-&gt;Copy</CODE>. Similarly the Paste may be done either in the
+font view — by selecting the “i” square and pressing <CODE>Edit-&gt;Paste</CODE> —
+or the outline view — by opening the “i” glyph and pressing <CODE>Edit-&gt;Paste</CODE>.
+
+<DIV class="illustration">
+<IMG SRC="i1.png" WIDTH="50" HEIGHT="170">
+<DIV class="caption">
+Import the “i” image, and copy the “l” glyph.
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="i2.png" WIDTH="111" HEIGHT="170">
+<DIV class="caption">
+Select the top serif of the “l”
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="i3.png" WIDTH="111" HEIGHT="170">
+<DIV class="caption">
+Drag it down to the right height
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="i4.png" WIDTH="111" HEIGHT="170">
+<DIV class="caption">
+Go to the guide layer and add a line at the x-height
+</DIV>
+</DIV>
+
+<P> <IMG SRC="o5.png" WIDTH="85" HEIGHT="101" ALIGN="Right">
+
+<P> Let's look briefly back at the “o” we built before. You may notice that the
+“o” reaches a little above the guide line we put in to mark the x-height (and a
+little below the baseline). This is called overshoot and is an attempt to
+remedy an optical illusion. A curve actually needs to rise about 3% (of its
+diameter) above the x-height for it to appear on the x-height.
+
+<P> Let's look at “k”. Again we will copy an “l” into it and import an
+appropriate image.
+
+<DIV class="illustration">
+	<IMG SRC="k1.png" WIDTH="87" HEIGHT="151"></TD>
+<DIV class="caption">
+Import the “k” image and copy the “l” glyph. Note that the x-height line
+matches the “k” (as we would hope). Also note that the width of the “l” is
+inappropriate for “k” so we'll have to select it and drag it over.
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="k2.png" WIDTH="87" HEIGHT="151">
+<DIV class="caption">
+Select the knife tool from the palette, and cut the stem of the “l” shape
+at appropriate points for “k”.
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="k3.png" WIDTH="87" HEIGHT="151">
+<DIV class="caption">
+Remove the splines between the cut points. An easy way to do this is
+to grab the spline itself, (which selects its end points) and then do
+<CODE>Edit -&gt; Clear</CODE>.
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="k4.png" WIDTH="87" HEIGHT="151">
+<DIV class="caption">
+Select the end points and convert them into corner points with <CODE>Point
+-&gt; Corner</CODE>.
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="k5.png" WIDTH="87" HEIGHT="151">
+<DIV class="caption">
+Then draw in the outer contour.
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="k6.png" WIDTH="87" HEIGHT="151">
+<DIV class="caption">
+And the inner contour. Finally do an <CODE>Edit -&gt; Select -&gt; Select
+All </CODE>and an <CODE>Element -&gt; Correct Direction</CODE>.
+</DIV>
+</DIV>
+
+</BODY></HTML>

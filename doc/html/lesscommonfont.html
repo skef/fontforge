@@ -40,82 +40,62 @@ The House At Pooh Corner
 Font design can be a Trap, but I find it a rather pleasant one. <EM>Caveat utor</EM>.
 </DIV>
 
-<H2 id="Overview">What FontForge Is</H2>
+<H2 id="Overview">Overview</H2>
 
 FontForge is a font editor — a program designed to create and modify fonts.  It
 can open existing Postscript, TrueType and OpenType fonts, save many different
 outline formats, and generate bitmaps.
 
-<P> Like the drawing programs FreeHand, Inkscape and Illustrator it lets you
-draw the outlines of letters. But unlike those programs it is designed to
+<P> Like the drawing programs FreeHand, Inkscape and Illustrator, it lets you
+draw the outlines of letters. But unlike those programs it is designed to 
 organize the pictures you draw <EM>by</EM> letter in a kind of database.
 
-<P> It also allows you to describe the way these “pictures” interact with each
-other when translated into a font format. For example, if you put the picture
-for “n” after the picture for “o”, you can specify how much space should
-separate them. That distance is one of a fonts “metrics”. Or you might specify
-that when an “i” follows an ”f”, a different picture depicting the combination
-should be shown instead. This would be a ”ligature” — one of the ”features” of
-a font. And so on. 
+<P> It also allows you to describe the way these “pictures” interact with each other
+when translated into a font format. For example, if you put the picture for “n” after
+the picture for “o”, you can specify how much space should separate them. That distance
+is one of a fonts “metrics”. Or you might specify that when an “i” follows an ”f”, a
+different picture depicting the combination should be shown instead. This would be a
+”ligature” — one of the ”features” of a font. And so on. 
 
-<P> The role of a font editor is to keep track of all of this information and
+<P> The role of a font editor is to keep track of all of this information and 
 eventually to translate it into a ”font” — a file that a computer can use to
 display and print text. 
 
 <H3 id="intro">Introductory concepts: Fonts, Splines, Lines, Points, Paths and the em-unit</H3>
 
-<H4>Characters, names and encodings</H4>
-
 <P>At its simplest a font is a collection of <EM>glyphs</EM> — pictures of
-letters, numbers, punctuation marks, accents, and so on — designed to have a
-consistent and complementary appearance when displayed together. Therefore
-one of the most basic tasks of any font editor is to keep track of <EM>which</EM>
-letter, number, punctuation mark, etc. each glyph is a picture <EM>of</EM>. The name
-for the general category that includes letters, numbers, punctuation marks, etc.
-is “character”, and FontForge identifies characters in two ways: by Unicode
-number and by glyph name.
+letters, numbers, accents, puncutation, and so on. However, computer fonts
+generally contain many other kinds of information. At the least each must
+specify which abstract “characters” correspond to which glyphs.  This mapping
+is called an “encoding”.  Many fonts also contain rules for how adjacent glyphs
+should be arranged. For instance, in fonts for the latin alphabet, there is
+often a rule saying that if an "f" is followed by an "i" then a special glyph,
+a ligature of "f" and "i" should be used instead. Fonts for latin letters
+generally do not require such rules (but can be enhanced by them), fonts for
+other scripts like arabic require them.
 
-<P> A mapping of from integer to character is called an “encoding”. There are
-many standardized encodings, but today the most important and widely used is
-Unicode (XXXlink). The Unicode Consortium strives to develop and maintain an
-encoding with “a unique number for every character, no matter what platform,
-device, application, or language”. This encoding is sufficiently complete that
-other encodings are often described as a mapping from other integers to Unicode
-numbers. Accordingly, FontForge maps glyphs to characters by their Unicode
-numbers or “code points”.
+<H4>What is the difference between a character and a glyph?</H4>
 
-<P> There are some glyphs, however, that are not pictures of a single
-character.  For software-historical reasons Unicode maps a small number of
-latin ligatures, but not (for example) “ffi”. And although Unicode provides
-numbers for the more common accented characters, in recent years it has
-encouraged the use of separate “combining characters” for encoding diacritics.
-The other means of identifying characters, with its own history, is by name —
-typically encoded as a (7-bit ASCII) string.  In FontForge every glyph has a
-name, which (except for certain special cases) should be unique.  Ideally each
-name should provide information about what character or characters the glyph
-corresponds to, and perhaps some stylistic information.  For example, a common
-name for the glyph representing "9" is "nine". 
+<P> In effect, a character is a concept and a glyph is a reification of that
+concept. The letter "A" is a character <IMG SRC="As.png"> are all glyphs that
+represent an "A". In many latin fonts there is one glyph for every character
+supported, but this not always true.  In renaissance printing there were two
+glyphs for a lower-case s, <IMG SRC="short-long-s.png">the short and the long
+s. A ligature is a glyph that represents two or more characters. In arabic
+fonts most of the letters (characters) have at least four different glyphs,
+with the appropriate glyph being determined by not a single character but a
+group of characters in sequence.  Here are four forms of the arabic character
+"seen":
 
-<P> Adobe has established a XXX <A
-HREF="http://partners.adobe.com/public/developer/en/opentype/aglfn13.txt">standard
-for what names may be assigned to what glyphs</A> and we recommend
-following that standard.  It provides reasonably mnemonic names for most
-alphabetic letters and identifies other glyphs by Unicode code point (uniXXXX
-or uXXXXX, where "X" represents a hexidecimal digit and XXXX is the Unicode
-code point in hexidecimal). Ligatures are often named by their Adobe names separated
-by underscores, as in “f_f_i”. And stylistic alternates can be assigned a suffix
-starting with a period, as in “c.sc” for the smallcaps glyph corresponding to “c”.
-It is also usually best to have at most one glyph associated with a Unicode number,
-and to assign all ligatures and character variants the number -1, leaving them
-identified primarily by their names. 
+<P><IMG SRC="arabic-seen.png" WIDTH="108" HEIGHT="17" ALIGN="Middle">.
 
 <H4>What is an outline font? What is a bitmap font?</H4>
 
-<P> In a traditional font the picture that constitutes a glyph is just a
+<P> In a traditional font the ”picture” that constitutes a glyph is just a
 <EM>shape</EM> — a set of straight or curved lines that specify where ink (or
 its equivalent) should touch paper (or its). Different font formats have
 different means of specifying shapes, but there are two basic categories:
-<EM>outlines</EM> and <EM>bitmaps</EM>.  OpenType and TrueType fonts
+<EM>outlines</EM> and <EM>bitmaps</EM>.  PostScript and TrueType fonts
 generally specify a set of <EM>contours</EM> — lines that start and end in the same
 place and are therefore ”closed”. Each contour is encoded to indicate whether
 it encloses an area to be included — where ink would be put — or excluded — as
@@ -273,7 +253,7 @@ illustrative pictures and not their mathematical representation.  Although
 FontForge is graphical tool, some understanding of that representation is
 needed to build a well-formed font. 
 
-<P> Each point is positioned on a Cartesian coordinate system which has its
+<P> Each point is positioned on a cartesian coordinate system which has its
 origin on the glyph's <A HREF="#Baseline">baseline</A> (the line on which
 letters without descenders rest). Most font formats expect coordinates to be
 integers between -32768 and 32767, FontForge uses “floating point” numbers
@@ -326,12 +306,12 @@ zero to leave some space between it and a previously displayed glyph.  This
 horizontal distance between the origin and the leftmost edge of the glyph is
 called the “left side bearing”. It may be positive, zero, or even negative, and
 therefore points can have negative coordinates.  All glyphs have a width,
-sometimes called the “advance width”, which is the distance from the origin of
+sometimes alled the “advance width”, which is the distance from the origin of
 the current glyph to the origin of the next. The distance between the right
 edge of the glyph (the highest x value in any contour) and the width is called
 the “right side bearing”.
 
-<P> CJK — Chinese, Japanese or Korean — text can be written either vertically or
+<P> CJK text (Chinese, Japanese or Korean) can be written either vertically or
 horizontally, and accordingly CJK fonts usually have a “vertical advance width”
 as well as the more common horizontal advance with (and concomittant top and
 bottom side bearings).
@@ -348,11 +328,11 @@ not all glyphs will have exactly those heights.  The letter "O" is usually
 slightly taller than the letter "I", but they both are within the range of the
 cap height for the font.
 
-<P> In the days of metal type no glyph could extend above the ascent or below
-the descent. In digital fonts a glyph can do either, but the concept is still a
-convenient one to retain; in almost all cases a glyph should not ascend above
-or descend below the font-wide ascent and descent.  The sum of the ascent and
-descent is the size of the font. 
+<P> In the days of metal type no glyph could extend above the the ascent or
+below the descent. In digital fonts a glyph can do either, but the concept is
+still a convenient one to retain; in almost all cases a glyph should not ascend
+above or descend below the font-wide ascent and descent.  The sum of the ascent
+and descent is the size of the font. 
 
 <H4 id="References">References</H4>
 
@@ -393,9 +373,9 @@ allows references in bitmap glyphs as well as in outline glyphs.
 cannot always be preserved in a generated font.  Generally this causes no
 problems as FontForge will simply unlink the references at generation time.
 Usually this just leaves the font a little bigger, but it can have implications
-for instructing (i.e. hinting XXX) TrueType. Most people can ignore this, but
-if you are interested there is more information <A
-HREF="ref-caveats.html">here</A>.
+for instructing TrueType, and, to a lesser extent, hinting PostScript (see XXX
+below). Most people can ignore this, but if you are interested there is more
+information <A HREF="ref-caveats.html">here</A>.
 
 <P> Most font formats require that a glyph contain either a set of contours (or
 bitmap rasters) or a set of references, but not both. FontForge allows glyphs
@@ -415,7 +395,7 @@ not true of <A HREF="#Type3">Type3 fonts</A>.)
 meanings: The foreground is the default layer, and is altered by commands and
 dialogs for which there is no way to specify a layer. The background layer can
 contain whatever splines or raster images you want wish, but is usually used
-for “reference” material, including images that can be XXX auto-traced into the
+for “reference” material, including images that can be autotraced into the
 foreground layer.
 
 <P> You may add other layers with the
@@ -423,8 +403,8 @@ foreground layer.
 </A></CODE>pane. Each layer may have a name and a different kind of spline
 (quadratic or cubic).
 
-<P> One potential use of additional layers: Many people find it easier to edit
-using cubic splines but like to produce TrueType fonts with quadratic splines.
+<P> One potential use of addtional layers: Many people find it easier to edit
+using cubic splines but like to produce truetype fonts with quadratic splines.
 You can use one layer to hold the cubic splines and another to hold the
 quadratics. There is a command for comparing layers — <CODE><A
 HREF="elementmenu.html#CompareL2L">Element-&gt;Compare Layer To
@@ -443,29 +423,6 @@ and so forth. It is only the outlines which differ.) Furthermore, you may choose
 store all the layers of a font into an “sfnt” (TrueType / OpenType font) with
 the <A HREF="generate.html#Options"><CODE>[]Layers</CODE> checkbox of the
 PfaEdit table of the <CODE>[Options]</CODE></A><CODE> </CODE>dialog.
-
-<H3 id="Glyph-names">Namelists</H3>
-
-<P> If you are an English speaker and you are working with latin glyphs the
-standard Adobe names may be fine and dandy. However if you are French you might
-wish that "adieresis" were named "atréma". Someone else might prefer it to be
-named "aumlaut".  Accordingly, FontForge has a concept called a <A
-HREF="encodingmenu.html#namelist">namelist</A>, each of which is simply a
-mapping from unicode code point to name. Several namelists may be defined,
-different lists may apply to different fonts and a font may have all its glyphs
-renamed from one namelist to another.
-
-<P> Namelists can also help navigating in a font. Even if a list does not apply
-to a given font its names may be used in the “goto” dialog to find glyphs.  So if
-you've loaded a French namelist you can search for "atréma" and FontForge will
-show you the glyph "adieresis" or "uni00E4" or "aumlaut" or whatever.
-
-<P> A few caveats: Adobe's glyph name standard expects all glyph names to be in
-ASCII characters. Syntactically postscript permits a wider range of glyph
-names, but if you use non-ASCII characters some rasterizers might have
-problems.  It is best to keep non-ASCII names within FontForge to rename glyphs
-using Adobe's standard names before generating a font for a format that encodes
-names.
 
 <H2>The Main Windows</H2>
 <H3 id="FontView">Font View</H3>
@@ -519,15 +476,6 @@ into its left-hand side, but they can also be placed into separate windows. The
 upper pallette has a grid of tools while the lower palette is used to switch between
 and alter layers. 
 
-<H4>Guidelines</H4>
-
-<P> “Guidelines” are just what they sound like — lines drawn in an Outline or
-Bitmap view window to aide the construction of glyphs. As already mentioned
-some of these are added by default, including a baseline, x=0, and a width
-line. Other lines that could be helpful would be the x-height, cap height, or
-other custom heights, such as one for smallcaps.  You may also drag horizontal
-and vertical guidelines out from the edges of the outline glyph view.
-
 <H3 id="BitmapView">Bitmap View</H3>
 
 <P> <IMG SRC="BitmapView.png" WIDTH="254" HEIGHT="273">
@@ -565,63 +513,298 @@ to see things arranged vertically.
 
 <P> <IMG SRC="HebrewMetrics.png" WIDTH="511" HEIGHT="323">
 
-<H2>Going Forward</H2>
+<H3>Types of Font</H3>
 
-There are many more advanced topics this overview has skipped over, including
-how to make ligatures appear in place of the glyphs for individual characters,
-how to adjust the spacing between pairs of glyphs (a process called Kerning),
-and so forth. However, these are better discussed after a more in-depth discussion
-of FontForge's more basic features and interface in the form of a tutorial. 
+Most of the information about glyphs and metrics presented so far applies to
+almost any variety of digital font. The rest of this introduction is about
+aspects of fonts that are more specific, and to discuss these aspects we 
+need to say a bit the two font formats in most most common use at the
+present time: TrueType and OpenType. Information about some additional 
+common formats is available here XXX>
 
-<H2>OpenType Features</H2>
-
-<P> Most of the information about glyphs and metrics presented so far applies
-to almost any variety of digital font. The rest of this overview is a brief
-summary of some features available in the OpenType font format. While not every
-feature mentioned is exclusive to OpenType — a number of other font formats
-support Kerning, for example — it is the most flexible font technology with
-wide support, and FontForge's interfaces to these features were created with
-OpenType in mind. 
-
-<H3>“OpenType”</H3>
-
-<P> Although “OpenType” is the name of a popular font format, the term has come
-to have multiple meanings.
-
-<P> The first meaning describes the glyph (and spline) format of the font. In
-this sense OpenType is a font with glyphs specified with cubic splines wedged
-into the TrueType file format; from the “outside” it looks like a TrueType font,
-except that is uses Postscript Type2 font descriptions (Technically it is a <A
-HREF="glossary.html#CFF">CFF</A> font inside an <A HREF="glossary.html#SFNT">sfnt</A>
-wrapper.)
-
-<P> In a second sense of the word “OpenType” refers to a set of tables
-containing advanced typographic information. These tables may be added to
-either fonts specified with quadratic splines or fonts with cubic splines.
-Some versions of Windows also use “OpenType” to refer to fonts that include a
-DSIG digital signature. 
-
-<P> To make things even more confusing, the OpenType specification includes the
-TrueType specification, so technically any TrueType font can be called an
-OpenType font.
-
-<P> FontForge does not support the DSIG digital signature table; there is a
-free tool from MS which will add one if needed. When generating a font
-FontForge uses the term "OpenType (CFF)" to represent a PostScript (CFF) font
-inside an sfont wrapper. To include OpenType typography tables you would press
-the <CODE>[Options] </CODE>button and select the <CODE>[] OpenType</CODE> check
+<P>
+FontForge can produce many font types. What's the difference?
+<P>
+PostScript is based on a <A HREF="bezier.html">cubic spline</A> technology,
+while TrueType is based on a <A HREF="bezier.html">quadratic</A> technology.
+Cubic splines are generally easier to edit (more shapes are possible with
+them). Any quadratic spline can be converted to a cubic spline with essentially
+no loss. A cubic spline can be converted to a quadratic with arbitrary precision,
+but there will be a slight loss of accuracy in most cases.
+<P>
+Within FontForge a font may contain either cubic or quadratic splines. These
+are converted to the appropriate format when a font is generated.
+<P>
+The other major difference between the two is how they solve the problem
+of drawing nice images at small pointsizes. PostScript calls this "Hinting",
+while TrueType calls it "Instructing" a font.
+<H4>
+  What's OpenType?
+</H4>
+<P>
+Unfortunately the word "OpenType" has come to have several meanings.
+<P>
+The first meaning describes the glyph (and spline) format of the font. In
+this sense Open Type is just a postscript font put into a truetype file format
+-- From the outside it looks like a truetype font except that the outline
+descriptions are postscript Type2 font descriptions rather than TrueType.
+Technically it is a <A HREF="glossary.html#CFF">CFF</A> font inside an
+<A HREF="glossary.html#SFNT">sfnt</A> wrapper.
+<P>
+In a second sense of the word OpenType refers to a set of tables containing
+advanced typographic information. These tables may be added to either fonts
+specified with quadratic splines (truetype) or fonts with cubic splines.
+<P>
+Finally MS Windows uses an OpenType icon for a font if that font contains
+a 'DSIG' (Digital Signature) table.
+<P>
+To make things even more confusing the OpenType specification includes the
+old TrueType specification, so technically any TrueType font can be called
+an OpenType font.
+<P>
+FontForge does not support the DSIG table (if you want one there is a free
+tool from MS which will add one). When generating a font, FontForge uses
+the term "OpenType (CFF)" to represent a PostScript (CFF) font inside an
+sfont wrapper. To include OpenType typography tables you would press the
+<CODE>[Options] </CODE>button and select the <CODE>[] OpenType</CODE> check
 box.
+<H4>
+  What's SVG?
+</H4>
+<P>
+SVG (Scalable Vector Graphics) provides a relatively new font format, written
+in an xml dialect. SVG fonts can be either cubic or quadratic (or can use
+both, but FontForge is limited and will force a font to be either all cubic
+or all quadratic). SVG allows for two different types of fonts, one corresponds
+roughly to PostScript Type1 fonts, and the other, roughly to PostScript Type3
+fonts.
+<H4>
+  What are Type3 fonts?
+</H4>
+<P>
+Back in the early days of PostScript, the Type1 format was proprietary, only
+Adobe could make Type1 fonts, but anyone could make Type3 fonts. Type3 fonts
+were unhinted, but could include any postscript command and so could produce
+a wider range of pictures (multi-colored glyphs, stroked glyphs, glyphs based
+on scaled images, etc.). Most of the time these extensions are unnecessary,
+and the disadvantage of being unhinted is onerous -- but sometimes you want
+to play.
+<H4>
+  What are Type1 fonts?
+</H4>
+<P>
+These were the standard stand-alone PostScript fonts of the '80s and '90s.
+<H4>
+  What are Type2 fonts?
+</H4>
+<P>
+These use a slightly different internal format (a more compact one) to express
+the same information as type1. This is the format that lives inside a CFF
+font which lives inside an OpenType font.
+<H4>
+  What are CFF fonts?
+</H4>
+<P>
+This is the font format that is designed to store PostScript Type2 information.
+It is most commonly found inside an OpenType (PostScript) font.
+<H4>
+  What is Apple Advanced Typography?
+</H4>
+<P>
+This is another way of specifying typographic information (like ligatures,
+kerning, glyph substitutions). It appeared before OpenType and is only used
+on Apple computers. It is based on state machines and is a little harder
+to work with than OpenType.
 
-<H3 id="Scripts">Scripts</H3>
-
-<P> A <EM>script</EM> is a collection of letter shapes and rules for putting
-letters together.  For instance the latin or ”LATN”  script consists of the
-letters A-Z, written left to right, along with a transformation from upper to
-lower case, a few ligatures, and various ways of encoding accented characters.
-Arabic is a script consisting of its own character set, written right to left,
-along with transformations for initial, medial, final and isolated forms, many
-ligatures and rules for placing vowel marks.
-
+<H3>
+  <A NAME="Hints">Hints</A>
+</H3>
+<P>
+At small pixel sizes, the process of drawing the interior of an outline font
+is quite difficult to do well. PostScript and TrueType have different approaches
+to the problem of providing extra information to the rasterizer about how
+to draw small fonts.
+<TABLE BORDER CELLPADDING="2" ALIGN="Center">
+  <CAPTION>
+    <SMALL>Rasterization improvements<BR>
+    from hinting TrueType.<BR>
+    18pt font rasterized by Windows<BR>
+    (scaled by a factor of 2)</SMALL>
+  </CAPTION>
+  <TR>
+    <TD><P ALIGN=Center>
+	&nbsp;&nbsp;<IMG SRC="HI.nohints.png" WIDTH="44" HEIGHT="28">&nbsp;&nbsp;<BR>
+	no hints</TD>
+    <TD><P ALIGN=Center>
+	&nbsp;&nbsp;<IMG SRC="HI.hints.png" WIDTH="44" HEIGHT="28">&nbsp;&nbsp;<BR>
+	hints</TD>
+  </TR>
+</TABLE>
+<DL>
+  <DT>
+    <H4>
+	PostScript
+    </H4>
+  <DD>
+    Adobe incorporated several different ways of providing hints for the rasterizer
+    about how things should be treated. The most obvious of these are the horizontal
+    and vertical stem hints. Each glyph has its own set of hints to tell the
+    rasterizer where to find stems. FontForge can usually figure out a reasonable
+    set of stem hints (a process called
+    <A HREF="hintsmenu.html#AutoHint">autohinting</A>), but some glyphs are too
+    complex for it and it can make bad choices. It also provides a mode for you
+    to override its choices.
+    <P>
+    Adobe also has a mechanism for handling dished serifs called flex hinting.
+    This means a curve that is only slightly deformed from the horizontal (or
+    vertical) will display as a line at small point sizes and as a curve at larger
+    ones. FontForge will use these when it seems appropriate.
+    <P>
+    The original version of hints did not allow them to overlap, this meant that
+    most serifs could not be described, Adobe then developed a mechanism called
+    hint substitution which allows for different sets of non-overlapping hints
+    to exist in different parts of the glyph. There are still shapes which cannot
+    be fully hinted, but hint substitution is an improvement. The
+    Hints-&gt;AutoHint command will figure out what stems overlap and where to
+    change the current set of hints. The Hints-&gt;Hint Substitution Pts command
+    will also figure where hint changes should occur, and the Hint Mask pane
+    of the Point Info dialog gives the user direct control over this.
+    <P>
+    Most recently Adobe has provide a means to control the counters, the spaces
+    between stems, in a glyph. The original Type1 description provided support
+    for the horizontal counters in "m" and the vertical counters in "E" but more
+    complex shapes could not be dealt with. Counter Hints (in a type1 font) may
+    only be used with non-latin (non-greek, non-cyrillic) glyph sets, in type2
+    (OpenType) things are a bit more complicated,. FontForge will generate counter
+    hints when appropriate.
+    <P>
+    Adobe provides some font-wide hinting mechanisms. The two most obvious are
+    the BlueValues and StemSnap settings in the
+    <A HREF="fontinfo.html#Private">private dictionary</A>. BlueValues provides
+    a list of vertical zones in which interesting things happen (so in a latin
+    font this might include the ascender height, the cap-height, the x-height,
+    the baseline and the descender height. At small point sizes everything within
+    one of these zones will snap to the same height, while at larger point sizes
+    the heights will be slightly different (for instance an "o" and an "x" usually
+    have slightly different heights, but displaying that at a small point size
+    would be ugly). Similarly the StemSnap variables specify standard stem widths
+    for the font. FontForge will try to guess reasonable values for these. It
+    also allows you to override these guesses and
+    <A HREF="fontinfo.html#Private">specify your own values</A>. For a more
+    comprehensible description of the private dictionary and what it can do,
+    look at
+    <A HREF="http://partners.adobe.com/asn/developer/PDFS/TN/T1_SPEC.PDF">Adobe's
+    Type1 font specification</A>.<BR>
+    <A NAME="HintOrder">FontForge</A>'s
+    <A HREF="hintsmenu.html#AutoHint">AutoHint</A> command will work better if
+    the BlueValues have been set. So before running AutoHint go to
+    <A HREF="fontinfo.html#Private">Element-&gt; FontInfo-&gt; Private</A> to
+    set this array. After AutoHinting you should regenerate the StemSnaps (also
+    at Element-&gt; FontInfo-&gt; Private).
+  <DT>
+    <H4>
+	<A NAME="TrueType">True</A> Type
+    </H4>
+  <DD>
+    <TABLE ALIGN=Right>
+	<TR>
+	  <TD ALIGN=Center><IMG SRC="GridFitM.png" WIDTH="246" HEIGHT="241"><BR>
+	    Grid Fit M</TD>
+	</TR>
+    </TABLE>
+    <P>
+    On the other hand, True Type says that figuring out what pixels to turn on
+    would be a lot simpler if only the points and the splines were in the right
+    place (ie. at pixel boundaries). And so True Type provides a set of instructions
+    that move points around until they are positioned appropriately for a given
+    size.
+    <P>
+    FontForge's hinting of True Type (properly called "instructing") is based
+    on the stem hints also used by PostScript and on diagonal hints. It uses
+    these hints to determine which points to move and where to move them.
+    <P>
+    When FontForge reads in a TrueType font it will store the instructions used,
+    and when it next generates that font it will use those instructions -- provided
+    no significant change has happened to a glyph.
+</DL>
+<P>
+Most of my <A HREF="hinting.html">hinting user interface</A> is designed
+with PostScript fonts in mind.
+<H4>
+  <A NAME="Type3">Type3 Fonts</A>
+</H4>
+<P>
+Most people aren't interested in editing <A HREF="multilayer.html">Type3
+PostScript fonts </A>(nor the equivalent SVG font), but if you want to, FontForge
+can. Here
+each layer represents a different drawing operation, and may specify a different
+color, stroke, fill, etc. Layers are not font-wide, each glyph has its own
+set of layers (which are not named). You can
+<A HREF="multilayer.html#Layer">create new layers with a popup menu </A>in
+the layers pane of the outline view.
+<H4>
+  Guidelines
+</H4>
+<P>
+In FontForge guidelines live in their own mini-layer (it isn't a full layer
+because all glyphs share the same set of guidelines rather than having an
+individual layer for each glyph). It can be edited just like any other layer
+and you may have guidelines of any shape you desire. You may also drag out
+horizontal and vertical guidelines from the edges of the outline glyph view.
+<H3>
+  <A NAME="Scripts">Scripts</A>
+</H3>
+<P>
+A script is a collection of letter shapes and rules for putting letters together.
+For instance the latin script consists of the letters A-Z, written left to
+right, along with a transformation from upper to lower case, a few ligatures
+and rules for generating accents. Arabic is a script consisting of its own
+character set, written right to left, along with transformations for initial,
+medial, final and isolated forms, many ligatures and rules for placing vowel
+marks.
+<H3>
+  <A NAME="Glyph-names">Glyph names &amp; Namelists</A>
+</H3>
+<P>
+Within fontforge every glyph will have a name. Generally the glyph name will
+be something that provides information about what the glyph looks like so
+the name for the glyph representing "9" is "nine". Adobe has established
+a
+<A HREF="http://partners.adobe.com/public/developer/en/opentype/aglfn13.txt">standard
+for what names may be assigned to what glyphs</A>, and when producing a font
+for general use it is best to stick to that standard (Acrobat uses the glyph
+names and recognizes the standard ones. If you try and use "neuf" for "nine"
+Acrobat will not recognize it and surprising things will fail).
+<P>
+Adobe's standard provides reasonably mnemonic names for most latin and greek
+glyphs (to English speakers anyway), some rather incomprehensible names for
+cyrillic and hebrew (afiiXXXXX) and identifies most other glyphs by unicode
+code point (uniXXXX or uXXXXX where "X" represents a hex digit and XXXX is
+the unicode code point in hex).
+<P>
+If you are an english speaker and you are working with latin glyphs this
+is fine and dandy. But if you are French you might wish that "adieresis"
+were named "atréma" -- for that matter even if you are an English
+speaker you might prefer it to be named "aumlaut". No matter who you are
+you might prefer more mnemonic names for the code block you are working on.
+<P>
+FontForge has a concept called a
+<A HREF="encodingmenu.html#namelist">namelist</A>, each of which is simply
+a mapping from unicode code point to name. Several namelists may be defined,
+different lists may apply to different fonts and a font may have all its
+glyphs renamed from one namelist to another.
+<P>
+Namelists can also help navigating in a font. Even if a list does not apply
+to a given font its names may be used in the goto dialog to find glyphs.
+So if you've loaded a french namelist you can search for "atréma"
+and FontForge will show you the glyph "adieresis" or "uni00E4" or "aumlaut"
+or whatever.
+<P>
+A few caveats: Adobe's glyph name standard expects all glyph names to be
+in ASCII characters. Syntactically postscript permits a wider range of glyph
+names, but if you use non-ASCII characters some rasterizers might have problems.
+Best to keep non-ASCII names within fontforge (and rename glyphs to adobe's
+standard names before generating a font).
 <H3>
   <A NAME="Lookups">Lookups,</A> Features, Scripts and Languages
 </H3>
@@ -901,7 +1084,7 @@ points in each glyph are coincident. Mark to ligature behaves similarly to
 mark to base except that there may be more that one attachment point on the
 ligature depending on which component a given mark is connected to. Finally,
 mark to mark allows you to position two marks with respect to each other
-(as you might need to do in Vietnamese or Hebrew where you may get several
+(as you might need to do in vietnamese or hebrew where you may get several
 marks for one glyph).
 <P>
 That is badly said. Consider the following two glyphs and how they are joined

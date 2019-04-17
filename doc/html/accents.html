@@ -1,0 +1,241 @@
+<HTML>
+<HEAD>
+  <!-- Created with AOLpress/2.0 -->
+  <!-- AP: Created on: 27-Jan-2003 -->
+  <TITLE>Building accented glyphs</TITLE>
+  <LINK REL="icon" href="fftype16.png">
+  <LINK REL="stylesheet" TYPE="text/css" HREF="FontForge.css">
+</HEAD>
+<BODY>
+
+<H2>Building Accents: Manual Process</H2>
+
+<P> Latin, Greek and Cyrillic all have a large complement of accented glyphs.
+FontForge provides several ways to build accented glyphs out of base glyphs,
+the most obvious being a simple copy and paste:
+
+<OL>
+<LI> <A HREF="editmenu.html#Copy">Copy</A> the letter “a” and
+<LI> <A HREF="editmenu.html#Paste">Paste</A> it to “ã” then
+<LI> <A HREF="editmenu.html#Copy">Copy</A> the tilde accent and
+<LI> <A HREF="editmenu.html#PasteInto">Paste (it) Into</A> “ã”
+<LI> Finally, select and move the tilde accent to the right position over the “a”
+</OL>
+
+<P> Note that <CODE>Paste Into</CODE> is subtly different from
+<CODE>Paste</CODE>. Paste clears out the glyph before pasting, while Paste Into
+merges what was in the glyph with the what is in the clipboard).  Then you open
+up “ã” and position the accent so that it appears properly centered over the “a”.
+
+<P> This mechanism is not particularly robust, in that if you change the shape of
+the letter “a” you will need to edit all the accented glyphs built
+from it. FontForge has the concept of a
+<A HREF="overview.html#References">Reference</A> to a glyph. So instead of
+doing the above you can <CODE>Copy a Reference</CODE> to "a”, and
+<CODE>Paste</CODE> it, then <CODE>Copy a Reference</CODE> to
+the tilde accent and <CODE>Paste Into<CODE>, adjusting the
+position of the accent over the “a” as needed.
+
+<P> If you later change the shape of the “a”, the shape of the reference in “ã” will
+be updated automatically — as will the width of that glyph.
+
+<H2>Building Accents: Automatic Process</H2>
+
+<P> When you create an accented glyph by hand the outlines or references can be
+copied from wherever, or added directly to the glyph itself. Unicode, however,
+includes a set of “combining characters” for accents and other diacritics,
+which are not usually displayed on their own but instead modify the character 
+that precedes them. For example, when a document contains the character “a” U+0061
+followed by the combining acute accent U+0301, the glyph displayed should look
+like “á”. A complete latin-supporting font should therefore include these combining
+accents, and they are a natural source of accent references. 
+
+<P> Because FontForge is “aware” of the Unicode combining characters it can
+create a “precombined” accented glyph by doing roughly what a Unicode-compliant
+“text shaper” would, placing references from “a” and the combining tilde
+character U+0303 in the “ã” glyph and positioning the accent over the "a". (The
+Unicode consortium provides a database which lists the components of every
+accented glyph in Unicode, which FontForge uses for this and other purposes).
+
+<P> As an example, open the file: tutorial/Ambrosia.sfd, then select all the
+glyphs at encodings <CODE>0xc0</CODE> to <CODE>0xff<CODE>, and then press <A
+HREF="elementmenu.html#Accented">Element-&gt;Build-&gt;Build Accented</A>. All
+the accented glyphs will then appear. (There are a few glyphs in this range
+which are not accented, which will remain blank.)
+
+<P> FontForge has a reasonable heuristic for positioning accents — most accents
+are centered over the highest point of the glyph — but sometimes this will
+produce bad results. If the one of the two stems of “u” is slightly taller, for
+example, the accent will be centered over it rather than over the glyph as a
+whole.  You should therefore look at your accented glyphs after they are
+created and make any needed adjustments.
+
+<H2 id="Marks">Anchor Points and Combining Characters</H2>
+
+<P> Some scripts (Arabic, Hebrew) need vowel marks placed around the main text
+glyphs. Other scripts (some variants of Latin and Greek) have so many possible
+accent combinations that having pre-combined glyphs for all combinations is
+unwieldy. In OpenType (and, for these purposes, TrueType) fonts it is possible
+to indicate on all base glyphs where marks should attach by adding an
+<EM>anchor point</EM>.
+
+<P> To have an effect an anchor point must be added to both the “base” glyph
+(in our running example the “a”) and in the combining character glyph, called
+the “mark”. For the most common latin script accents the mark is centered
+slightly above the base glyph and then slightly below the mark glyph. 
+
+<DIV class="illustration">
+<IMG SRC="a_with_anchor.png" WIDTH=104 HEIGHT=208>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="grave_with_anchor.png" WIDTH=66 HEIGHT=208>
+<DIV class="caption">
+
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="agrave_anchored.png" WIDTH=104 HEIGHT=208>
+<DIV class="caption">
+&gt;
+</DIV>
+</DIV>
+
+<P> This is just a convention, however. The mark is placed so that its anchor
+point (relative to its contours) has the same coordinates as the base glyph's
+anchor point. Therefore moving the position of the anchor in both glyphs five
+units to the left or down would put leave the mark in the same place relative
+to the base.
+
+<P> The biggest advantage of anchor points is that you can put one mark in
+each base relevant glyph and one mark in each composing character glyph and
+all of those pairs will be well-positioned.  However, not all accents are
+typically centered above the letter (the dot and ogonek ride below the letter,
+for example), so you may need more than one anchor for different styles of
+attachment.
+
+<P> In some cases a user may want to put more than one accent or other
+diacritic above the same letter. Unicode character U+1EA4, for example, is an
+“A” with both a circumflex and an acute accent, and a user may want to achieve
+the same effect with combining characters. By default the circumflex and the
+acute would attach at the same anchor point, which would be ugly and confusing.
+happily there is a different flavor of anchor, called a “mark to mark” anchor. 
+this is like an anchor added to a base glyph, but sets the position of another
+mark relative to the mark glyph it is added to.
+
+<P> Note that the font format likely to make the best use of anchor points with
+combining characters is OpenType, and OpenType needs all anchors to be
+configured in a lookup table. Therefore if you expect to support combining
+characters in OpenType you should read the <A HREF="XXX">Introduction to
+OpenType</A> and configure appropriate lookups. However, FontForge also supports
+“untabled” anchor points, which can either be added to a table later or used
+is described in the next section. 
+
+<P> XXX section on adding a point with the dialog
+
+<P> For each other glyph in which an attachment will be made, you should first
+click at the point where the anchor is to be created and then bring up the
+<CODE><A HREF="pointmenu.html#AddAnchor">Point-&gt;Add Anchor</A></CODE>
+dialog.
+
+<P> You can also examine and change how a glyph fits to any others that combine
+with it by using the
+<CODE><A HREF="viewmenu.html#AnchorControl">View-&gt;Anchor
+Control...</A></CODE> command.
+
+<P> Note that not all programs and shaping engines support anchor points. And
+some may support them in some scripts but not others.
+
+<H2>Building Accents: Automatic Process with Anchor Points</H2>
+
+<P> Another advantage of anchor points that is unrelated to other programs
+is that FontForge will use them to build “pre-composed” accent glyphs in
+preference to its built-in positioning heuristic. Just add the anchor
+points before hand and follow the same instructions in XXX.
+
+<H2 id="ligature">Creating a Ligature</H2>
+
+<P> Unicode contains a number of ligature glyphs. In the latin script there are
+&AElig;”, “OE”, ”fi” and others, while in arabic there are hundreds.  The
+unicode Consortium also provides a database mapping each ligature character to
+its components.
+
+<P> FontForge cannot create a nice ligature for you, but what it can do is put
+all the components of the ligature into the glyph with <A
+HREF="elementmenu.html#Accented">Element-&gt;Build-&gt;Build Composite</A>.
+this makes it slightly easier — in the latin script, at least — to design a ligature.
+
+<DIV class="illustration">
+<IMG SRC="ffi-refs.png" ALT="ffi ligature as references" WIDTH="154" HEIGHT="277">
+<DIV class="caption">
+Use the <A HREF="elementmenu.html#CharInfo">Element -&gt; Glyph Info</A>
+dialog to name the glyph and mark it as a ligature. Then use
+<A HREF="elementmenu.html#Accented">Element -&gt; Build -&gt; Build
+Composite</A> to insert references to the ligature components.
+</DIV>
+</DIV>
+
+<DIV class="illustration">
+<IMG SRC="ffi-unlink.png" WIDTH="154" HEIGHT="277" ALT="ffi after unlinking references">
+<DIV class="caption">
+  <TD>Use the <A HREF="editmenu.html#Unlink">Edit-&gt; Unlink References</A>
+	command to turn the references into a set of contours.</TD>
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="ffi-moved.png" WIDTH="154" HEIGHT="277" ALT="ffi after lowering first f">
+<DIV class="caption">
+  <TD>Adjust the components so that they will look better together. Here the
+	stem of the first f has been lowered.</TD>
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="ffi-rmoverlap.png" ALT="ffi after doing remove overlap" WIDTH="154" HEIGHT="277">
+<DIV class="caption">
+  <TD>Use the <A HREF="elementmenu.html#Remove">Element -&gt; Remove Overlap</A>
+	command to clean up the glyph.</TD>
+</DIV>
+</DIV>
+<DIV class="illustration">
+<IMG SRC="ffi-caret.png" ALT="ffi after adjusting ligature carets" WIDTH="154" HEIGHT="277">
+<DIV class="caption">
+  <TD>Finally drag the ligature caret lines from the origin to more appropriate
+	places between the components.</TD>
+</DIV>
+</DIV>
+
+<P> Some word processors will allow the editing caret to be placed inside a
+ligature (with a caret position between each component of the ligature). This
+means that the user of that word processor does not need to know s/he is
+dealing with a ligature and sees behavior very similar to what s/he would see
+if the components were present. However, for word processor to do this needs
+information from the font designer about appropriate caret positions.  When
+FontForge notices that a glyph is a ligature it will insert in it enough caret
+location lines to fit between the ligature's components.  FontForge places
+these on the origin, and if you leave them on the origin FontForge will ignore
+them. Once you have built your ligature, however, you might want to move the
+pointer tool over to the origin line, press the button and drag one of the
+caret lines to its correct location.  (Only Apple Advanced Typography and
+OpenType support this feature).
+
+<P> There are a good many ligatures needed for the indic scripts, but Unicode
+does not encode them specifically as precombined characters or with combining
+characters. And only the most common latin script ligatures are encoded.
+However, if you wish to support a ligature that is not part of Unicode you may
+do so in some font formats, and most straightforwardly in OpenType. First <A
+HREF="faq.html#new-name">add an unencoded glyph to your font</A> (or if your
+font is a Unicode font, you could use a code point in the private use area),
+and name the glyph. The name is important; if you name it correctly FontForge
+will be able to figure out that it is a ligature and what its components are.
+If you want to build a ligature out of the glyphs "longs", "longs" and "l" then
+name it "longs_longs_l", if you want to build a ligature out of Unicode 0D15,
+0D4D and 0D15 then name it "uni0D15_uni0D4D_uni0D15".
+
+<P> Once you have named your ligature, and inserted its components (with
+<CODE>Build Composite</CODE>), you probably want to open the glyph, <A
+HREF="editmenu.html#Unlink">Unlink your References</A> and edit them to make a
+pleasing shape (as above).
+
+<P> Information about swapping your ligature in for its components using
+OpenType substitution is documented in XXX. 
+
+</BODY></HTML>
