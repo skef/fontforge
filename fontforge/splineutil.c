@@ -1731,12 +1731,21 @@ ImageList *ImageListTransform(ImageList *img, real transform[6],int everything) 
 return( head );
 }
 
-void BpTransform(BasePoint *to, BasePoint *from, real transform[6]) {
+static void _BpTransform(BasePoint *to, BasePoint *from, real transform[6], enum transformPointMask tpmask) {
     BasePoint p;
     p.x = transform[0]*from->x + transform[2]*from->y + transform[4];
     p.y = transform[1]*from->x + transform[3]*from->y + transform[5];
-    to->x = rint(1024*p.x)/1024;
-    to->y = rint(1024*p.y)/1024;
+    if ( ! (tpmask & tpmask_dontTrimValues ) ) {
+	to->x = rint(1024*p.x)/1024;
+	to->y = rint(1024*p.y)/1024;
+    } else {
+	to->x = p.x;
+	to->y = p.y;
+    }
+}
+
+void BpTransform(BasePoint *to, BasePoint *from, real transform[6]) {
+    _BpTransform(to, from, transform, 0);
 }
 
 void ApTransform(AnchorPoint *ap, real transform[6]) {
@@ -1755,13 +1764,13 @@ static void TransformPointExtended(SplinePoint *sp, real transform[6], enum tran
 	if( sp->nextcpselected )
 	{
 	    int order2 = sp->next ? sp->next->order2 : 0;
-	    BpTransform(&sp->nextcp,&sp->nextcp,transform);
+	    _BpTransform(&sp->nextcp,&sp->nextcp,transform,tpmask);
 	    SPTouchControl( sp, &sp->nextcp, order2 );
 	}
 	else if( sp->prevcpselected )
 	{
 	    int order2 = sp->next ? sp->next->order2 : 0;
-	    BpTransform(&sp->prevcp,&sp->prevcp,transform);
+	    _BpTransform(&sp->prevcp,&sp->prevcp,transform,tpmask);
 	    SPTouchControl( sp, &sp->prevcp, order2 );
 	}
     }
@@ -1770,11 +1779,11 @@ static void TransformPointExtended(SplinePoint *sp, real transform[6], enum tran
 	/**
 	 * Transform the base splinepoints.
 	 */
-	BpTransform(&sp->me,&sp->me,transform);
+	_BpTransform(&sp->me,&sp->me,transform,tpmask);
 
 	if ( !sp->nonextcp )
 	{
-	    BpTransform(&sp->nextcp,&sp->nextcp,transform);
+	    _BpTransform(&sp->nextcp,&sp->nextcp,transform,tpmask);
 	}
 	else
 	{
@@ -1783,7 +1792,7 @@ static void TransformPointExtended(SplinePoint *sp, real transform[6], enum tran
 
 	if ( !sp->noprevcp )
 	{
-	    BpTransform(&sp->prevcp,&sp->prevcp,transform);
+	    _BpTransform(&sp->prevcp,&sp->prevcp,transform,tpmask);
 	}
 	else
 	{
@@ -1822,7 +1831,7 @@ static void TransformSpiro(spiro_cp *cp, real transform[6]) {
 }
 
 static void TransformPTsInterpolateCPs(BasePoint *fromorig,Spline *spline,
-	BasePoint *toorig,real transform[6] ) {
+	BasePoint *toorig,real transform[6], enum transformPointMask tpmask ) {
     BasePoint totrans, temp;
     bigreal fraction;
 
@@ -1831,7 +1840,7 @@ static void TransformPTsInterpolateCPs(BasePoint *fromorig,Spline *spline,
     /*  last spline both from and to will have been transform. We can detect */
     /*  this because toorig will be different from &spline->to->me */
     if ( spline->to->selected && toorig==&spline->to->me )
-	BpTransform(&totrans,&spline->to->me,transform);
+	_BpTransform(&totrans,&spline->to->me,transform,tpmask);
     else
 	totrans = spline->to->me;
 
@@ -1842,9 +1851,9 @@ static void TransformPTsInterpolateCPs(BasePoint *fromorig,Spline *spline,
 	fraction = (spline->to->prevcp.x-fromorig->x)/( toorig->x-fromorig->x );
 	spline->to->prevcp.x = spline->from->me.x + fraction*( totrans.x-spline->from->me.x );
     } else {
-	BpTransform(&temp,&spline->from->nextcp,transform);
+	_BpTransform(&temp,&spline->from->nextcp,transform,tpmask);
 	spline->from->nextcp.x = temp.x;
-	BpTransform(&temp,&spline->to->prevcp,transform);
+	_BpTransform(&temp,&spline->to->prevcp,transform,tpmask);
 	spline->to->prevcp.x = temp.x;
     }
     if ( fromorig->y!=toorig->y ) {
@@ -1853,9 +1862,9 @@ static void TransformPTsInterpolateCPs(BasePoint *fromorig,Spline *spline,
 	fraction = (spline->to->prevcp.y-fromorig->y)/( toorig->y-fromorig->y );
 	spline->to->prevcp.y = spline->from->me.y + fraction*( totrans.y-spline->from->me.y );
     } else {
-	BpTransform(&temp,&spline->from->nextcp,transform);
+	_BpTransform(&temp,&spline->from->nextcp,transform,tpmask);
 	spline->from->nextcp.y = temp.y;
-	BpTransform(&temp,&spline->to->prevcp,transform);
+	_BpTransform(&temp,&spline->to->prevcp,transform,tpmask);
 	spline->to->prevcp.y = temp.y;
     }
 
@@ -1880,7 +1889,7 @@ SplinePointList *SplinePointListTransformExtended(SplinePointList *base, real tr
 	    printf("SplinePointListTransformExtended() spl->first->selected %d\n", spl->first->selected );
 	    if ( spl->first->selected ) {
 		anysel = true;
-		BpTransform(&spl->first->me,&spl->first->me,transform);
+		_BpTransform(&spl->first->me,&spl->first->me,transform,tpmask);
 	    } else
 		allsel = false;
 	    for ( spline = spl->first->next; spline!=NULL && spline!=first; spline=spline->to->next ) {
@@ -1890,7 +1899,7 @@ SplinePointList *SplinePointListTransformExtended(SplinePointList *base, real tr
 		{
 		    TransformPTsInterpolateCPs( &lastpointorig, spline,
 						spl->first==spline->to? &firstpointorig : &spline->to->me,
-						transform );
+						transform, tpmask );
 		}
 		lastpointorig = orig;
 		if ( spline->to->selected ) anysel = true; else allsel = false;
@@ -7925,3 +7934,57 @@ bigreal DistanceBetweenPoints( BasePoint *p1, BasePoint *p2 )
     return t;
 }
 
+/* Return the t value * such that the tangent angle at the point equals
+ * theta or -1 if the tangent never has that slope.
+ *
+ * A cubic spline goes through at most <360 degrees and therefore a
+ * tangent angle is never duplicated.
+ */
+
+bigreal SplineSolveForTangentAngle(Spline *spl, bigreal theta) {
+    int i;
+    real transform[6];
+    bigreal s, c;
+    extended te1, te2;
+    SplinePointList ss_orig, *ss_trans;
+
+    // Nothing to "solve" for; lines should be handled by different means
+    // because you can't "advance" along them based on slope changes
+    if ( SplineIsLinear(spl) )
+        return -1;
+
+    // Check endpoints first
+    if ( RealNear(theta,SplineTangentAngle(spl,0.0)) )
+        return 0.0;
+    if ( RealNear(theta,SplineTangentAngle(spl,1.0)) )
+        return 1.0;
+
+    // Copy and rotate the spline
+    s = sin(-theta);
+    c = cos(-theta);
+    transform[0] = c;
+    transform[1] = s;
+    transform[2] = -s;
+    transform[3] = c;
+    transform[4] = 0;
+    transform[5] = 0;
+
+    memset(&ss_orig,0,sizeof(SplinePointList));
+    ss_orig.first = spl->from;
+    ss_orig.last = spl->to;
+
+    ss_trans = SplinePointListCopy(&ss_orig);
+    ss_trans = SplinePointListTransformExtended(ss_trans, transform, tpt_AllPoints, tpmask_dontTrimValues);
+
+    // After rotating by theta the desired angle will be at a y extrema
+    SplineFindExtrema(&ss_trans->first->next->splines[1], &te1, &te2);
+    SplinePointListFree(ss_trans);
+
+    if (te1 != -1 && RealNear(theta,SplineTangentAngle(spl, te1)))
+	return te1;
+    if (te2 != -1 && RealNear(theta,SplineTangentAngle(spl, te2)))
+	return te2;
+
+    // Nothing found
+    return -1;
+}

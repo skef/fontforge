@@ -59,67 +59,59 @@ enum pentype { pt_circle, pt_square, pt_poly };
 
 typedef struct strokecontext {
     enum pentype pentype;
-    bigreal resolution;	/* take samples roughly this many em-units */ /* radius/16.0? */
+    // For circle pens
     bigreal radius;
-    bigreal radius2;	/* Squared */
-    enum linejoin join;	/* Only for circles */
-    enum linecap cap;	/* Only for circles */
-    bigreal miterlimit;	/* Only for circles if join==lj_miter */
-	    /* PostScript uses 1/sin( theta/2 ) as their miterlimit */
-	    /*  I use -cos(theta). (where theta is the angle between the slopes*/
-	    /*  same idea, different implementation */
-    int n;		/* For polygon pens */
-    BasePoint *corners;	/* Expressed as an offset from the center of the poly */ /* (Where center could mean center of bounding box, or average or all verteces) */
-    BasePoint *slopes;	/* slope[0] is unitvector corners[1]-corners[0] */
-    bigreal longest_edge;
-    unsigned int open: 1;	/* Original is an open contour */
+    bigreal radius2; // Squared
+    enum linejoin join;
+    enum linecap cap;
+    bigreal miterlimit;	// For miter joins
+	    // PostScript uses 1/sin( theta/2 ) as their miterlimit
+	    //  I use -cos(theta). (where theta is the angle between the slopes
+	    //  same idea, different implementation
+    // For polygon pens
+    int n;
+    BasePoint *corners;	// Expressed as a vector from the stroke point
+    bigreal *fromangles; // Angle in radians of slope _clockwise away from_ corner
     unsigned int remove_inner: 1;
     unsigned int remove_outer: 1;
-    /* unsigned int rotate_relative_to_direction: 1; */	/* Rotate the polygon pen so it maintains the same orientation with respect to the contour's slope */
-    /* Um, the above is essentially equivalent to a circular pen. No point in duplicating it */
-    unsigned int leave_users_center: 1;			/* Don't move the pen so its center is at the origin */
+    unsigned int leave_users_center: 1;	// Don't move the pen so its center is at the origin
     unsigned int scaled_or_rotated: 1;
     unsigned int transform_needed: 1;
+    unsigned int open: 1;	// Per-contour: whether the contour being processed is open
     real transform[6];
     real inverse[6];
 } StrokeContext;
 
-/*
-static void dumpBasePoint(FILE *f, char *nm, BasePoint *p) {
-	if (p == NULL)
-		return;
-	fprintf(f, "   <%s x='%f' y='%f'/>\n", nm, p->x, p->y);
-}
-
-static void dumpStrokePoint(FILE *f, StrokePoint *p) {
-	fprintf(f, "  <strokepoint>\n");
-	dumpBasePoint(f, "me", &(p->me));
-	dumpBasePoint(f, "edge", &(p->edge));
-	fprintf(f, "  </strokepoint>\n");
-}
-
-static void dumpStrokeContext(StrokeContext *c) {
-	FILE *f;
-	if (c == NULL)
-		return;
-	f = fopen("/tmp/strokecontext.xml", "w");
-	if (f == NULL)
-		return;
-
-	fprintf(f, "<strokecontext>\n");
-	fprintf(f, " <resolution>%f</resolution>\n", c->resolution);
-	fprintf(f, " <miterlimit>%f</miterlimit>\n", c->miterlimit);
-	fprintf(f, " <longestedge>%f</longestedge>\n", c->longest_edge);
-	fprintf(f, " <open>%d</open>\n", (int) c->open);
-	for (int k = 0; k < c->cur; k++) {
-		dumpStrokePoint(f, &(c->all[k]));
-	}
-	fprintf(f, "</strokecontext>\n");
-	fclose(f);
-}
-*/
-
 static char *glyphname=NULL;
+
+static void RotateCorners(StrokeContext *c, int first) {
+    int n = c->n;
+    BasePoint *tbp = malloc(n*sizeof(BasePoint));
+    bigreal *ta = malloc(n*sizeof(bigreal));
+
+    memcpy(tbp, c->corners, n*sizeof(BasePoint));
+    memcpy(c->corners, tbp+first, (n-first)*sizeof(BasePoint));
+    memcpy(c->corners+(n-first), tbp, first*sizeof(BasePoint));
+    memcpy(ta, c->fromangles, n*sizeof(bigreal));
+    memcpy(c->fromangles, ta+first, (n-first)*sizeof(bigreal));
+    memcpy(c->fromangles+(n-first), ta, first*sizeof(bigreal));
+    free(tbp);
+    free(ta);
+}
+
+/* Returns the index into c->corners and c->fromangles of the
+ * greatest fromangle value less than or equal to theta. If
+ * there is no such entry -1 is returned
+ */
+
+static int GreatestLTECornerIndex(StrokeContext *c, bigreal theta) {
+    int i;
+    // XXX could binary search instead.
+    for (i = 0; i<c->n; ++i)
+	if ( theta>c->fromangles[i] )
+	    return i-1;
+    return c->n-1;
+}
 
 static int AdjustedSplineLength(Spline *s) {
     /* I find the spline length in hopes of subdividing the spline into chunks*/
@@ -135,9 +127,9 @@ static int AdjustedSplineLength(Spline *s) {
     bigreal distance = sqrt(xdiff*xdiff+ydiff*ydiff);
 
     if ( len<=distance )
-return( len );			/* It's a straight line */
+	return( len );			/* It's a straight line */
     len += 1.5*(len-distance);
-return( len );
+	return( len );
 }
 
 /* Something is a valid polygonal pen if: */
@@ -148,10 +140,8 @@ return( len );
 /*	 the center of each contour to the center of all the contours. Trace  */
 /*	 each contour individually and then translate by this offset) */
 /*  3. All edges must be lines (no control points) */
-/*  4. No more than 255 corners (could extend this number, but why?) */
-/*  5. It must be drawn clockwise (not really an error, if found just invert, but important for later checks). */
-/*  6. It must be convex */
-/*  7. No extranious points on the edges */
+/*  4. It must be convex */
+/*  5. No extranious points on the edges */
 
 enum PolyType PolygonIsConvex(BasePoint *poly,int n, int *badpointindex) {
     /* For each vertex: */
@@ -227,75 +217,96 @@ return( Poly_Concave );
 return( Poly_Convex );
 }
 
-static void FindSlope(StrokePoint *p, Spline *s, bigreal t, bigreal tdiff, int peekback) {
-    bigreal len;
+/* Copies the portion of orig from t_start to t_end and translates
+ * it so that it starts at point start. The copy is then appended after 
+ * point start and the new end-point is returned. When t_start is larger
+ * than t_end the spline direction will be reversed and the point
+ * corresponding to t_end on the original spline will correspond to
+ * start on the new one.
+ *
+ * Calculations cribbed from https://stackoverflow.com/a/879213
+ */
+SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_start, bigreal t_end,
+                                 SplinePoint *start) {
+    extended u_start = 1-t_start, u_end = 1-t_end;
+    SplinePoint *end;
+    BasePoint v, qf, qcf, qct, qt;
 
-    p->sp = s;
-    p->t = t;
-    p->me.x = ((s->splines[0].a*t+s->splines[0].b)*t+s->splines[0].c)*t+s->splines[0].d;
-    p->me.y = ((s->splines[1].a*t+s->splines[1].b)*t+s->splines[1].c)*t+s->splines[1].d;
-    p->slope.x = (3*s->splines[0].a*t+2*s->splines[0].b)*t+s->splines[0].c;
-    p->slope.y = (3*s->splines[1].a*t+2*s->splines[1].b)*t+s->splines[1].c;
+    // Intermediate calculations
+    qf.x = s->from->me.x*u_start*u_start + s->from->nextcp.x*2*t_start*u_start + s->to->prevcp.x*t_start*t_start;
+    qcf.x = s->from->me.x*u_end*u_end + s->from->nextcp.x*2*t_end*u_end + s->to->prevcp.x*t_end*t_end;
+    qct.x = s->from->nextcp.x*u_start*u_start + s->to->prevcp.x*2*t_start*u_start+s->to->me.x*t_start*t_start;
+    qt.x = s->from->nextcp.x*u_end*u_end + s->to->prevcp.x*2*t_end*u_end + s->to->me.x*t_end*t_end;
 
-    if ( p->slope.x==0 && p->slope.y==0 ) {
-	/* If the control point is at the endpoint then at the endpoints we */
-	/*  have an undefined slope. Can't have that. */
-	/* I suppose it could happen elsewhere */
-	if ( peekback )
-	    p->slope = p[-1].slope;
-	else {
-	    bigreal nextt=t+tdiff;
-	    p->slope.x = (3*s->splines[0].a*nextt+2*s->splines[0].b)*nextt+s->splines[0].c;
-	    p->slope.y = (3*s->splines[1].a*nextt+2*s->splines[1].b)*nextt+s->splines[1].c;
-	    if ( p->slope.x==0 && p->slope.y==0 ) {
-		BasePoint next;
-		next.x = ((s->splines[0].a*nextt+s->splines[0].b)*nextt+s->splines[0].c)*nextt+s->splines[0].d;
-		next.y = ((s->splines[1].a*nextt+s->splines[1].b)*nextt+s->splines[1].c)*nextt+s->splines[1].d;
-		p->slope.x = next.x - p->me.x;
-		p->slope.y = next.y - p->me.y;
-	    }
-	}
-	if ( p->slope.x==0 && p->slope.y==0 ) {
-	    p->slope.x = s->to->me.x = s->from->me.x;
-	    p->slope.y = s->to->me.y = s->from->me.y;
-	}
-	if ( p->slope.x==0 && p->slope.y==0 )
-	    p->slope.x = 1;
+    qf.y = s->from->me.y*u_start*u_start + s->from->nextcp.y*2*t_start*u_start + s->to->prevcp.y*t_start*t_start;
+    qcf.y = s->from->me.y*u_end*u_end + s->from->nextcp.y*2*t_end*u_end + s->to->prevcp.y*t_end*t_end;
+    qct.y = s->from->nextcp.y*u_start*u_start + s->to->prevcp.y*2*t_start*u_start+s->to->me.y*t_start*t_start;
+    qt.y = s->from->nextcp.y*u_end*u_end + s->to->prevcp.y*2*t_end*u_end + s->to->me.y*t_end*t_end;
+
+    // Difference vector to offset other points
+    v.x = start->me.x - (qf.x*u_start + qct.x*t_start);
+    v.y = start->me.y - (qf.y*u_start + qct.y*t_start);
+    printf("vx = %lf, vy = %lf\n", v.x, v.y);
+
+    end = SplinePointCreate(qcf.x*u_end + qt.x*t_end + v.x, qcf.y*u_end + qt.y*t_end + v.y);
+
+    start->nonextcp = false; end->noprevcp = false;
+    start->nextcp.x = qf.x*u_end + qct.x*t_end + v.x;
+    start->nextcp.y = qf.y*u_end + qct.y*t_end + v.y;
+    end->prevcp.x = qcf.x*u_start + qt.x*t_start + v.x;
+    end->prevcp.y = qcf.y*u_start + qt.y*t_start + v.y;
+
+    SplineMake3(start,end);
+
+    if ( SplineIsLinear(start->next)) { // Linearish?
+        start->nextcp = start->me;
+        end->prevcp = end->me;
+        start->nonextcp = end->noprevcp = true;
+        SplineRefigure(start->next);
+    } 
+}
+
+static SplineSet *SplinesToContoursVector(SplineSet *ss, StrokeContext *c) {
+    Spline *s, *first;
+    bigreal length;
+    int i;
+    bigreal t;
+    int open = ss->first->prev == NULL;
+    SplineSet *head = NULL, *last = NULL, *cur;
+    SplinePoint *sp;
+    Spline *lspline;
+    for ( s=ss->first->next; s!=NULL && s!=first; s=s->to->next ) {
+	if ( first==NULL ) first = s;
+	length = AdjustedSplineLength(s);
+	if ( length==0 )
+	    continue;		/* We can safely ignore it because it is of zero length */
     }
-    len = p->slope.x*p->slope.x + p->slope.y*p->slope.y;
-    if ( len!=0 ) {
-	len = sqrt(len);
-	p->slope.x/=len;
-	p->slope.y/=len;
-    }
+    return head;
 }
 
 #define NIPOINTS 20
 #define NIDIFF (1.0/NIPOINTS)
 
-static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
+static SplineSet *SplinesToContoursRadial(SplineSet *ss, StrokeContext *c) {
     Spline *s, *first;
     bigreal length;
-    int i, len;
-    bigreal diff, t;
-    int open = ss->first->prev == NULL;
-    int gothere = false;
+    int i;
+    bigreal t;
     SplineSet *head = NULL, *last = NULL, *cur;
     StrokePoint *p, stp[NIPOINTS];
     TPoint l[NIPOINTS], r[NIPOINTS];
     SplinePoint *sp;
-    Spline *lspline;
 
     first = NULL;
     for ( s=ss->first->next; s!=NULL && s!=first; s=s->to->next ) {
 	if ( first==NULL ) first = s;
 	length = AdjustedSplineLength(s);
-	if ( length==0 )		/* This can happen when we have a spline with the same first and last point and no control point */
-    continue;		/* We can safely ignore it because it is of zero length */
+	if ( length==0 )
+	    continue;		/* We can safely ignore it because it is of zero length */
 	for ( i=0, t=0; i<NIPOINTS; ++i, t+= NIDIFF ) {
 	    p = &stp[i];
 	    if ( i==NIPOINTS-1 ) t = 1.0;	/* In case there were rounding errors */
-	    FindSlope(p,s,t,NIDIFF,i!=0);
+	    // FindSlope(p,s,t,NIDIFF,i!=0);
 	    l[i].x = p->me.x - c->radius*p->slope.y;
 	    l[i].y = p->me.y + c->radius*p->slope.x;
 	    l[i].t = t;
@@ -311,20 +322,28 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	    last->next = cur;
 	last = cur;
 	sp = SplinePointCreate(l[0].x, l[0].y);
-	sp->nextcp.x += stp[0].slope.x;
-	sp->nextcp.y += stp[0].slope.y;
+	//sp->pointtype = pt_corner;
+	// SetNextCPSlope(sp, stp[0].slope, 1);
 	cur->first = cur->last = sp;
+
 	sp = SplinePointCreate(l[NIPOINTS-1].x, l[NIPOINTS-1].y);
-	sp->prevcp.x -= stp[NIPOINTS-1].slope.x;
-	sp->prevcp.y -= stp[NIPOINTS-1].slope.y;
-	ApproximateSplineFromPoints(cur->last,sp,l+1,NIPOINTS-2,false);
+	//sp->pointtype = pt_corner;
+	// SetPrevCPSlope(sp, stp[NIPOINTS-1].slope, -1);
+	ApproximateSplineFromPointsSlopes(cur->last,sp,l+1,NIPOINTS-2,false);
 	cur->last = sp;
+
 	sp = SplinePointCreate(r[NIPOINTS-1].x, r[NIPOINTS-1].y);
 	SplineMake3(cur->last,sp);
+	sp->pointtype = pt_corner;
+	// SetNextCPSlope(sp, stp[NIPOINTS-1].slope, -1);
 	cur->last = sp;
+
 	sp = SplinePointCreate(r[0].x, r[0].y);
-	ApproximateSplineFromPoints(cur->last,sp,r+1,NIPOINTS-2,false);
+	sp->pointtype = pt_corner;
+	// SetPrevCPSlope(sp, stp[0].slope, 1);
+	ApproximateSplineFromPointsSlopes(cur->last,sp,r+1,NIPOINTS-2,false);
 	cur->last = sp;
+
 	SplineMake3(cur->last,cur->first);
 	cur->last = cur->first;
     }
@@ -489,8 +508,10 @@ static SplineSet *SplineSet_Stroke(SplineSet *ss,struct strokecontext *c,
 	ret = SinglePointStroke(base->first,c);
     else {
 	c->open = base->first->prev==NULL;
-	//dumpStrokeContext(c);
-	ret = SplinesToContours(base, c);
+	if ( c->pentype == pt_circle )
+	    ret = SplinesToContoursRadial(base, c);
+	else
+	    ret = SplinesToContoursVector(base, c);
     }
     if ( c->transform_needed )
 	ret = SplinePointListTransform(ret,c->inverse,tpt_AllPoints);
@@ -522,8 +543,8 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     StrokeContext c;
     SplineSet *first, *last, *cur, *ret, *active = NULL, *anext;
     SplinePoint *sp, *nsp;
-    int n, max;
-    bigreal d2, maxd2, len, maxlen;
+    int n, max, has_min_angle;
+    bigreal d2, maxd2, len, sn, co, factor, min_angle;
     DBounds b;
     BasePoint center;
     real trans[6];
@@ -532,10 +553,6 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
 	IError("centerline not handled");
 
     memset(&c,0,sizeof(c));
-    c.resolution = si->resolution;
-    if ( si->resolution==0 )
-	c.resolution = 1;
-    c.pentype = si->stroke_type==si_std ? pt_circle : pt_poly;
     c.join = si->join;
     c.cap  = si->cap;
     c.miterlimit = /* -cos(theta) */ -.98 /* theta=~11 degrees, PS miterlimit=10 */;
@@ -545,12 +562,11 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     c.remove_outer = si->removeexternal;
     c.leave_users_center = si->leave_users_center;
     c.scaled_or_rotated = si->factor!=NULL;
-    if ( c.pentype==pt_circle || c.pentype==pt_square ) {
+    if ( si->stroke_type==si_std ) {
+	c.pentype = pt_circle;
 	if ( si->minorradius==0 )
 	    si->minorradius = si->radius;
-	if ( si->minorradius!=si->radius ||
-		(si->penangle!=0 && si->stroke_type!=si_std) ) {	/* rotating a circle is irrelevant (rotating an elipse means something) */
-	    bigreal sn,co,factor;
+	if ( si->minorradius!=si->radius ) {
 	    c.transform_needed = true;
 	    sn = sin(si->penangle);
 	    co = cos(si->penangle);
@@ -558,29 +574,61 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
 	    c.transform[0] = c.transform[3] = co;
 	    c.transform[1] = -sn;
 	    c.transform[2] = sn;
-	    c.transform[1] *= factor; c.transform[3] *= factor;
+	    c.transform[1] *= factor;
+	    c.transform[3] *= factor;
 	    c.inverse[0] = c.inverse[3] = co;
 	    c.inverse[1] = sn;
 	    c.inverse[2] = -sn;
-	    c.inverse[3] /= factor; c.inverse[2] /= factor;
+	    c.inverse[3] /= factor;
+	    c.inverse[2] /= factor;
 	}
-	if ( si->resolution==0 && c.resolution>c.radius/3 )
-	    c.resolution = c.radius/3;
-    if (c.resolution == 0) {
-        ff_post_notice(_("Invalid stroke parameters"), _("Stroke resolution is zero"));
-        return SplinePointListCopy(ss);
-    }
 	ret = SplineSets_Stroke(ss,&c,order2);
-    } else {
+    } else if ( si->stroke_type==si_caligraphic ) {
+	// This is more or less si_poly with a different setup routine
+	c.pentype = pt_square;
+	memset(trans,0,sizeof(trans));
+	// If penangle is 0 and the two radii are equal this should just
+	// be the identity matrix
+	sn = sin(si->penangle);
+	co = cos(si->penangle);
+	factor = si->radius/si->minorradius;
+	trans[0] = trans[3] = co;
+	trans[1] = -sn;
+	trans[2] = sn;
+	trans[1] *= factor;
+	trans[3] *= factor;
+	c.n = 4;
+	c.corners = malloc(c.n*sizeof(BasePoint));
+	c.fromangles = malloc(c.n*sizeof(bigreal));
+	c.corners[0].x = -1; c.corners[0].y = -1;
+	c.corners[1].x = -1; c.corners[1].y = 1;
+	c.corners[2].x = 1; c.corners[2].y = 1;
+	c.corners[3].x = 1; c.corners[3].y = -1;
+	for ( n=0; n<c.n; ++n )
+	    BpTransform(c.corners+n, c.corners+n, trans);
+	has_min_angle = -1;
+	min_angle = 100;
+	for ( n=0; n<c.n; ++n ) {
+	    c.fromangles[n] = atan2(c.corners[n].y - c.corners[(n-1)%c.n].y, c.corners[n].x - c.corners[(n-1)%c.n].x);
+	    if ( c.fromangles[n]<min_angle ) {
+		has_min_angle = n;
+		min_angle = c.fromangles[n];
+	    }
+	}
+	RotateCorners(&c, n);
+	ret = SplineSets_Stroke(ss,&c,order2);
+	free(c.corners);
+	free(c.fromangles);
+    } else if ( si->stroke_type==si_poly ) {
+	c.pentype = pt_poly;
 	first = last = NULL;
 	max = 0;
 	memset(&center,0,sizeof(center));
-        // if ( c.pentype==pt_square ) { # make poly for square
 	for ( active=si->poly; active!=NULL; active=active->next ) {
 	    for ( sp=active->first, n=0; ; ) {
 		++n;
 		if ( sp->next==NULL )
-return( NULL );				/* That's an error, must be closed */
+		    return( NULL ); // Error: must be closed
 		sp=sp->next->to;
 		if ( sp==active->first )
 	    break;
@@ -589,7 +637,7 @@ return( NULL );				/* That's an error, must be closed */
 		max = n;
 	}
 	c.corners = malloc(max*sizeof(BasePoint));
-	c.slopes  = malloc(max*sizeof(BasePoint));
+	c.fromangles  = malloc(max*sizeof(bigreal));
 	memset(trans,0,sizeof(trans));
 	trans[0] = trans[3] = 1;
 	if ( !c.leave_users_center ) {
@@ -612,36 +660,25 @@ return( NULL );				/* That's an error, must be closed */
 		SplinePointListTransform(active,trans,tpt_AllPoints);	/* Only works if pen is fixed and does not rotate or get scaled */
 		active->next = anext;
 	    }
-	    maxd2 = 0; maxlen = 0;
+	    maxd2 = 0;
+	    has_min_angle = -1;
+	    min_angle = 100;
 	    for ( sp=active->first, n=0; ; ) {
 		nsp = sp->next->to;
 		c.corners[n] = sp->me;
-		c.slopes[n].x = nsp->me.x - sp->me.x;
-		c.slopes[n].y = nsp->me.y - sp->me.y;
-		len = c.slopes[n].x*c.slopes[n].x + c.slopes[n].y*c.slopes[n].y;
-		len = sqrt(len);
-		if ( len>maxlen ) maxlen = len;
-		if ( len!=0 ) {
-		    c.slopes[n].x/=len; c.slopes[n].y/=len;
+		c.fromangles[n] = atan2(nsp->me.y - sp->me.y, nsp->me.x - sp->me.x);
+		if ( c.fromangles[n]<min_angle ) {
+		    has_min_angle = n;
+		    min_angle = c.fromangles[n];
 		}
-		d2 = sp->me.x*sp->me.x + sp->me.y*sp->me.y;
-		if ( d2>maxd2 )
-		    maxd2 = d2;
+		printf("corner %d: x = %f, y = %f, angle = %f\n", n, sp->me.x, sp->me.y, c.fromangles[n]);
 		++n;
 		sp=nsp;
 		if ( sp==active->first )
-	    break;
+		    break;
 	    }
+	    RotateCorners(&c, n);
 	    c.n = n;
-	    c.longest_edge = maxlen;
-	    c.radius = sqrt(maxd2);
-	    c.radius2 = maxd2;
-	    if ( si->resolution==0 && c.resolution>c.radius/3 )
-		c.resolution = c.radius/3;
-        if (c.resolution == 0) {
-            ff_post_notice(_("Invalid stroke parameters"), _("Stroke resolution is zero"));
-            return SplinePointListCopy(ss);
-        }
 	    cur = SplineSets_Stroke(ss,&c,order2);
 	    if ( !c.scaled_or_rotated ) {
 		trans[4] = -trans[4]; trans[5] = -trans[5];
@@ -665,7 +702,7 @@ return( NULL );				/* That's an error, must be closed */
 		    last = last->next;
 	}
 	free(c.corners);
-	free(c.slopes);
+	free(c.fromangles);
 	ret = first;
     }
 return( ret );
