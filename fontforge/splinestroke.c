@@ -264,24 +264,122 @@ SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_start, bigreal t_end,
         start->nonextcp = end->noprevcp = true;
         SplineRefigure(start->next);
     } 
+    return end;
+}
+
+int AnglesIncreasing(bigreal theta1, bigreal theta2, bigreal theta3) {
+    bigreal d12, d23;
+
+    return fmod(theta2-theta1+2*PI, 2*PI) + fmod(theta3-theta2+2*PI, 2*PI) < 2*PI;
+}
+
+static int NextCorner(StrokeContext *c, int i, int dir_up) {
+    int d = dir_up ? 1 : -1;
+    return (i + c->n + d) % c->n;
 }
 
 static SplineSet *SplinesToContoursVector(SplineSet *ss, StrokeContext *c) {
-    Spline *s, *first;
-    bigreal length;
-    int i;
-    bigreal t;
-    int open = ss->first->prev == NULL;
-    SplineSet *head = NULL, *last = NULL, *cur;
+    Spline *s, *first=NULL;
+    int i, dir_up, cci, ncci, linear;
+    bigreal last_t, t, theta, righttheta, endtheta, prevendtheta, tx, ty;
+    SplineSet *left=NULL, *right=NULL, *cur;
     SplinePoint *sp;
     Spline *lspline;
+
+    if ( !c->remove_outer || c->open )
+	left = chunkalloc(sizeof(SplineSet));
+    if ( !c->remove_inner || c->open )
+	right = chunkalloc(sizeof(SplineSet));
+
     for ( s=ss->first->next; s!=NULL && s!=first; s=s->to->next ) {
-	if ( first==NULL ) first = s;
-	length = AdjustedSplineLength(s);
-	if ( length==0 )
+	if ( first==NULL )
+	    first = s;
+	if ( AdjustedSplineLength(s)==0 )
 	    continue;		/* We can safely ignore it because it is of zero length */
+	theta = SplineTangentAngle(s, 0.0);
+	righttheta = theta+PI;
+	if ( righttheta > PI )
+	    righttheta -= 2*PI;
+	linear = SplineIsLinearish(s);
+	if ( linear ) {
+	    endtheta = theta;
+	} else {
+	    endtheta = SplineTangentAngle(s, 1.0);
+	    dir_up = AnglesIncreasing(theta, SplineTangentAngle(s, 0.5), endtheta);
+	}
+	for ( i=0; i<2; ++i ) { // 0 is left, 1 is right
+	    if ( i==0 ) {
+		if ( left==NULL )
+		    continue;
+		cci = GreatestLTECornerIndex(c, theta);
+		cur = left;
+	    } else {
+		if ( right==NULL )
+		    continue;
+		cci = GreatestLTECornerIndex(c, righttheta);
+		cur = right;
+	    }
+	    // Create or verify starting point
+	    tx = s->from->me.x+c->corners[cci].x;
+	    ty = s->from->me.y+c->corners[cci].y;
+	    if ( cur->first==NULL ) {
+		cur->first = SplinePointCreate(tx, ty);
+		cur->last = cur->first;
+	    } else if ( cur->last->me.x != tx || cur->last->me.y != ty ) {
+		sp = SplinePointCreate(tx, ty);
+		SplineMake3(cur->last, sp);
+		cur->last = sp;
+	    }
+	    if ( linear ) {
+		sp = SplinePointCreate(s->to->me.x+c->corners[cci].x, s->to->me.y+c->corners[cci].y);
+		SplineMake3(cur->last, sp);
+		cur->last = sp;
+	    } else {
+		t = 0.0;
+		while ( t < 1.0 ) {
+		    last_t = t;
+		    ncci = NextCorner(c, cci, dir_up);
+		    t = SplineSolveForTangentAngle(s, c->fromangles[ncci]);
+		    if (t == -1.0)
+			t = 1.0;
+		    sp = AppendCubicSplinePortion(s, last_t, t, cur->last);
+		    cur->last = sp;
+		    sp = SplinePointCreate(sp->me.x-c->corners[cci].x+c->corners[ncci].x, sp->me.y-c->corners[cci].y+c->corners[ncci].y);
+		    SplineMake3(cur->last, sp);
+		    cur->last = sp;
+		    cci = ncci;
+		}
+	    }
+	}
     }
-    return head;
+    if ( (left && left->first==NULL) || (right && right->first==NULL) ) { // No non-zero-length splines.
+	chunkfree(left, sizeof(SplineSet));
+	chunkfree(right, sizeof(SplineSet));
+	return NULL;
+    }
+    if ( !c->open ) {
+	SplineSetReverse(right);
+	SplineMake3(left->last, right->first);
+	SplineMake3(right->last, left->first);
+	left->last = left->first;
+	right = NULL;
+    } else {
+	if ( left!=NULL ) {
+	    SplineMake3(left->last, left->first);
+	    left->last = left->first;
+	}
+	if ( right!=NULL ) {
+	    if ( left != NULL ) {
+		SplineSetReverse(right);
+		left->next = right;
+	    } else
+		left = right;
+	    SplineMake3(right->last, right->first);
+	    right->last = right->first;
+	    right = NULL;
+	}
+    }
+    return left;
 }
 
 #define NIPOINTS 20
@@ -609,7 +707,7 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
 	has_min_angle = -1;
 	min_angle = 100;
 	for ( n=0; n<c.n; ++n ) {
-	    c.fromangles[n] = atan2(c.corners[n].y - c.corners[(n-1)%c.n].y, c.corners[n].x - c.corners[(n-1)%c.n].x);
+	    c.fromangles[n] = atan2(c.corners[n].y - c.corners[(c.n+n-1)%c.n].y, c.corners[n].x - c.corners[(c.n+n-1)%c.n].x);
 	    if ( c.fromangles[n]<min_angle ) {
 		has_min_angle = n;
 		min_angle = c.fromangles[n];
