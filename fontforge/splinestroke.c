@@ -357,6 +357,11 @@ static SplineSet *SplinesToContoursVector(SplineSet *ss, StrokeContext *c) {
 	chunkfree(right, sizeof(SplineSet));
 	return NULL;
     }
+    if ( left && right) {
+	left->next = right;
+	left->first->name = copy("L");
+	return left;
+    }
     if ( !c->open ) {
 	SplineSetReverse(right);
 	SplineMake3(left->last, right->first);

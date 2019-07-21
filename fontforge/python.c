@@ -1717,6 +1717,53 @@ Py_RETURN_NONE;
 return( reto );
 }
 
+extern int AnglesIncreasing(bigreal theta1, bigreal theta2, bigreal theta3);
+
+static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
+    SplineSet *ss, *ss2;
+    PyObject *obj, *obj2;
+    Spline *s;
+    double t, t2, calc_t, theta;
+
+    if ( PyArg_ParseTuple(args,"Od", &obj, &t) ) {
+	ss = SSFromContour((PyFF_Contour *) obj, NULL);
+	if ( ss==NULL )
+	    return NULL;
+
+	theta = SplineTangentAngle(ss->first->next, t);
+	printf("theta: %lf\n", theta);
+	calc_t = SplineSolveForTangentAngle(ss->first->next, theta);
+	printf("calc_t: %lf\n", calc_t);
+	SplinePointListFree(ss);
+	Py_RETURN_NONE;
+    }
+    PyErr_Clear();
+    if ( PyArg_ParseTuple(args,"OddO", &obj, &t, &t2, &obj2) ) {
+	ss = SSFromContour((PyFF_Contour *) obj, NULL);
+	if ( ss==NULL )
+	    return NULL;
+	ss2 = SSFromContour((PyFF_Contour *) obj2, NULL);
+	if ( ss2==NULL )
+	    return NULL;
+	AppendCubicSplinePortion(ss->first->next, t, t2, ss2->last);
+	obj = (PyObject *) ContourFromSS(ss2, NULL);
+	SplinePointListFree(ss);
+	SplinePointListFree(ss2);
+	return obj;
+    }
+    PyErr_Clear();
+    if ( PyArg_ParseTuple(args,"OO", &obj, &obj2) ) {
+	ss = SSFromContour((PyFF_Contour *) obj, NULL);
+	if ( ss==NULL )
+	    return NULL;
+	s = ss->first->next;
+	AnglesIncreasing(SplineTangentAngle(s, 0.0), SplineTangentAngle(s, 0.5), SplineTangentAngle(s, 1.0));
+	Py_RETURN_NONE;
+    }
+    PyErr_Format(PyExc_ValueError, "Not Recognized");
+    return NULL;
+}
+
 /* ************************************************************************** */
 /* Points */
 /* ************************************************************************** */
@@ -18499,6 +18546,7 @@ PyMethodDef module_fontforge_methods[] = {
     { "ask", PyFF_ask, METH_VARARGS, "Pops up a dialog asking the user a question and providing a set of buttons for the user to reply with" },
     { "askChoices", PyFF_askChoices, METH_VARARGS, "Pops up a dialog asking the user a question and providing a scrolling list for the user to reply with" },
     { "askString", PyFF_askString, METH_VARARGS, "Pops up a dialog asking the user a question and providing a textfield for the user to reply with" },
+    { "testCode", PyFF_testCode, METH_VARARGS, "Run some test code" },
     // Leave some sentinel slots here so that the UI
     // code can add it's methods to the end of the object declaration.
     PYMETHODDEF_EMPTY,
