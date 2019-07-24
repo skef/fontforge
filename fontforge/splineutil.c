@@ -114,6 +114,19 @@ void chunktest(void) {
 }
 #endif
 
+static void SplineCompare(Spline *s1, Spline *s2) {
+    for (int i = 0; i < 2; ++i) {
+        if (! RealNear(s1->splines[i].a, s2->splines[i].a) )
+	    printf("Bad Spline Compare splines[%d].a %lf %lf\n", i, s1->splines[i].a, s2->splines[i].a);
+        if (! RealNear(s1->splines[i].b, s2->splines[i].b) )
+	    printf("Bad Spline Compare splines[%d].b %lf %lf\n", i, s1->splines[i].b, s2->splines[i].b);
+        if (! RealNear(s1->splines[i].c, s2->splines[i].c) )
+	    printf("Bad Spline Compare splines[%d].c %lf %lf\n", i, s1->splines[i].c, s2->splines[i].c);
+        if (! RealNear(s1->splines[i].d, s2->splines[i].d) )
+	    printf("Bad Spline Compare splines[%d].d %lf %lf\n", i, s1->splines[i].d, s2->splines[i].d);
+    }
+}
+
 char *strconcat(const char *str1,const char *str2) {
     char *ret;
     int len1 = strlen(str1);
@@ -1746,6 +1759,14 @@ static void _BpTransform(BasePoint *to, BasePoint *from, real transform[6], enum
 
 void BpTransform(BasePoint *to, BasePoint *from, real transform[6]) {
     _BpTransform(to, from, transform, 0);
+}
+
+static void BpTransformDouble(BasePoint *to, BasePoint *from, bigreal transform[6]) {
+    BasePoint p;
+    p.x = transform[0]*from->x + transform[2]*from->y + transform[4];
+    p.y = transform[1]*from->x + transform[3]*from->y + transform[5];
+    to->x = p.x;
+    to->y = p.y;
 }
 
 void ApTransform(AnchorPoint *ap, real transform[6]) {
@@ -7934,19 +7955,18 @@ bigreal DistanceBetweenPoints( BasePoint *p1, BasePoint *p2 )
     return t;
 }
 
-/* Return the t value * such that the tangent angle at the point equals
- * theta or -1 if the tangent never has that slope.
+/* Return the t value * such that the tangent at the point is
+ * parallel to s, or -1 if the tangent never has that slope.
  *
  * A cubic spline goes through at most <360 degrees and therefore a
  * tangent angle is never duplicated.
  */
 
-bigreal SplineSolveForTangentAngle(Spline *spl, bigreal theta) {
-    int i;
+bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut) {
     real transform[6];
-    bigreal s, c;
     extended te1, te2;
-    SplinePointList ss_orig, *ss_trans;
+    SplinePoint t_from, t_to;
+    Spline t_spline;
 
     // Nothing to "solve" for; lines should be handled by different means
     // because you can't "advance" along them based on slope changes
@@ -7954,35 +7974,44 @@ bigreal SplineSolveForTangentAngle(Spline *spl, bigreal theta) {
         return -1;
 
     // Check endpoints first
-    if ( RealNear(theta,SplineTangentAngle(spl,0.0)) )
+    if ( UTanVecNear(ut, SplineUTanVecAt(spl, 0.0)) )
         return 0.0;
-    if ( RealNear(theta,SplineTangentAngle(spl,1.0)) )
+    if ( UTanVecNear(ut, SplineUTanVecAt(spl, 1.0)) )
         return 1.0;
 
-    // Copy and rotate the spline
-    s = sin(-theta);
-    c = cos(-theta);
-    transform[0] = c;
-    transform[1] = s;
-    transform[2] = -s;
-    transform[3] = c;
+    // Copy the spline and rotate back to bring the slope to zero
+    transform[0] = ut.x;
+    transform[1] = -ut.y;
+    transform[2] = ut.y;
+    transform[3] = ut.x;
     transform[4] = 0;
     transform[5] = 0;
 
-    memset(&ss_orig,0,sizeof(SplinePointList));
-    ss_orig.first = spl->from;
-    ss_orig.last = spl->to;
+    memset(&t_from, 0, sizeof(SplinePoint));
+    memset(&t_to, 0, sizeof(SplinePoint));
+    memset(&t_spline, 0, sizeof(Spline));
 
-    ss_trans = SplinePointListCopy(&ss_orig);
-    ss_trans = SplinePointListTransformExtended(ss_trans, transform, tpt_AllPoints, tpmask_dontTrimValues);
+    _BpTransform(&t_from.me, &spl->from->me, transform, tpmask_dontTrimValues);
+    _BpTransform(&t_from.nextcp, &spl->from->nextcp, transform, tpmask_dontTrimValues);
+    t_from.nonextcp = spl->from->nonextcp;
+    _BpTransform(&t_to.me, &spl->to->me, transform, tpmask_dontTrimValues);
+    _BpTransform(&t_to.prevcp, &spl->to->prevcp, transform, tpmask_dontTrimValues);
+    t_to.noprevcp = spl->to->noprevcp;
+
+    t_spline.from = &t_from; t_spline.to = &t_to;
+    t_from.next = t_to.prev = &t_spline;
+    SplineRefigure3(&t_spline);
 
     // After rotating by theta the desired angle will be at a y extrema
-    SplineFindExtrema(&ss_trans->first->next->splines[1], &te1, &te2);
-    SplinePointListFree(ss_trans);
+    SplineFindExtrema(&t_spline.splines[1], &te1, &te2);
 
-    if (te1 != -1 && RealNear(theta,SplineTangentAngle(spl, te1)))
+    BasePoint tmp1 = SplineUTanVecAt(spl, te1), tmp2 = SplineUTanVecAt(spl, te2);
+
+    printf("target: %lf,%lf, te1: %lf, slope1: %lf,%lf, te2: %lf, slope2: %lf,%lf\n", ut.x, ut.y, (double)te1, tmp1.x, tmp1.y, (double)te2, tmp2.x, tmp2.y);
+
+    if (te1 != -1 && UTanVecNear(ut, SplineUTanVecAt(spl, te1)))
 	return te1;
-    if (te2 != -1 && RealNear(theta,SplineTangentAngle(spl, te2)))
+    if (te2 != -1 && UTanVecNear(ut, SplineUTanVecAt(spl, te2)))
 	return te2;
 
     // Nothing found

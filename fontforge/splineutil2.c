@@ -349,32 +349,6 @@ return( true );
 return( spline->islinear );
 }
 
-int SplineIsLinearish(Spline *spline) {
-    int i;
-    real dmax = 0, dtmp, ldx, ldy, ln;
-    BasePoint *sp, *ep, *cp;
-
-    if ( SplineIsLinear(spline) )
-	return 1;
-
-    sp = &spline->from->me;
-    ep = &spline->to->me;
-    ldx = ep->x - sp->x;
-    ldy = ep->y - sp->y;
-    ln = sqrt(ldy*ldy + ldx*ldx);
-
-    for (i = 0; i < 2; ++i) {
-	if ( i==0 )
-	    cp = &spline->from->nextcp;
-	else
-	    cp = &spline->to->prevcp;
-	dtmp = fabs(ldy*cp->x - ldx*cp->y + ep->x*sp->y - ep->y*sp->x)/ln;
-	if (dtmp > dmax)
-	    dmax = dtmp;
-    }
-    return ( ln/dmax >= 500 );
-}
-
 static Spline *IsLinearApprox(SplinePoint *from, SplinePoint *to,
 	TPoint *mid, int cnt, int order2) {
     bigreal vx, vy, slope;
@@ -2545,6 +2519,37 @@ void SPLNearlyHvLines(SplineChar *sc,SplineSet *ss,bigreal err) {
 	    }
 	}
     }
+}
+
+/* The older check below is based on an absolute distance
+ * and is therefore magnification-relative. This one is
+ * (more or less) hull-based with a ratio of 500 visually
+ * verified at multiple magnifications.
+ */
+int SplineIsLinearish(Spline *spline) {
+    int i;
+    real dmax = 0, dtmp, ldx, ldy, ln;
+    BasePoint *sp, *ep, *cp;
+
+    if ( SplineIsLinear(spline) )
+	return 1;
+
+    sp = &spline->from->me;
+    ep = &spline->to->me;
+    ldx = ep->x - sp->x;
+    ldy = ep->y - sp->y;
+    ln = sqrt(ldy*ldy + ldx*ldx);
+
+    for (i = 0; i < 2; ++i) {
+	if ( i==0 )
+	    cp = &spline->from->nextcp;
+	else
+	    cp = &spline->to->prevcp;
+	dtmp = fabs(ldy*cp->x - ldx*cp->y + ep->x*sp->y - ep->y*sp->x)/ln;
+	if (dtmp > dmax)
+	    dmax = dtmp;
+    }
+    return ( ln/dmax >= 500 );
 }
 
 /* Does this spline deviate from a straight line between its endpoints by more*/
@@ -5181,33 +5186,50 @@ return( true );
 return( false );
 }
 
+BasePoint UTanVectorize(bigreal x, bigreal y) {
+    BasePoint ret = { 0.0, 0.0 };
+    bigreal len = x*x + y*y;
+    if ( len!=0 ) {
+	len = sqrt(len);
+	ret.x = x/len;
+	ret.y = y/len;
+    }
+    return ret;
+}
+
+int UTanVecNear(BasePoint ut1, BasePoint ut2) {
+    return RealNear(ut1.x, ut2.x) && RealNear(ut1.y, ut2.y);
+}
+
 static bigreal Spline1DTangentVal(Spline1D *s, bigreal t) {
     return (3*s->a*t + 2*s->b)*t + s->c;
 }
 
-bigreal SplineTangentAngle(Spline *s, bigreal t) {
-    bigreal x, y, tmp, d;
-    int i;
+BasePoint SplineUTanVecAt(Spline *s, bigreal t) {
+    bigreal x, y;
 
-    if ( SplineIsLinear(s) )
-        return atan2(s->to->me.y - s->from->me.y, s->to->me.x - s->from->me.x);
+    if ( SplineIsLinear(s) ) {
+	x = s->to->me.x - s->from->me.x;
+	y = s->to->me.y - s->from->me.y;
+    } else {
+	x = Spline1DTangentVal(&s->splines[0], t);
+	y = Spline1DTangentVal(&s->splines[1], t);
 
-    x = Spline1DTangentVal(&s->splines[0], t);
-    y = Spline1DTangentVal(&s->splines[1], t);
+	if ( x==0 && y==0 ) {
 
-    if ( x!=0 || y!=0 )
-	return atan2(y, x);
+	    /* For missing slopes take a very small step away (smaller than RealNear())
+	     * and try again. The common (only?) source of a missing slope is when one
+	     * control point is co-located with is on-curve point and the other isn't.
+	     */
 
-    /* For missing slopes take a very small step away (smaller than RealNear())
-     * and try again. The common (only?) source of a missing slope is when one
-     * control point is co-located with is on-curve point and the other isn't.
-     */
-    if ( t+1e-9 <= 1.0 )
-	t += 1e-9;
-    else
-	t -= 1e-9;
+	    if ( t+1e-9 <= 1.0 )
+		t += 1e-9;
+	    else
+		t -= 1e-9;
 
-    x = Spline1DTangentVal(&s->splines[0], t);
-    y = Spline1DTangentVal(&s->splines[1], t);
-    return atan2(y, x);
+	    x = Spline1DTangentVal(&s->splines[0], t);
+	    y = Spline1DTangentVal(&s->splines[1], t);
+	}
+    }
+    return UTanVectorize(x, y);
 }
