@@ -2200,7 +2200,6 @@ static bigreal SecondDerivative(Spline *s,bigreal t) {
     bigreal d2ydt2 = 6*s->splines[1].a*t + 2*s->splines[1].b;
     bigreal d2xdt2 = 6*s->splines[0].a*t + 2*s->splines[0].b;
     bigreal top = (d2ydt2*dxdt - dydt*d2xdt2);
-
     if ( dxdt==0 ) {
 	if ( top==0 )
 return( 0 );
@@ -5201,6 +5200,13 @@ int UTanVecNear(BasePoint ut1, BasePoint ut2) {
     return RealNear(ut1.x, ut2.x) && RealNear(ut1.y, ut2.y);
 }
 
+BasePoint UTanVecDiff(BasePoint ut_ref, BasePoint ut_vec) {
+    BasePoint ret;
+    ret.x = ut_ref.x*ut_vec.x + ut_ref.y*ut_vec.y; // dot product
+    ret.y = ut_ref.x*ut_vec.y - ut_ref.y*ut_vec.x; // mag of cross product
+    return ret;
+}
+
 static bigreal Spline1DTangentVal(Spline1D *s, bigreal t) {
     return (3*s->a*t + 2*s->b)*t + s->c;
 }
@@ -5232,4 +5238,16 @@ BasePoint SplineUTanVecAt(Spline *s, bigreal t) {
 	}
     }
     return UTanVectorize(x, y);
+}
+
+int SplineTurningCWAt(Spline *s, bigreal t) {
+    bigreal tmp = SecondDerivative(s, t);
+    if ( tmp==0 ) { 
+	if ( t+1e-9 <= 1.0 )
+	    t += 1e-9;
+	else
+	    t -= 1e-9;
+    	tmp = SecondDerivative(s, t);
+    }
+    return tmp < 0;
 }

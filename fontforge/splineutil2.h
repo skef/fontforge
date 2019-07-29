@@ -70,7 +70,9 @@ extern void SPLStartToLeftmost(SplineChar *sc, SplinePointList *spl, int *change
 extern void SPSmoothJoint(SplinePoint *sp);
 
 extern BasePoint SplineUTanVecAt(Spline *s, bigreal t);
+extern int SplineTurningCWAt(Spline *s, bigreal t);
 extern int UTanVecNear(BasePoint s1, BasePoint s2);
+extern BasePoint UTanVecDiff(BasePoint s1, BasePoint s2);
 extern BasePoint UTanVectorize(bigreal x, bigreal y);
 
 /**

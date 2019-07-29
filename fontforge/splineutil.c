@@ -7955,14 +7955,12 @@ bigreal DistanceBetweenPoints( BasePoint *p1, BasePoint *p2 )
     return t;
 }
 
-/* Return the t value * such that the tangent at the point is
- * parallel to s, or -1 if the tangent never has that slope.
- *
- * A cubic spline goes through at most <360 degrees and therefore a
- * tangent angle is never duplicated.
+/* Return the lowest t value greater than min_t such that the
+ * tangent at the point is parallel to ut, or -1 if the tangent
+ * never has that slope.
  */
 
-bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut) {
+bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
     real transform[6];
     extended te1, te2;
     SplinePoint t_from, t_to;
@@ -8002,6 +8000,7 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut) {
     t_from.next = t_to.prev = &t_spline;
     SplineRefigure3(&t_spline);
 
+//    printf("(%lf, %lf), (%lf, %lf), (%lf, %lf), (%lf, %lf)\n", t_from.me.x, t_from.me.y, t_from.nextcp.x, t_from.nextcp.y, t_to.prevcp.x, t_to.prevcp.y, t_to.me.x, t_to.me.y);
     // After rotating by theta the desired angle will be at a y extrema
     SplineFindExtrema(&t_spline.splines[1], &te1, &te2);
 
@@ -8009,9 +8008,9 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut) {
 
     printf("target: %lf,%lf, te1: %lf, slope1: %lf,%lf, te2: %lf, slope2: %lf,%lf\n", ut.x, ut.y, (double)te1, tmp1.x, tmp1.y, (double)te2, tmp2.x, tmp2.y);
 
-    if (te1 != -1 && UTanVecNear(ut, SplineUTanVecAt(spl, te1)))
+    if (te1 != -1 && te1 > min_t && UTanVecNear(ut, SplineUTanVecAt(spl, te1)))
 	return te1;
-    if (te2 != -1 && UTanVecNear(ut, SplineUTanVecAt(spl, te2)))
+    if (te2 != -1 && te2 > min_t && UTanVecNear(ut, SplineUTanVecAt(spl, te2)))
 	return te2;
 
     // Nothing found

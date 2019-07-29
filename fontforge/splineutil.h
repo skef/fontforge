@@ -96,7 +96,7 @@ extern SplineSet *LayerAllSplines(Layer *layer);
 extern SplineSet *LayerUnAllSplines(Layer *layer);
 extern Spline *SplineMake3(SplinePoint *from, SplinePoint *to);
 extern Spline *SplineSplit(Spline *spline, extended ts[3]);
-extern bigreal SplineSolveForUTanVec(Spline *spl, BasePoint s);
+extern bigreal SplineSolveForUTanVec(Spline *spl, BasePoint s, bigreal min_t);
 extern struct baselangextent *BaseLangCopy(struct baselangextent *extent);
 extern struct ff_glyphclasses *SFGetGroup(const struct splinefont *sf, int index, const char *name);
 extern struct glyphvariants *GlyphVariantsCopy(struct glyphvariants *gv);
