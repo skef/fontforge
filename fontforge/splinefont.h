@@ -223,7 +223,7 @@ struct pen {
 };
 
 struct spline;
-enum si_type { si_std, si_caligraphic, si_poly, si_centerline };
+enum si_type { si_std, si_caligraphic, si_nib, si_centerline };
 /* If you change this structure you may need to update MakeStrokeDlg */
 /*  and cvpalettes.c both contain statically initialized StrokeInfos */
 typedef struct strokeinfo {
@@ -236,7 +236,7 @@ typedef struct strokeinfo {
     unsigned int leave_users_center: 1;			/* Don't move the pen so its center is at the origin */
     real penangle;
     real minorradius;
-    struct splinepointlist *poly;
+    struct splinepointlist *nib;
     real resolution;
 /* For freehand tool */
     real radius2;

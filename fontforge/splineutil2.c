@@ -5196,7 +5196,7 @@ BasePoint UTanVectorize(bigreal x, bigreal y) {
     return ret;
 }
 
-int UTanVecNear(BasePoint ut1, BasePoint ut2) {
+int BasePointNear(BasePoint ut1, BasePoint ut2) {
     return RealNear(ut1.x, ut2.x) && RealNear(ut1.y, ut2.y);
 }
 

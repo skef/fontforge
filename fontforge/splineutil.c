@@ -7972,9 +7972,9 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
         return -1;
 
     // Check endpoints first
-    if ( UTanVecNear(ut, SplineUTanVecAt(spl, 0.0)) )
+    if ( BasePointNear(ut, SplineUTanVecAt(spl, 0.0)) )
         return 0.0;
-    if ( UTanVecNear(ut, SplineUTanVecAt(spl, 1.0)) )
+    if ( BasePointNear(ut, SplineUTanVecAt(spl, 1.0)) )
         return 1.0;
 
     // Copy the spline and rotate back to bring the slope to zero
@@ -8006,11 +8006,11 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
 
     BasePoint tmp1 = SplineUTanVecAt(spl, te1), tmp2 = SplineUTanVecAt(spl, te2);
 
-    printf("target: %lf,%lf, te1: %lf, slope1: %lf,%lf, te2: %lf, slope2: %lf,%lf\n", ut.x, ut.y, (double)te1, tmp1.x, tmp1.y, (double)te2, tmp2.x, tmp2.y);
+    printf("target: %lf,%lf, te1: %.15lf, slope1: %lf,%lf, te2: %.15lf, slope2: %lf,%lf\n", ut.x, ut.y, (double)te1, tmp1.x, tmp1.y, (double)te2, tmp2.x, tmp2.y);
 
-    if (te1 != -1 && te1 > min_t && UTanVecNear(ut, SplineUTanVecAt(spl, te1)))
+    if (te1 != -1 && te1 > (min_t+1e-9) && BasePointNear(ut, SplineUTanVecAt(spl, te1)))
 	return te1;
-    if (te2 != -1 && te2 > min_t && UTanVecNear(ut, SplineUTanVecAt(spl, te2)))
+    if (te2 != -1 && te2 > (min_t+1e-9) && BasePointNear(ut, SplineUTanVecAt(spl, te2)))
 	return te2;
 
     // Nothing found

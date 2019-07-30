@@ -1717,22 +1717,21 @@ Py_RETURN_NONE;
 return( reto );
 }
 
-extern int AnglesIncreasing(bigreal theta1, bigreal theta2, bigreal theta3);
-
 static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
     SplineSet *ss, *ss2;
     PyObject *obj, *obj2;
     Spline *s;
-    double t, t2, calc_t, theta;
+    double t, t2, calc_t;
+    BasePoint theta;
 
     if ( PyArg_ParseTuple(args,"Od", &obj, &t) ) {
 	ss = SSFromContour((PyFF_Contour *) obj, NULL);
 	if ( ss==NULL )
 	    return NULL;
 
-	theta = SplineTangentAngle(ss->first->next, t);
-	printf("theta: %lf\n", theta);
-	calc_t = SplineSolveForTangentAngle(ss->first->next, theta);
+	theta = SplineUTanVecAt(ss->first->next, t);
+	printf("theta: %lf,%lf\n", theta.x, theta.y);
+	calc_t = SplineSolveForUTanVec(ss->first->next, theta, 0.0);
 	printf("calc_t: %lf\n", calc_t);
 	SplinePointListFree(ss);
 	Py_RETURN_NONE;
@@ -1757,8 +1756,7 @@ static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
 	if ( ss==NULL )
 	    return NULL;
 	s = ss->first->next;
-	AnglesIncreasing(SplineTangentAngle(s, 0.0), SplineTangentAngle(s, 0.5), SplineTangentAngle(s, 1.0));
-	Py_RETURN_NONE;
+        return( Py_BuildValue("i", 1 ) );
     }
     PyErr_Format(PyExc_ValueError, "Not Recognized");
     return NULL;
@@ -4342,53 +4340,34 @@ return( NULL );
 Py_RETURN( self );
 }
 
-static int PolyCheck(SplineSet *poly) {
+static int NibCheck(SplineSet *nib) {
     SplineSet *ss;
     SplinePoint *sp;
-    BasePoint pts[256];
     int cnt;
 
-    for ( ss=poly ; ss!=NULL; ss=ss->next ) {
+    for ( ss=nib ; ss!=NULL; ss=ss->next ) {
 	if ( ss->first->prev==NULL ) {
-	    PyErr_Format(PyExc_ValueError, "The polygonal pen must be a closed, convex polygon. This one is not closed." );
-return( false );
+	    PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one is not closed." );
+	    return( false );
 	} else {
-	    for ( sp=ss->first, cnt=0; cnt<255; ++cnt ) {
-		pts[cnt] = sp->me;
-		if ( !sp->next->knownlinear ) {
-		    PyErr_Format(PyExc_ValueError, "The polygonal pen must be a closed, convex polygon. This one is has curved edges." );
-return( false );
-		}
-		sp = sp->next->to;
-		if ( sp==ss->first ) {
-		    ++cnt;
-	    break;
-		}
-	    }
-	    if ( cnt==255 ) {
-		PyErr_Format(PyExc_ValueError, "There are too many vertices on this polygon.");
-return( false );
-	    } else {
-		enum PolyType pt;
-		int badindex;
-		pt = PolygonIsConvex(pts,cnt,&badindex);
-		if ( pt==Poly_Line ) {
-		    PyErr_Format(PyExc_ValueError, "The polygonal pen must be a closed, convex polygon. This one is a line." );
-return( false );
-		} else if ( pt==Poly_TooFewPoints ) {
-		    PyErr_Format(PyExc_ValueError, "The polygonal pen must be a closed, convex polygon. This one has too few points." );
-return( false );
-		} else if ( pt!=Poly_Convex ) {
-		    if ( pt==Poly_PointOnEdge )
-			PyErr_Format(PyExc_ValueError, "There are at least 3 colinear vertices.");
-		    else
-			PyErr_Format(PyExc_ValueError, "The polygonal pen must be a closed, convex polygon. This one is concave." );
-return( false );
-		}
+	    enum ShapeType pt;
+	    pt = NibIsConvex(ss);
+	    if ( pt==Shape_Line ) {
+		PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one is a line." );
+		return( false );
+	    } else if ( pt==Shape_TooFewPoints ) {
+		PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one has too few points." );
+		return( false );
+	    } else if ( pt!=Shape_Convex ) {
+		if ( pt==Shape_PointOnEdge )
+		    PyErr_Format(PyExc_ValueError, "There are at least 3 colinear vertices in the brush.");
+		else
+		    PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one is concave." );
+		return( false );
 	    }
 	}
     }
-return( true );
+    return( true );
 }
 
 /* Linecap type: see 'enum linecap' in splinefont.h */
@@ -4419,7 +4398,7 @@ static int Stroke_Parse(StrokeInfo *si, PyObject *args) {
     double width=0, minor=1, angle=0;
     int c, j, f;
     PyObject *flagtuple=NULL;
-    PyObject *poly=NULL;
+    PyObject *nib=NULL;
     int argcnt;
 
     if ( !PySequence_Check(args) ) {
@@ -4458,11 +4437,11 @@ return( -1 );
 	}
 	si->stroke_type = si_caligraphic;
     } else if ( strcmp(str,"polygonal")==0 || strcmp(str,"poly")==0 ) {
-	if ( !PyArg_ParseTuple(args,"sO|O", &str, &poly, &flagtuple ) ) {
+	if ( !PyArg_ParseTuple(args,"sO|O", &str, &nib, &flagtuple ) ) {
 	    ENDPYGETSTR();
 return( -1 );
 	}
-	si->stroke_type = si_poly;
+	si->stroke_type = si_nib;
     } else {
 	    ENDPYGETSTR();
         PyErr_Format(PyExc_ValueError, "Unknown stroke type %s", str );
@@ -4470,21 +4449,21 @@ return( -1 );
     }
     ENDPYGETSTR();
 
-    if ( poly!=NULL ) {
+    if ( nib!=NULL ) {
 	SplineSet *ss=NULL;
 	int start=0, order2=0;
 
-	if ( PyType_IsSubtype(&PyFF_ContourType, Py_TYPE(poly)) ) {
-	    order2 = ((PyFF_Contour *) poly)->is_quadratic;
-	    ss = SSFromContour((PyFF_Contour *) poly,&start);
+	if ( PyType_IsSubtype(&PyFF_ContourType, Py_TYPE(nib)) ) {
+	    order2 = ((PyFF_Contour *) nib)->is_quadratic;
+	    ss = SSFromContour((PyFF_Contour *) nib,&start);
             if ( ss==NULL ) {
 		if ( PyErr_Occurred() != NULL )
                     PyErr_SetString(PyExc_AttributeError, "Empty Contour");
                 return( -1 );
             }
-	} else if ( PyType_IsSubtype(&PyFF_LayerType, Py_TYPE(poly)) ) {
-	    order2 = ((PyFF_Layer *) poly)->is_quadratic;
-	    ss = SSFromLayer((PyFF_Layer *) poly);
+	} else if ( PyType_IsSubtype(&PyFF_LayerType, Py_TYPE(nib)) ) {
+	    order2 = ((PyFF_Layer *) nib)->is_quadratic;
+	    ss = SSFromLayer((PyFF_Layer *) nib);
             if ( ss==NULL ) {
 		if ( PyErr_Occurred() != NULL )
                     PyErr_SetString(PyExc_AttributeError, "Empty Layer");
@@ -4499,9 +4478,9 @@ return( -1 );
 	    SplinePointListsFree(ss);
 	    ss = temp;
 	}
-	if ( !PolyCheck(ss))
+	if ( !NibCheck(ss))
 return( -1 );
-	si->poly = ss;
+	si->nib = ss;
     } else if ( width<=0 || minor<=0 ) {
         PyErr_Format(PyExc_ValueError, "Stroke width must be positive" );
 return( -1 );
@@ -4609,7 +4588,7 @@ return( NULL );
     SplinePointListFree(ss);
     LayerFromSS(newss,self);
     SplinePointListsFree(newss);
-    SplinePointListsFree(si.poly); si.poly = NULL;
+    SplinePointListsFree(si.nib); si.nib = NULL;
     Py_RETURN( self );
 }
 
@@ -9195,7 +9174,7 @@ return( NULL );
     SplinePointListFree(self->sc->layers[self->layer].splines);
     self->sc->layers[self->layer].splines = newss;
     SCCharChangedUpdate(self->sc,self->layer);
-    SplinePointListsFree(si.poly); si.poly = NULL;
+    SplinePointListsFree(si.nib); si.nib = NULL;
 Py_RETURN( self );
 }
 
@@ -17625,7 +17604,7 @@ return (NULL);
 return( NULL );
 
     FVStrokeItScript(self->fv, &si,false);
-    SplinePointListsFree(si.poly); si.poly = NULL;
+    SplinePointListsFree(si.nib); si.nib = NULL;
 Py_RETURN( self );
 }
 

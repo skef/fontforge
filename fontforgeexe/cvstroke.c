@@ -134,24 +134,23 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
     if ( GGadgetIsChecked( GWidgetGetControl(sw,CID_Caligraphic)) )
 	si->stroke_type = si_caligraphic;
     else if ( GGadgetIsChecked( GWidgetGetControl(sw,CID_Polygon)) )
-	si->stroke_type = si_poly;
+	si->stroke_type = si_nib;
     else if ( si!= &strokeinfo &&
 	    GGadgetIsChecked( GWidgetGetControl(sw,CID_CenterLine)) )
 	si->stroke_type = si_centerline;
-    if ( si->stroke_type == si_poly ) {
-	si->poly = sd->sc_stroke.layers[ly_fore].splines;
+    if ( si->stroke_type == si_nib ) {
+	si->nib = sd->sc_stroke.layers[ly_fore].splines;
 	if ( sd->sc_stroke.layers[ly_fore].refs != NULL ) {
 	    ff_post_error(_("No References"),_("No references allowed in a pen."));
 	    err = true;
-	} else if ( si->poly == NULL ) {
+	} else if ( si->nib == NULL ) {
 	    ff_post_error(_("Nothing specified"),_("Please draw a convex polygon in the drawing area."));
 	    err = true;
 	} else {
 	    SplineSet *ss;
 	    SplinePoint *sp;
-	    BasePoint pts[256];
 	    int cnt, selectall;
-	    for ( ss=si->poly ; ss!=NULL && !err; ss=ss->next ) {
+	    for ( ss=si->nib ; ss!=NULL && !err; ss=ss->next ) {
 		for ( sp=ss->first;;) {
 		    sp->selected = false;
 		    if ( sp->next==NULL )
@@ -163,56 +162,28 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
 	    }
 	    msg = NULL;
 	    selectall = false;
-	    for ( ss=si->poly ; ss!=NULL && !err; ss=ss->next ) {
+	    for ( ss=si->nib ; ss!=NULL && !err; ss=ss->next ) {
 		if ( ss->first->prev==NULL ) {
-		    msg = _("The selected contour is open, but it must be a convex polygon.");
+		    msg = _("The selected contour is open, but it must be a closed convex shape.");
 		    err = selectall = true;
 		} else {
-		    for ( sp=ss->first, cnt=0; cnt<255; ++cnt ) {
-			pts[cnt] = sp->me;
-			if ( !sp->next->knownlinear ) {
-			    sp->selected = true;
-			    sp->next->to->selected = true;
-			    err = true;
-			    msg = _("The selected spline has curved edges, but it must be a convex polygon (with straight edges).");
-		    break;
-			}
-			sp = sp->next->to;
-			if ( sp==ss->first ) {
-			    ++cnt;
-		    break;
-			}
-		    }
 		    if ( err )
 			/* Already handled */;
-		    else if ( cnt==255 ) {
-			msg = _("There are too many vertices on this polygon.");
-			err = selectall = true;
-		    } else {
-			enum PolyType pt;
-			int badindex;
-			pt = PolygonIsConvex(pts,cnt,&badindex);
-			if ( pt==Poly_Line ) {
+		    else {
+			enum ShapeType pt;
+			pt = NibIsConvex(ss);
+			if ( pt==Shape_Line ) {
 			    msg = _("This is a line; it must enclose some area.");
 			    err = selectall = true;
-			} else if ( pt==Poly_TooFewPoints ) {
-			    msg = _("There aren't enough vertices to be a polygon.");
+			} else if ( pt==Shape_TooFewPoints ) {
+			    msg = _("There aren't enough vertices to be a convex shape.");
 			    err = selectall = true;
-			} else if ( pt!=Poly_Convex ) {
+			} else if ( pt!=Shape_Convex ) {
 			    err = true;
-			    if ( pt==Poly_PointOnEdge )
+			    if ( pt==Shape_PointOnEdge )
 				msg = _("There are at least 3 colinear vertices. Please remove (Edit->Merge) the selected point.");
 			    else
-				msg = _("The selected vertex makes this a concave polygon. Please remove (Edit->Merge) it.");
-			    for ( sp=ss->first, cnt=0; cnt<255; ++cnt ) {
-				if ( cnt==badindex ) {
-				    sp->selected = true;
-			    break;
-				}
-				sp = sp->next->to;
-				if ( sp==ss->first )
-			    break;
-			    }
+				msg = _("The selected vertex makes this a concave shape. Please remove (Edit->Merge) it.");
 			}
 		    }
 		}
@@ -242,11 +213,12 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
 		GGadgetIsChecked( GWidgetGetControl(sw,CID_RoundJoin))?lj_round:
 		lj_miter;
 	si->radius = GetReal8(sw,CID_Width,_("Stroke _Width:"),&err)/2;
-    if (si->radius == 0) {
-        ff_post_error(_("Bad Value"), _("Stroke width cannot be zero"));
-        err = true;
-    }
-	if ( si->radius<0 ) si->radius = -si->radius;	/* Behavior is said to be very slow (but correct) for negative strokes */
+	if (si->radius == 0) {
+	    ff_post_error(_("Bad Value"), _("Stroke width cannot be zero"));
+	    err = true;
+	}
+	if ( si->radius<0 )
+	    si->radius = -si->radius;
 	si->penangle = GetReal8(sw,CID_PenAngle,_("Pen _Angle:"),&err);
 	if ( si->penangle>180 || si->penangle < -180 ) {
 	    si->penangle = fmod(si->penangle,360);
@@ -396,7 +368,7 @@ return( true );
 static int Stroke_Polygon(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_radiochanged ) {
 	StrokeDlg *sd = (StrokeDlg *) ((CharViewBase *) GDrawGetUserData(GGadgetGetWindow(g)))->container;
-	StrokeSetup(sd,si_poly);
+	StrokeSetup(sd,si_nib);
 	Stroke_ShowNib(sd);
     }
 return( true );
@@ -642,9 +614,9 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	sd->si = si;
 	yoff = 18;
     }
-    if ( sd->old_poly==NULL && si!=NULL && si->poly!=NULL ) {
-	sd->old_poly = si->poly;
-	si->poly = NULL;
+    if ( sd->old_poly==NULL && si!=NULL && si->nib!=NULL ) {
+	sd->old_poly = si->nib;
+	si->nib = NULL;
     }
 
     if ( sd->gw==NULL ) {
@@ -719,7 +691,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->stroke_type == si_poly ? gg_cb_on : 0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->stroke_type == si_nib ? gg_cb_on : 0);
 	gcd[gcdoff].gd.u.radiogroup = 1;
 	gcd[gcdoff].gd.cid = CID_Polygon;
 	gcd[gcdoff].gd.handle_controlevent = Stroke_Polygon;
@@ -1006,7 +978,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
     if ( si==NULL ) {
 	StrokeSetup(sd,GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Caligraphic))?si_caligraphic:
 		GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Circle))?si_std:
-		GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Polygon))?si_poly:
+		GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Polygon))?si_nib:
 		si_centerline);
 	GGadgetSetVisible( GWidgetGetControl(sd->gw,CID_Apply),strokeit==CVStrokeIt );
     } else {
