@@ -171,7 +171,7 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
 			/* Already handled */;
 		    else {
 			enum ShapeType pt;
-			pt = NibIsConvex(ss);
+			pt = NibIsValid(ss);
 			if ( pt==Shape_Line ) {
 			    msg = _("This is a line; it must enclose some area.");
 			    err = selectall = true;

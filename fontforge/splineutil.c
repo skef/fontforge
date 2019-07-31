@@ -7971,11 +7971,9 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
     if ( SplineIsLinear(spl) )
         return -1;
 
-    // Check endpoints first
-    if ( BasePointNear(ut, SplineUTanVecAt(spl, 0.0)) )
-        return 0.0;
-    if ( BasePointNear(ut, SplineUTanVecAt(spl, 1.0)) )
-        return 1.0;
+    // Don't check zero point -- that's handled separately
+//    if ( min_t==0.0 && BasePointNear(ut, SplineUTanVecAt(spl, 0.0)) )
+//       return min_t;
 
     // Copy the spline and rotate back to bring the slope to zero
     transform[0] = ut.x;
@@ -7998,6 +7996,7 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
 
     t_spline.from = &t_from; t_spline.to = &t_to;
     t_from.next = t_to.prev = &t_spline;
+    // XXX Needs to be updated to support order 2 trace
     SplineRefigure3(&t_spline);
 
 //    printf("(%lf, %lf), (%lf, %lf), (%lf, %lf), (%lf, %lf)\n", t_from.me.x, t_from.me.y, t_from.nextcp.x, t_from.nextcp.y, t_to.prevcp.x, t_to.prevcp.y, t_to.me.x, t_to.me.y);
@@ -8012,6 +8011,10 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
 	return te1;
     if (te2 != -1 && te2 > (min_t+1e-9) && BasePointNear(ut, SplineUTanVecAt(spl, te2)))
 	return te2;
+
+    // Check the endpoint
+    if ( BasePointNear(ut, SplineUTanVecAt(spl, 1.0)) )
+        return 1.0;
 
     // Nothing found
     return -1;

@@ -11,7 +11,7 @@ enum ShapeType {
 	Shape_Line
 };
 
-extern enum ShapeType NibIsConvex(SplineSet *);
+extern enum ShapeType NibIsValid(SplineSet *);
 extern SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_start, bigreal t_end, SplinePoint *start);
 extern SplineSet *SplineSetStroke(SplineSet *ss, StrokeInfo *si, int order2);
 extern SplineSet *UnitShape(int n);

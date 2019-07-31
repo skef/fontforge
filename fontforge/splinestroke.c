@@ -42,26 +42,16 @@
 
 #define PI      3.1415926535897932
 
-/*
-typedef struct strokepoint {
-    Spline *sp;
-    bigreal t;
-    BasePoint me;		// This lies on the original curve 
-    BasePoint slope;		// Slope at that point
-    BasePoint edge[2];
-    unsigned int needs_point: 1;
-    //uint8 et;
-} StrokePoint;
-*/
-
 enum pentype { pt_circle, pt_square, pt_poly };
 
-/* c->nibcorners is a structure that models the "corners" of the current nib,
- * considered as if all splines were linear, and therefore as a convex polygon
+/* c->nibcorners is a structure that models the "corners" of the current nib
+ * considered as if all splines were linear, and therefore as a convex polygon.
  */
+
 typedef struct nibcorner {
     SplinePoint *on_nib;
     BasePoint utanvec;    // Unit tangent of the "line" from the previous point
+    unsigned int linear: 1;
 } NibCorner;
 
 typedef struct strokecontext {
@@ -127,40 +117,28 @@ static int CornerIndex(StrokeContext *c, BasePoint ut, int is_right, int cw) {
     return c->n-1;
 }
 
+/* A contour is a valid convex polygon if:
+ *  1. It contains something (not a line or a single point
+ *     but a closed piecewise spline containing area) 
+ *  2. All edges/splines are lines
+ *  3. It is convex
+ *  4. There are no extranious points on the edges
+ *
+ * A contour is a valid nib shape if:
+ *  5. It's on-curve points would form a valid convex
+ *     polygon if there were no control points.
+ *  6. Every edge/spline is either:
+ *     6a. A line, or
+ *     6b. A spline where *both* control points are
+ *         outside of the polygon but inside the 
+ *         triangle formed by the spline edge and
+ *         extending the lines of the adjacent edges.
+ *
+ * A valid nib is a SplineSet containing only valid
+ * nib shapes.
+ */
 
-/* I find the spline length in hopes of subdividing the spline into chunks*/
-/*  roughly 1em unit apart. But if the spline bends a lot, then when      */
-/*  expanded out by a pen the distance between chunks will be amplified   */
-/*  So do something quick and dirty to adjust for that */
-/* What I really want to do is to split the spline into segments, find */
-/*  the radius of curvature, find the length, multiply length by       */
-/*  (radius-curvature+c->radius)/radius-curvature                      */
-/*  For each segment and them sum that. But that's too hard */
-/*
-static int AdjustedSplineLength(Spline *s) {
-    bigreal len = SplineLength(s);
-    bigreal xdiff=s->to->me.x-s->from->me.x, ydiff=s->to->me.y-s->from->me.y;
-    bigreal distance = sqrt(xdiff*xdiff+ydiff*ydiff);
-
-    if ( len<=distance )
-	return( len );			// It's a straight line
-    len += 1.5*(len-distance);
-	return( len );
-}
-*/
-
-/* Something is a valid polygonal pen if: */
-/*  1. It contains something (not a line, or a single point, something with area) */
-/*  2. It contains ONE contour */
-/*	(Multiple contours can be dealt with as long as each contour follows */
-/*	 requirements 3-n. If we have multiple contours: Find the offset from */
-/*	 the center of each contour to the center of all the contours. Trace  */
-/*	 each contour individually and then translate by this offset) */
-/*  3. All edges must be lines (no control points) */
-/*  4. It must be convex */
-/*  5. No extranious points on the edges */
-
-enum ShapeType NibIsConvex(SplineSet *ss) {
+enum ShapeType NibIsValid(SplineSet *ss) {
     /* For each vertex: */
     /*  Remove that vertex from the polygon, and then test if the vertex is */
     /*  inside the resultant poly. If it is inside, then the polygon is not */
@@ -243,6 +221,7 @@ return( Shape_Convex );
  *
  * Calculations cribbed from https://stackoverflow.com/a/879213
  */
+// XXX Would need to be extended to support quadratic input
 SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_start, bigreal t_end,
                                  SplinePoint *start) {
     extended u_start = 1-t_start, u_end = 1-t_end;
@@ -282,6 +261,77 @@ SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_start, bigreal t_end,
         SplineRefigure(start->next);
     } 
     return end;
+}
+
+static bigreal Spline1DVal(Spline1D *s, bigreal t) {
+    return ((s->a*t+s->b)*t+s->c)*t+s->d;
+}
+
+static BasePoint SplineVal(Spline *s, bigreal t) {
+    BasePoint ret;
+    ret.x = Spline1DVal(&s->splines[0], t);
+    ret.y = Spline1DVal(&s->splines[1], t);
+    return ret;
+}
+
+static BasePoint SplinePointRelativeOffset(BasePoint xy, BasePoint ut, StrokeContext *c, int cci, int is_right) {
+   BasePoint ret;
+   Spline *ns;
+   bigreal nt;
+
+   if ( c->nibcorners[cci].linear ) {
+	ret.x = xy.x + c->nibcorners[cci].on_nib->me.x;
+	ret.y = xy.y + c->nibcorners[cci].on_nib->me.y;
+   } else {
+	if ( is_right ) {
+	    ut.x *= -1;
+	    ut.y *= -1;
+	}
+	ns = c->nibcorners[cci].on_nib->prev;
+	// Nib splines are locally convex and should therefore have t value per slope
+	nt = SplineSolveForUTanVec(ns, ut, 0.0);
+	ret.x = xy.x + Spline1DVal(&ns->splines[0], nt);
+	ret.y = xy.y + Spline1DVal(&ns->splines[1], nt);
+   }
+   return ret;
+}
+
+#define NIPOINTS 20
+
+SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start, bigreal t_end,
+    SplinePoint *start, int cci, int is_right) {
+    TPoint tp[NIPOINTS];
+    bigreal nidiff, t, nt;
+    int i;
+    BasePoint xy, ut, txy, ut_s, ut_e;
+    SplinePoint *sp;
+
+    nidiff = (t_end - t_start) / NIPOINTS;
+
+    for ( i=0, t=t_start; i<NIPOINTS; ++i, t+= nidiff ) {
+	xy = SplineVal(s, t);
+	ut = SplineUTanVecAt(s, t);
+	if ( i==0 )
+	    ut_s = ut;
+	if ( i==(NIPOINTS-1) )
+	    ut_e = ut;
+	txy = SplinePointRelativeOffset(xy, ut, c, cci, is_right);
+	tp[i].x = txy.x;
+	tp[i].y = txy.y;
+	tp[i].t = 1/NIPOINTS;
+	printf("TPoints i=%d, x=%lf, y=%lf, t=%lf\n", i, tp[i].x, tp[i].y, tp[i].t);
+    }
+    printf("   calc.x=%lf, calc.y=%lf, cur.x=%lf, cur.y=%lf\n", tp[0].x, tp[0].y, start->me.x, start->me.y);
+    start->nextcp.x = start->me.x + ut_s.x;
+    start->nextcp.y = start->me.y + ut_s.y;
+    start->nonextcp = false;
+    sp = SplinePointCreate(tp[NIPOINTS-1].x, tp[NIPOINTS-1].y);
+    sp->prevcp.x = sp->me.x - ut_e.x;
+    sp->prevcp.y = sp->me.y - ut_e.y;
+    sp->noprevcp = false;
+    ApproximateSplineFromPointsSlopes(start,sp,tp+1,NIPOINTS-2,false);
+
+    return sp;
 }
 
 static bigreal PolyNextT(StrokeContext *c, Spline *s, int i, bigreal cur_t, BasePoint *cur_ut, int is_right) {
@@ -354,22 +404,17 @@ static int ShapeCapNext(int n, int start_i, int end_i, int ccw) {
     }
 }
 
-static BasePoint SplinePointRelativeOffset(SplinePoint *sp, StrokeContext *c, int fi, int ti) {
-   BasePoint ret;
-   ret.x = sp->me.x - ( fi == -1 ? 0 : c->nibcorners[fi].on_nib->me.x )
-                    + ( ti == -1 ? 0 : c->nibcorners[ti].on_nib->me.x );
-   ret.y = sp->me.y - ( fi == -1 ? 0 : c->nibcorners[fi].on_nib->me.y )
-                    + ( ti == -1 ? 0 : c->nibcorners[ti].on_nib->me.y );
-   return ret;
-}
 
-static void ShapeCap(StrokeContext *c, SplinePoint *start_p, int start_i, SplinePoint *end_p, int end_i, int ccw) {
+static void ShapeCap(StrokeContext *c, BasePoint ut, SplinePoint *start_p, int start_i, SplinePoint *end_p, int end_i, int ccw) {
     SplinePoint *tmp_p;
-    BasePoint l;
+    BasePoint l, rxy;
     int pi = start_i, i;
 
+    rxy.x = start_p->me.x - c->nibcorners[start_i].on_nib->me.x;
+    rxy.y = start_p->me.y - c->nibcorners[start_i].on_nib->me.y;
+
     while ( (i = ShapeCapNext(c->n, pi, end_i, ccw)) != -1 ) {
-	l = SplinePointRelativeOffset(start_p, c, pi, i);
+	l = SplinePointRelativeOffset(rxy, ut, c, i, 0);
 	tmp_p = SplinePointCreate(l.x, l.y);
 	SplineMake3(start_p, tmp_p);
 	start_p = tmp_p;
@@ -378,21 +423,21 @@ static void ShapeCap(StrokeContext *c, SplinePoint *start_p, int start_i, Spline
     SplineMake3(start_p, end_p);
 }
 
-static void ShapeJoint(StrokeContext *c, SplinePoint *start_p, int start_i, SplinePoint *end_p, int end_i,
+static void ShapeJoint(StrokeContext *c, BasePoint ut, SplinePoint *start_p, int start_i, SplinePoint *end_p, int end_i,
                        int is_neg, int is_right ) {
     if ( !is_neg == !is_right ) {
 	SplineMake3(start_p, end_p);
 	return;
     }
-    ShapeCap(c, start_p, start_i, end_p, end_i, is_right);
+    ShapeCap(c, ut, start_p, start_i, end_p, end_i, is_right);
 }
 
 static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
     Spline *s, *first=NULL;
-    int is_right, cci, ncci, linear, cw_start, cw_mid;
+    int is_right, cci, linear, cw_start, cw_mid;
     int fli = -1, fri = -1, li, ri, open = ss->first->prev==NULL;
     bigreal last_t, t, tx, ty;
-    BasePoint ut_ini = { 2,0 }, ut_start, ut_mid, ut_end, ut_diff, tmp_p;
+    BasePoint ut_ini = { 2,0 }, ut_start, ut_mid, ut_end, ut_diff, tmp_p, sxy;
     SplineSet *left=NULL, *right=NULL, *cur;
     SplinePoint *sp;
     Spline *lspline;
@@ -441,7 +486,7 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	    }
 
 	    // Create or verify initial spline point
-	    tmp_p = SplinePointRelativeOffset(s->from, c, -1, cci);
+	    tmp_p = SplinePointRelativeOffset(s->from->me, ut_start, c, cci, is_right);
 	    printf("is_right=%d cci=%d fc.x=%lf fc.y=%lf x=%lf, y=%lf, ut_start=%lf,%lf, cw_start=%d\n", is_right, cci, c->nibcorners[cci].on_nib->me.x, c->nibcorners[cci].on_nib->me.y, tmp_p.x, tmp_p.y, ut_start.x, ut_start.y, cw_start);
 	    if ( cur->first==NULL ) {
 		cur->first = SplinePointCreate(tmp_p.x, tmp_p.y);
@@ -449,39 +494,40 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	    } else if ( cur->last->me.x != tmp_p.x || cur->last->me.y != tmp_p.y ) {
 		sp = SplinePointCreate(tmp_p.x, tmp_p.y);
 		ut_diff = UTanVecDiff(ut_end, ut_start);
-		ShapeJoint(c, cur->last, is_right ? ri : li, sp, cci, ut_diff.y >= 0, is_right);
+		ShapeJoint(c, ut_start, cur->last, is_right ? ri : li, sp, cci, ut_diff.y >= 0, is_right);
 		cur->last = sp;
 	    }
 
 	    // Complete the path
 	    if ( linear ) {
-		tmp_p = SplinePointRelativeOffset(s->to, c, -1, cci);
+		tmp_p = SplinePointRelativeOffset(s->to->me, ut_end, c, cci, is_right);
 		sp = SplinePointCreate(tmp_p.x, tmp_p.y);
 		SplineMake3(cur->last, sp);
 		cur->last = sp;
 	    } else {
 		t = 0.0;
 		ut_mid = ut_start;
-		ncci = -1;
 		while ( t < 1.0 ) {
 		    last_t = t;
 		    t = PolyNextT(c, s, cci, t, &ut_mid, is_right);
 		    if ( t==-1.0 || t<last_t ) // That slope not found -- copy rest of spline
 			t = 1.0;
-		    printf("cci: %d, ncci: %d, ut_mid=%lf,%lf, t=%.15lf\n", cci, ncci, ut_mid.x, ut_mid.y, t);
-		    // XXX do differently for splined nib side
-		    sp = AppendCubicSplinePortion(s, last_t, t, cur->last);
+		    printf("cci: %d, ut_mid=%lf,%lf, t=%.15lf\n", cci, ut_mid.x, ut_mid.y, t);
+		    if ( c->nibcorners[cci].linear )
+			sp = AppendCubicSplinePortion(s, last_t, t, cur->last);
+		    else
+			sp = TraceAndFitSpline(c, s, last_t, t, cur->last, cci, is_right);
 		    cur->last = sp;
 		    if (t < 1.0) {
 			cw_mid = SplineTurningCWAt(s, t);
-			ncci = CornerIndex(c, ut_mid, is_right, cw_mid);
-			tmp_p = SplinePointRelativeOffset(sp, c, cci, ncci);
+			cci = CornerIndex(c, ut_mid, is_right, cw_mid);
+			sxy = SplineVal(s, t);
+			tmp_p = SplinePointRelativeOffset(sxy, ut_mid, c, cci, is_right);
 			if ( !BasePointNear(cur->last->me, tmp_p) ) {
 			    sp = SplinePointCreate(tmp_p.x, tmp_p.y);
 			    SplineMake3(cur->last, sp);
 			    cur->last = sp;
 			}
-			cci = ncci;
 		    }
 		}
 	    }
@@ -506,8 +552,8 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
     } */
     if ( open ) {
 	SplineSetReverse(right);
-	ShapeCap(c, left->last, li, right->first, ri, 0);
-	ShapeCap(c, right->last, fri, left->first, fli, 0);
+	ShapeCap(c, ut_end, left->last, li, right->first, ri, 0);
+	ShapeCap(c, ut_start, right->last, fri, left->first, fli, 0);
 	left->last = left->first;
 	right = NULL;
     } else {
@@ -529,74 +575,6 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
     }
     return left;
 }
-
-/*
-#define NIPOINTS 20
-#define NIDIFF (1.0/NIPOINTS)
-
-static SplineSet *SplinesToContoursRadial(SplineSet *ss, StrokeContext *c) {
-    Spline *s, *first;
-    bigreal length;
-    int i;
-    bigreal t;
-    SplineSet *head = NULL, *last = NULL, *cur;
-    StrokePoint *p, stp[NIPOINTS];
-    TPoint l[NIPOINTS], r[NIPOINTS];
-    SplinePoint *sp;
-
-    first = NULL;
-    for ( s=ss->first->next; s!=NULL && s!=first; s=s->to->next ) {
-	if ( first==NULL ) first = s;
-	length = AdjustedSplineLength(s);
-	if ( length==0 )
-	    continue;		// We can safely ignore it because it is of zero length
-	for ( i=0, t=0; i<NIPOINTS; ++i, t+= NIDIFF ) {
-	    p = &stp[i];
-	    if ( i==NIPOINTS-1 ) t = 1.0;	// In case there were rounding errors
-	    // FindSlope(p,s,t,NIDIFF,i!=0);
-	    l[i].x = p->me.x - c->radius*p->slope.y;
-	    l[i].y = p->me.y + c->radius*p->slope.x;
-	    l[i].t = t;
-	    printf(" x: %f, y: %f\n", l[i].x, l[i].y);
-	    r[i].x = p->me.x + c->radius*p->slope.y;
-	    r[i].y = p->me.y - c->radius*p->slope.x;
-	    r[i].t = 1.0-t;
-	}
-	cur = chunkalloc(sizeof(SplineSet));
-	if ( head==NULL )
-	    head = cur;
-	else
-	    last->next = cur;
-	last = cur;
-	sp = SplinePointCreate(l[0].x, l[0].y);
-	//sp->pointtype = pt_corner;
-	// SetNextCPSlope(sp, stp[0].slope, 1);
-	cur->first = cur->last = sp;
-
-	sp = SplinePointCreate(l[NIPOINTS-1].x, l[NIPOINTS-1].y);
-	//sp->pointtype = pt_corner;
-	// SetPrevCPSlope(sp, stp[NIPOINTS-1].slope, -1);
-	ApproximateSplineFromPointsSlopes(cur->last,sp,l+1,NIPOINTS-2,false);
-	cur->last = sp;
-
-	sp = SplinePointCreate(r[NIPOINTS-1].x, r[NIPOINTS-1].y);
-	SplineMake3(cur->last,sp);
-	sp->pointtype = pt_corner;
-	// SetNextCPSlope(sp, stp[NIPOINTS-1].slope, -1);
-	cur->last = sp;
-
-	sp = SplinePointCreate(r[0].x, r[0].y);
-	sp->pointtype = pt_corner;
-	// SetPrevCPSlope(sp, stp[0].slope, 1);
-	ApproximateSplineFromPointsSlopes(cur->last,sp,r+1,NIPOINTS-2,false);
-	cur->last = sp;
-
-	SplineMake3(cur->last,cur->first);
-	cur->last = cur->first;
-    }
-    return head;
-}
-*/
 
 /******************************************************************************/
 /* ******************************* Unit Stuff ******************************* */
@@ -786,7 +764,7 @@ return( first );
 static int BuildBCorners(StrokeContext *c, SplinePoint *nib_first, int maxp) {
     int i, max_utan_index = -1;
     BasePoint max_utanangle = { -1, -DBL_MIN };
-    SplinePoint *sp, *nsp;
+    SplinePoint *sp;
     NibCorner *tpc;
 
     if ( c->nibcorners==NULL )
@@ -800,15 +778,15 @@ static int BuildBCorners(StrokeContext *c, SplinePoint *nib_first, int maxp) {
 	    free(c->nibcorners);
 	    c->nibcorners = tpc;
 	}
-	nsp = sp->next->to;
-	c->nibcorners[i].on_nib = nsp;
-	c->nibcorners[i].utanvec = UTanVectorize(nsp->me.x - sp->me.x, nsp->me.y - sp->me.y);
+	c->nibcorners[i].on_nib = sp;
+	c->nibcorners[i].linear = SplineIsLinear(sp->prev);
+	c->nibcorners[i].utanvec = SplineUTanVecAt(sp->prev, 0.0);
 	if ( UTanAngleGreater(c->nibcorners[i].utanvec, max_utanangle) ) {
 	    max_utan_index = i;
 	    max_utanangle = c->nibcorners[i].utanvec;
 	}
 	++i;
-	sp=nsp;
+	sp=sp->next->to;
 	if ( sp==nib_first )
 	    break;
     }
@@ -889,23 +867,8 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
 	    reversed = true;
 	    SplineSetReverse(nib);
 	}
-/*	if ( !c.scaled_or_rotated ) {
-	    bnext = nib->next; nib->next = NULL;
-	    SplineSetQuickBounds(nib,&b);
-	    trans[4] = -(b.minx+b.maxx)/2;
-	    trans[5] = -(b.miny+b.maxy)/2;
-	    SplinePointListTransformExtended(nib,trans,tpt_AllPoints,tpmask_dontTrimValues);
-	    nib->next = bnext;
-	} */
 	max_pc = BuildBCorners(&c, nib->first, max_pc);
 	cur = SplineSets_Stroke(ss,&c,order2);
-/*	if ( !c.scaled_or_rotated ) {
-	    trans[4] = -trans[4]; trans[5] = -trans[5];
-	    SplinePointListTransformExtended(cur,trans,tpt_AllPoints,tpmask_dontTrimValues);
-	    bnext = nib->next; nib->next = NULL;
-	    SplinePointListTransformExtended(nib,trans,tpt_AllPoints,tpmask_dontTrimValues);
-	    nib->next = bnext;
-	} */
 	if ( reversed ) {
 	    SplineSet *ss;
 	    for ( ss=cur; ss!=NULL; ss=ss->next )
@@ -922,6 +885,7 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     }
 
     free(c.nibcorners);
+
     if ( si->stroke_type==si_std || si->stroke_type==si_caligraphic ) {
 	SplinePointListFree(si->nib);
 	si->nib = NULL;

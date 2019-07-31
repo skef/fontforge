@@ -4351,7 +4351,7 @@ static int NibCheck(SplineSet *nib) {
 	    return( false );
 	} else {
 	    enum ShapeType pt;
-	    pt = NibIsConvex(ss);
+	    pt = NibIsValid(ss);
 	    if ( pt==Shape_Line ) {
 		PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one is a line." );
 		return( false );
