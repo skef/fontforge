@@ -5196,48 +5196,23 @@ BasePoint UTanVectorize(bigreal x, bigreal y) {
     return ret;
 }
 
-int BasePointNear(BasePoint ut1, BasePoint ut2) {
-    return RealNear(ut1.x, ut2.x) && RealNear(ut1.y, ut2.y);
-}
-
-BasePoint UTanVecDiff(BasePoint ut_ref, BasePoint ut_vec) {
-    BasePoint ret;
-    ret.x = ut_ref.x*ut_vec.x + ut_ref.y*ut_vec.y; // dot product
-    ret.y = ut_ref.x*ut_vec.y - ut_ref.y*ut_vec.x; // mag of cross product
-    return ret;
-}
-
-static bigreal Spline1DTangentVal(Spline1D *s, bigreal t) {
-    return (3*s->a*t + 2*s->b)*t + s->c;
-}
-
 BasePoint SplineUTanVecAt(Spline *s, bigreal t) {
-    bigreal x, y;
+    BasePoint raw;
 
     if ( SplineIsLinear(s) ) {
-	x = s->to->me.x - s->from->me.x;
-	y = s->to->me.y - s->from->me.y;
+	raw.x = s->to->me.x - s->from->me.x;
+	raw.y = s->to->me.y - s->from->me.y;
     } else {
-	x = Spline1DTangentVal(&s->splines[0], t);
-	y = Spline1DTangentVal(&s->splines[1], t);
+	raw = SPLINEPTANVAL(s, t);
 
-	if ( x==0 && y==0 ) {
-
-	    /* For missing slopes take a very small step away (smaller than RealNear())
-	     * and try again. The common (only?) source of a missing slope is when one
-	     * control point is co-located with is on-curve point and the other isn't.
-	     */
-
-	    if ( t+1e-9 <= 1.0 )
-		t += 1e-9;
-	    else
-		t -= 1e-9;
-
-	    x = Spline1DTangentVal(&s->splines[0], t);
-	    y = Spline1DTangentVal(&s->splines[1], t);
-	}
+	/* For missing slopes take a very small step away (smaller than BasePointNear())
+	 * and try again. The common (only?) source of a missing slope is when one
+	 * control point is co-located with is on-curve point and the other isn't.
+	 */
+	if ( raw.x==0 && raw.y==0 )
+	    raw = SPLINEPTANVAL(s, (t+1e-9 <= 1.0) ? t+1e-9 : t-1e-9);
     }
-    return UTanVectorize(x, y);
+    return UTanVectorize(raw.x, raw.y);
 }
 
 int SplineTurningCWAt(Spline *s, bigreal t) {

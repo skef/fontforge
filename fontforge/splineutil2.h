@@ -69,11 +69,9 @@ extern void SPLsStartToLeftmost(SplineChar *sc, int layer);
 extern void SPLStartToLeftmost(SplineChar *sc, SplinePointList *spl, int *changed);
 extern void SPSmoothJoint(SplinePoint *sp);
 
+extern BasePoint UTanVectorize(bigreal x, bigreal y);
 extern BasePoint SplineUTanVecAt(Spline *s, bigreal t);
 extern int SplineTurningCWAt(Spline *s, bigreal t);
-extern int BasePointNear(BasePoint s1, BasePoint s2);
-extern BasePoint UTanVecDiff(BasePoint s1, BasePoint s2);
-extern BasePoint UTanVectorize(bigreal x, bigreal y);
 
 /**
  * This is like SPAdjustControl but you have not wanting to move the

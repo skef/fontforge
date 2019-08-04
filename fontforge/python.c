@@ -1721,7 +1721,9 @@ static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
     SplineSet *ss, *ss2;
     PyObject *obj, *obj2;
     Spline *s;
+    SplinePoint *sp, *sp2;
     double t, t2, calc_t;
+    int p, p2, bk, i;
     BasePoint theta;
 
     if ( PyArg_ParseTuple(args,"Od", &obj, &t) ) {
@@ -1735,6 +1737,27 @@ static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
 	printf("calc_t: %lf\n", calc_t);
 	SplinePointListFree(ss);
 	Py_RETURN_NONE;
+    }
+    PyErr_Clear();
+    if ( PyArg_ParseTuple(args,"OOididi", &obj, &obj2, &p, &t, &p2, &t2, &bk) ) {
+	ss = SSFromContour((PyFF_Contour *) obj, NULL);
+	if ( ss==NULL )
+	    return NULL;
+	ss2 = SSFromContour((PyFF_Contour *) obj2, NULL);
+	if ( ss2==NULL )
+	    return NULL;
+	sp = ss2->first;
+	for (i=0; i<p; ++i)
+	    sp = sp->next->to;
+	sp2 = ss2->first;
+	for (i=0; i<p2; ++i)
+	    sp2 = sp2->next->to;
+	sp = AppendCubicSplineSetPortion(sp, t, sp2, t2, ss->last, bk);
+	ss->last = sp;
+	obj = (PyObject *) ContourFromSS(ss, NULL);
+	SplinePointListFree(ss);
+	SplinePointListFree(ss2);
+	return obj;
     }
     PyErr_Clear();
     if ( PyArg_ParseTuple(args,"OddO", &obj, &t, &t2, &obj2) ) {

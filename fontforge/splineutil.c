@@ -7971,9 +7971,9 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
     if ( SplineIsLinear(spl) )
         return -1;
 
-    // Don't check zero point -- that's handled separately
-//    if ( min_t==0.0 && BasePointNear(ut, SplineUTanVecAt(spl, 0.0)) )
-//       return min_t;
+    // Only check t==0 if min_t is negative
+    if ( min_t<=0 && BPNEAR(ut, SplineUTanVecAt(spl, 0.0)) )
+       return min_t;
 
     // Copy the spline and rotate back to bring the slope to zero
     transform[0] = ut.x;
@@ -7999,21 +7999,20 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
     // XXX Needs to be updated to support order 2 trace
     SplineRefigure3(&t_spline);
 
-//    printf("(%lf, %lf), (%lf, %lf), (%lf, %lf), (%lf, %lf)\n", t_from.me.x, t_from.me.y, t_from.nextcp.x, t_from.nextcp.y, t_to.prevcp.x, t_to.prevcp.y, t_to.me.x, t_to.me.y);
     // After rotating by theta the desired angle will be at a y extrema
     SplineFindExtrema(&t_spline.splines[1], &te1, &te2);
 
     BasePoint tmp1 = SplineUTanVecAt(spl, te1), tmp2 = SplineUTanVecAt(spl, te2);
 
-    printf("target: %lf,%lf, te1: %.15lf, slope1: %lf,%lf, te2: %.15lf, slope2: %lf,%lf\n", ut.x, ut.y, (double)te1, tmp1.x, tmp1.y, (double)te2, tmp2.x, tmp2.y);
+    printf("target: %.15lf,%.15lf, te1: %.15lf, slope1: %.15lf,%.15lf, near1: %d, te2: %.15lf, slope2: %.15lf,%.15lf, near2=%d\n", ut.x, ut.y, (double)te1, tmp1.x, tmp1.y, (double)te2, tmp2.x, tmp2.y, (int)BPNEAR(ut, SplineUTanVecAt(spl, te1)), BPNEAR(ut, SplineUTanVecAt(spl, te2)));
 
-    if (te1 != -1 && te1 > (min_t+1e-9) && BasePointNear(ut, SplineUTanVecAt(spl, te1)))
+    if (te1 != -1 && te1 > (min_t+1e-9) && BPNEAR(ut, SplineUTanVecAt(spl, te1)))
 	return te1;
-    if (te2 != -1 && te2 > (min_t+1e-9) && BasePointNear(ut, SplineUTanVecAt(spl, te2)))
+    if (te2 != -1 && te2 > (min_t+1e-9) && BPNEAR(ut, SplineUTanVecAt(spl, te2)))
 	return te2;
 
-    // Check the endpoint
-    if ( BasePointNear(ut, SplineUTanVecAt(spl, 1.0)) )
+    // Check t==1
+    if ( (min_t+1e-9) < 1 && BPNEAR(ut, SplineUTanVecAt(spl, 1.0)) )
         return 1.0;
 
     // Nothing found
