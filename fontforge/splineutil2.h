@@ -71,7 +71,7 @@ extern void SPSmoothJoint(SplinePoint *sp);
 
 extern BasePoint UTanVectorize(bigreal x, bigreal y);
 extern BasePoint SplineUTanVecAt(Spline *s, bigreal t);
-extern int SplineTurningCWAt(Spline *s, bigreal t);
+extern int SplineTurningCCWAt(Spline *s, bigreal t);
 
 /**
  * This is like SPAdjustControl but you have not wanting to move the

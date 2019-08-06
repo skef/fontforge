@@ -1717,6 +1717,8 @@ Py_RETURN_NONE;
 return( reto );
 }
 
+extern void SplineStrokeTests();
+
 static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
     SplineSet *ss, *ss2;
     PyObject *obj, *obj2;
@@ -1725,6 +1727,7 @@ static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
     double t, t2, calc_t;
     int p, p2, bk, i;
     BasePoint theta;
+    char *str;
 
     if ( PyArg_ParseTuple(args,"Od", &obj, &t) ) {
 	ss = SSFromContour((PyFF_Contour *) obj, NULL);
@@ -1758,6 +1761,13 @@ static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
 	SplinePointListFree(ss);
 	SplinePointListFree(ss2);
 	return obj;
+    }
+    PyErr_Clear();
+    if ( PyArg_ParseTuple(args,"s",&str) ) {
+	if (strcmp(str, "asserts") == 0) {
+	    SplineStrokeTests();
+	    Py_RETURN_NONE;
+	}
     }
     PyErr_Clear();
     if ( PyArg_ParseTuple(args,"OddO", &obj, &t, &t2, &obj2) ) {

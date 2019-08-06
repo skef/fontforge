@@ -7972,8 +7972,8 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
         return -1;
 
     // Only check t==0 if min_t is negative
-    if ( min_t<=0 && BPNEAR(ut, SplineUTanVecAt(spl, 0.0)) )
-       return min_t;
+    if ( min_t<0 && BPNEAR(ut, SplineUTanVecAt(spl, 0.0)) )
+       return 0.0;
 
     // Copy the spline and rotate back to bring the slope to zero
     transform[0] = ut.x;

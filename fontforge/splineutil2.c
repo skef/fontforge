@@ -5215,14 +5215,11 @@ BasePoint SplineUTanVecAt(Spline *s, bigreal t) {
     return UTanVectorize(raw.x, raw.y);
 }
 
-int SplineTurningCWAt(Spline *s, bigreal t) {
+int SplineTurningCCWAt(Spline *s, bigreal t) {
     bigreal tmp = SecondDerivative(s, t);
-    if ( tmp==0 ) { 
-	if ( t+1e-9 <= 1.0 )
-	    t += 1e-9;
-	else
-	    t -= 1e-9;
-    	tmp = SecondDerivative(s, t);
-    }
-    return tmp < 0;
+
+    if ( tmp==0 )
+	tmp = SecondDerivative(s, (t+1e-9 <= 1.0) ? t+1e-9 : t-1e-9 );
+
+    return tmp > 0;
 }
