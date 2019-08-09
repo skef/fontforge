@@ -600,14 +600,11 @@ static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
     return next_t;
 }
 
-// ???
-static SplinePoint *AddJoint(StrokeContext *c, BasePoint sxy, SplinePoint *start_p,
+static SplinePoint *AddJoint(StrokeContext *c, SplinePoint *start_p,
                              NibOffset *nos, int is_ccw_s, NibOffset *noe, int is_ccw_e, int bk) {
     SplinePoint *sp;
-    // assert( BPNEAR((BP_ADD(nos->off[nos_idx], sxy)), start_p->me) );
 
-    printf("is_ccw_s=%d, is_ccw_e=%d, ncis=%d, ncie=%d\n", is_ccw_s, is_ccw_e, nos->nci[is_ccw_s], noe->nci[is_ccw_e]);
-    if ( bk ) 
+    if ( bk )
 	sp = AppendCubicSplineSetPortion(c->nibcorners[nos->nci[is_ccw_s]].on_nib->next->to, nos->nt,
 	                                 c->nibcorners[noe->nci[is_ccw_e]].on_nib->next->to, noe->nt, start_p, true);
     else
@@ -616,24 +613,6 @@ static SplinePoint *AddJoint(StrokeContext *c, BasePoint sxy, SplinePoint *start
     return sp;
 }
 
-/*
-static void AddCap(StrokeContext *c, BasePoint sxy, SplineSet *ss, NibOffset *nos, NibOffset *noe) {
-    SplinePoint *sp;
-    NibOffset no1, no2;
-    BasePoint sxy;
-    int linear;
-
-	    sxy = SPLINEPVAL(s, 0.0);
-	    CalcNibOffset(c, BP_REV_IF(is_right, ut_start), &no, -1);
-	    no_idx = cw_start ? NIBOFF_HIGH_IDX : NIBOFF_LOW_IDX;
-	    oxy = BP_ADD(sxy, no.off[no_idx]);
-	linear = SplineIsLinearish(s);
-    CalcNibOffset(c, ut_end, &no1, -1);
-    CalcNibOffset(c, BP_REV(ut_end), &no2, -1);
-    return sp;
-} */
-
-// ??? Center non-linear loop needs to be finalized
 static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
     NibOffset no, no_last;
     Spline *s, *first=NULL;
@@ -642,7 +621,7 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
     BasePoint ut_ini = { 2,0 }, ut_start, ut_mid, ut_end, ut_endlast;
     BasePoint oxy, sxy;
     bigreal last_t, t;
-    int is_right, linear, curved, is_ccw_start, is_ccw_mid, was_ccw;
+    int is_right, linear, curved, is_ccw_ini, is_ccw_start, is_ccw_mid, was_ccw;
     int closed = ss->first->prev!=NULL;
 
     if ( !c->remove_outer || !closed )
@@ -658,8 +637,6 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	    continue;		/* We can safely ignore it because it is of zero length */
 
 	ut_start = SplineUTanVecAt(s, 0.0);
-	if ( ut_ini.x==2 )
-	    ut_ini = ut_start;
 	linear = SplineIsLinearish(s);
 	if ( linear ) {
 	    ut_end = ut_start;
@@ -667,6 +644,10 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	} else {
 	    ut_end = SplineUTanVecAt(s, 1.0);
 	    is_ccw_start = SplineTurningCCWAt(s, 0.0);
+	}
+	if ( ut_ini.x==2 ) {
+	    ut_ini = ut_start;
+	    is_ccw_ini = is_ccw_start;
 	}
 
 	// Left then right
@@ -694,11 +675,12 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 		cur->last = cur->first;
 	    } else if ( !BPWITHIN(cur->last->me, oxy, 1e-1) ) {
 		if ( JointBendsCW(ut_endlast, ut_start) == !is_right ) {
+		    // XXX Mark for cleanup
 		    sp = SplinePointCreate(oxy.x, oxy.y);
 		    SplineMake3(cur->last, sp);
 		} else {
 		    CalcNibOffset(c, ut_endlast, is_right, &no_last, -1);
-		    sp = AddJoint(c, sxy, cur->last, &no_last, was_ccw, &no, is_ccw_start, !is_ccw_start==is_right);
+		    sp = AddJoint(c, cur->last, &no_last, was_ccw, &no, is_ccw_start, !is_ccw_start==is_right);
 		}
 		cur->last = sp;
 	    }
@@ -755,21 +737,20 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
     }
     if ( !closed ) {
 	SplineSetReverse(right);
-/*	AddCap(c, ss, left, false);
+	CalcNibOffset(c, ut_endlast, false, &no_last, -1);
+	CalcNibOffset(c, ut_endlast, true, &no, -1);
+        sp = AddJoint(c, left->last, &no_last, was_ccw, &no, was_ccw, false);
+	left->last = sp;
 	left->next = right;
 	right = NULL;
 	SplineSetJoin(left, true, 1e-8, &closed);
 	assert(closed);
-	AddCap(c, ss, left, true);
-        CalcNibOffset(c, ut_start, &no, -1);
-        CalcNibOffset(c, BP_REV(ut_start), &no2, -1);
-	AddCap(c, left->last, &no, &no2);
+	CalcNibOffset(c, ut_ini, true, &no_last, -1);
+	CalcNibOffset(c, ut_ini, false, &no, -1);
+        sp = AddJoint(c, left->last, &no, is_ccw_start, &no_last, is_ccw_start, true);
+	left->last = sp;
 	SplineSetJoin(left, true, 1e-8, &closed);
-	assert(closed); */
-	SplineMake3(left->last, right->first);
-	SplineMake3(right->last, left->first);
-	right = NULL;
-	left->last = left->first;
+	assert(closed);
     } else {
 	if ( left!=NULL ) {
             left = SplineSetJoin(left, true, 1e-1, &closed);
