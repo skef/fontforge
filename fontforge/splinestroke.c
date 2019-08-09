@@ -70,7 +70,6 @@ typedef struct nibcorner {
 
 typedef struct strokecontext {
     enum pentype pentype;
-    // For circle pens
     enum linejoin join;
     enum linecap cap;
     bigreal miterlimit;	// For miter joins
@@ -86,33 +85,36 @@ typedef struct strokecontext {
     unsigned int scaled_or_rotated: 1;
 } StrokeContext;
 
-// The corner of the nib corresponding to utanvec and the offset
-// (away from a spline point with that slope) corresponding to
-// that angle.
-//
-// When the corner is curved the arrayed values will be the same
-// They will be different when the corner is a line and utanvec
-// equals the slope of the line, which makes the offset ambiguous
-// between points. 
-
+/* The corner of the nib corresponding to utanvec and the offset
+ * (away from a spline point with that slope) corresponding to
+ * that angle.
+ *
+ * When the corner is curved the arrayed values will be the same
+ * They will be different when the corner is a line and utanvec
+ * equals the slope of the line, making the offset ambiguous
+ * between points. The two values correspond to the corners that
+ * are contiguous when a curve is turning clockwise and 
+ * counterclockwise respectively.
+ */
 #define NIBOFF_CW_IDX 0
 #define NIBOFF_CCW_IDX 1
 
-// When at_line is true the arrayed values may differ, corresponding
-// to two possible offsets for that angle.
 typedef struct niboffset {
-    BasePoint utanvec;
+    BasePoint utanvec;        // The reference angle
     int nci[2];
     BasePoint off[2];
-    bigreal nt;
-    unsigned int at_line: 1;
-    unsigned int curve: 1;
+    bigreal nt;               // The t value on the nib spline for the angle
+    unsigned int at_line: 1;  // Whether the angle is ambiguous
+    unsigned int curve: 1;    // Whether the angle is on a curve or line
+    unsigned int reversed: 1; // Whether the calculations were reversed for
+                              // tracing the right side
 } NibOffset;
 
 static char *glyphname=NULL;
 
-// Orders unit tangent vectors on an absolute -PI+e to PI
-// equivalent basis
+/* Orders unit tangent vectors on an absolute -PI+e to PI
+ * equivalent basis
+ */
 static int UTanVecGreater(BasePoint uta, BasePoint utb) {
     assert(RealNear(BASEPOINT_LENSQ(uta),1) && RealNear(BASEPOINT_LENSQ(utb),1));
 
@@ -126,22 +128,26 @@ static int UTanVecGreater(BasePoint uta, BasePoint utb) {
     return uta.x > utb.x && !BPNEAR(uta, utb);
 }
 
-// True if rotating from ut1 to ut3 in the specified
-// direction passes through ut2. 
+/* True if rotating from ut1 to ut3 in the specified direction
+ * the angle passes through ut2.
+ *
+ * Note that this returns true if ut1 is near ut2 but false 
+ * if ut2 is near ut3
+ */
 static int UTanVecsSequent(BasePoint ut1, BasePoint ut2, BasePoint ut3, int ccw) {
     BasePoint tmp;
+
+    if ( BPNEAR(ut1, ut2) )
+	return true;
+
+    if ( BPNEAR(ut2, ut3) || BPNEAR(ut1, ut3) )
+	return false;
 
     if (ccw) {
 	tmp = ut1;
 	ut1 = ut3;
 	ut3 = tmp;
     }
-
-    if ( BPNEAR(ut1, ut2) || BPNEAR(ut2, ut3) )
-	return true;
-
-    if ( BPNEAR(ut1, ut3) )
-	return false;
 
     if ( UTanVecGreater(ut1, ut3) ) {
 	return UTanVecGreater(ut1, ut2) && UTanVecGreater(ut2, ut3);
@@ -208,90 +214,67 @@ static int BuildNibCorners(StrokeContext *c, int maxp) {
     return maxp;
 }
 
-static int IndexForUTanVec(StrokeContext *c, BasePoint ut, int *at_line, int i_hint) {
-    int i;
+static int IndexForUTanVec(StrokeContext *c, BasePoint ut, int nci_hint) {
+    int nci;
 
-    if ( at_line!=NULL)
-	*at_line = false; 
-
-    // Easier to let the Near case fall back to the search
-/*    if (   i_hint != -1
-        && BPNEAR(no->utanvec, c->nibcorners[i].utv[NC_IN_IDX])
-	|| (   UTanVecGreater(c->nibcorners[i_hint].utv[NC_IN_IDX], ut)
-            && (   (i_hint+1==c->n)
-                || UTanVecGreater(ut, c->nibcorners[i_hint+1].utv[NC_IN_IDX]))))
-	i = i_hint; // Hint was accurate
-    else { */
-	for (i = 0; i<c->n; ++i) {
-	    if ( BPNEAR(ut, c->nibcorners[i].utv[NC_IN_IDX]) ) {
-		// Angle is shared, previous point is reference
-		if ( c->nibcorners[NC_PREVI(c, i)].linear ) {
-		    i = NC_PREVI(c, i);
-		    if ( at_line!=NULL)
-			*at_line = true; 
-		}
+    if (   nci_hint != -1
+        && UTanVecsSequent(c->nibcorners[nci_hint].utv[NC_IN_IDX], ut, c->nibcorners[NC_NEXTI(c, nci_hint)].utv[NC_IN_IDX], false) )
+	nci = nci_hint;
+    else // XXX Replace with binary search
+	for (nci = 0; nci<c->n; ++nci)
+	    if ( UTanVecsSequent(c->nibcorners[nci].utv[NC_IN_IDX], ut, c->nibcorners[NC_NEXTI(c, nci)].utv[NC_IN_IDX], false) )
 		break;
-	    } else if ( UTanVecGreater(ut, c->nibcorners[i].utv[NC_IN_IDX]) ) {
-		// Go back one
-		i = NC_PREVI(c, i);
-		break;
-	    }
-	}
-//    }
 
-    if ( i==c->n )
-	--i;
+    assert( UTanVecsSequent(c->nibcorners[nci].utv[NC_IN_IDX], ut, c->nibcorners[NC_NEXTI(c, nci)].utv[NC_IN_IDX], false) );
 
-    return i;
+    return nci;
 }
 
-static NibOffset *CalcNibOffset(StrokeContext *c, BasePoint ut, NibOffset *no, int i_hint) {
-    int i, at_line;
+static NibOffset *CalcNibOffset(StrokeContext *c, BasePoint ut, int reverse, NibOffset *no, int nci_hint) {
+    int nci, ncni, ncpi;
     Spline *ns;
-    BasePoint utd;
+    BasePoint tmp;
 
     if ( no==NULL )
 	no = malloc(sizeof(NibOffset));
 
     memset(no,0,sizeof(NibOffset));
-    no->utanvec = ut;
+    no->utanvec = ut; // Store the unreversed value for reference
 
-    i = no->nci[0] = no->nci[1] = IndexForUTanVec(c, ut, &at_line, i_hint);
-    no->at_line = at_line;
+    if ( reverse ) {
+	ut = BP_REV(ut);
+	no->reversed = 1;
+    }
+
+    nci = no->nci[0] = no->nci[1] = IndexForUTanVec(c, ut, nci_hint);
+    ncpi = NC_PREVI(c, nci);
+    ncni = NC_NEXTI(c, nci);
 
     // The only case where one of two points might draw the same angle,
     // so the only case where the array values differ
-    if ( no->at_line ) {
+    if ( c->nibcorners[ncpi].linear && BPNEAR(ut, c->nibcorners[ncpi].utv[NC_OUT_IDX]) ) {
 	no->nt = 0.0;
-	no->nci[NIBOFF_CW_IDX] = NC_NEXTI(c, i);
-	no->off[NIBOFF_CCW_IDX] = c->nibcorners[i].on_nib->me;
-	no->off[NIBOFF_CW_IDX] = c->nibcorners[no->nci[NIBOFF_CW_IDX]].on_nib->me;
+	no->off[NIBOFF_CCW_IDX] = c->nibcorners[ncpi].on_nib->me;
+	no->nci[NIBOFF_CCW_IDX] = ncpi;
+	no->off[NIBOFF_CW_IDX] = c->nibcorners[nci].on_nib->me;
+	no->at_line = true;
 	no->curve = false;
-    // Whether no->utanvec is (effectively) between IN and OUT, in 
+    // Whether ut is (effectively) between IN and OUT, in 
     // which case the point draws the offset curve
-    } else if ( UTanVecsSequent(c->nibcorners[i].utv[NC_IN_IDX], no->utanvec, c->nibcorners[i].utv[NC_OUT_IDX], false) ) {
+    } else if (    UTanVecsSequent(c->nibcorners[nci].utv[NC_IN_IDX], ut, c->nibcorners[nci].utv[NC_OUT_IDX], false) 
+               || BPNEAR(ut, c->nibcorners[nci].utv[NC_OUT_IDX] ) ) {
 	no->nt = 0.0;
-	no->off[0] = no->off[1] = c->nibcorners[i].on_nib->me;
+	no->off[0] = no->off[1] = c->nibcorners[nci].on_nib->me;
 	no->curve = false;
     } else {
-	// no->utanvec is on a spline curve ahead of point i
-	ns = c->nibcorners[i].on_nib->next;
+	// ut is on a spline curve ahead of point i
+	assert( UTanVecsSequent(c->nibcorners[nci].utv[NC_OUT_IDX], ut, c->nibcorners[ncni].utv[NC_IN_IDX], false) );
 	// Nib splines are locally convex and should therefore have t value per slope
+	ns = c->nibcorners[nci].on_nib->next;
+	no->nt = SplineSolveForUTanVec(ns, ut, 0.0);
+	no->off[0] = no->off[1] = SPLINEPVAL(ns, no->nt);
 	no->curve = true;
-	if ( BPNEAR(no->utanvec, c->nibcorners[i].utv[NC_OUT_IDX]) ) {
-	    no->nt = 0.0;
-	    no->off[0] = no->off[1] = SPLINEPVAL(ns, no->nt);
-	} else {
-	    no->nt = SplineSolveForUTanVec(ns, no->utanvec, 0.0);
-	    if ( RealNear(no->nt, 1.0) ) {
-		no->nt = 1.0;
-		no->off[0] = no->off[1] = c->nibcorners[NC_NEXTI(c, i)].on_nib->me;
-	    } else {
-		no->off[0] = no->off[1] = SPLINEPVAL(ns, no->nt);
-	    }
-	}
     }
-    printf("nt=%lf, off.x=%lf, off.y=%lf\n", no->nt, no->off[NIBOFF_CW_IDX].x, no->off[NIBOFF_CW_IDX].y);
     return no;
 }
 
@@ -460,9 +443,9 @@ SplinePoint *AppendCubicSplineSetPortion(SplinePoint *src_start, bigreal t_start
 
     // walk spline-wise until pointing to src_end
     while ( (backward ? s->from : s->to) != src_end ) {
-	assert( (backward ? s->from : s->to)!=src_start );
         s = backward ? s->from->prev : s->to->next;
 	assert( s!=NULL );
+	assert( (backward ? s->from : s->to)!=src_start );
         dst_start = AppendCubicSplinePortion(s, backward ? 1 : 0, backward ? 0 : 1, dst_start);
     }
     s = backward ? s->from->prev : s->to->next;
@@ -483,7 +466,9 @@ SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start, big
 
     nidiff = (t_end - t_start) / (NIPOINTS-1);
 
-    no.nci[0] = no.nci[1] = -1;
+    // XXX There is no ambiguity between cw and ccw at the ends of a
+    // curved portion of the nib so just use first value.
+    no.nci[false] = nci_hint;
     for ( i=0, t=t_start; i<NIPOINTS; ++i, t+= nidiff ) {
 	xy = SPLINEPVAL(s, t);
 	ut = SplineUTanVecAt(s, t);
@@ -491,9 +476,7 @@ SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start, big
 	    ut_s = ut;
 	if ( i==(NIPOINTS-1) )
 	    ut_e = ut;
-	CalcNibOffset(c, BP_REV_IF(is_right, ut), &no, no.nci[false]);
-	// XXX There is no ambiguity between cw and ccw at the end of a
-	// curved portion of the nib so just use first value.
+	CalcNibOffset(c, ut, is_right, &no, no.nci[false]);
 	tp[i].x = xy.x + no.off[false].x;
 	tp[i].y = xy.y + no.off[false].y;
 	tp[i].t = (bigreal)i/(NIPOINTS-1);
@@ -510,112 +493,108 @@ SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start, big
     return sp;
 }
 
-static void SplineStrokeNextAngle(StrokeContext *c, int *i, int *inout, int is_ccw, int *curved) {
-    int nci=*i, ncni=NC_NEXTI(c, *i), ncpi=NC_PREVI(c, *i);
+static BasePoint SplineStrokeNextAngle(StrokeContext *c, BasePoint ut, int is_ccw, int *curved, int reverse, int nci_hint) {
+    int nci, ncni, ncpi, inout;
 
-    if ( is_ccw ) {
-	if ( *inout == NC_IN_IDX ) {
+    ut = BP_REV_IF(reverse, ut);
+    nci = IndexForUTanVec(c, ut, nci_hint);
+    ncni = NC_NEXTI(c, nci);
+    ncpi = NC_PREVI(c, nci);
+
+    if ( BPNEAR(ut, c->nibcorners[nci].utv[NC_IN_IDX]) ) {
+	if ( is_ccw ) {
 	    if ( BPNEAR(c->nibcorners[nci].utv[NC_IN_IDX], c->nibcorners[ncpi].utv[NC_OUT_IDX]) ) {
 		assert(c->nibcorners[ncpi].linear);
-		*i = ncpi;
-		*inout = NC_IN_IDX;
+		inout = NC_IN_IDX;
 		*curved = false;
 	    } else {
-		*i = ncpi;
-		*inout = NC_OUT_IDX;
+		inout = NC_OUT_IDX;
 		*curved = true;
 	    }
-	} else { // OUT
-	    if ( BPNEAR(c->nibcorners[nci].utv[NC_OUT_IDX], c->nibcorners[nci].utv[NC_IN_IDX]) ) {
-		assert(c->nibcorners[nci].linear);
-		*i = ncpi;
-		*inout = NC_OUT_IDX;
-		*curved = false;
-	    } else {
-		*i = nci;
-		*inout = NC_IN_IDX;
-		*curved = true;
-	    }
-	}
-    } else { // Clockwise
-	if ( *inout == NC_IN_IDX ) {
+	    nci = ncpi;
+	} else { // CW
 	    if ( BPNEAR(c->nibcorners[nci].utv[NC_IN_IDX], c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
-		*i = ncni;
-		*inout = NC_IN_IDX;
+		nci = ncni;
+		inout = NC_IN_IDX;
 		*curved = true;
 	    } else {
-		*i = nci;
-		*inout = NC_OUT_IDX;
-		*curved = false;
-	    }
-	} else { // OUT
-	    if ( BPNEAR(c->nibcorners[nci].utv[NC_OUT_IDX], c->nibcorners[ncni].utv[NC_IN_IDX]) ) {
-		*i = ncni;
-		*inout = NC_OUT_IDX;
-		*curved = true;
-	    } else {
-		*i = ncni;
-		*inout = NC_IN_IDX;
+		inout = NC_OUT_IDX;
 		*curved = false;
 	    }
 	}
+    } else if ( BPNEAR(ut, c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
+	if ( is_ccw ) {
+	    if ( BPNEAR(c->nibcorners[nci].utv[NC_IN_IDX], c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
+		nci = ncpi;
+		inout = NC_OUT_IDX;
+		*curved = true;
+	    } else {
+		inout = NC_IN_IDX;
+		*curved = false;
+	    }
+	} else { // CW
+	    if ( BPNEAR(c->nibcorners[nci].utv[NC_OUT_IDX], c->nibcorners[ncni].utv[NC_IN_IDX]) ) {
+		assert(c->nibcorners[nci].linear);
+		inout = NC_OUT_IDX;
+		*curved = false;
+	    } else {
+		inout = NC_IN_IDX;
+		*curved = true;
+	    }
+	    nci = ncni;
+	}
+    } else if ( UTanVecsSequent(c->nibcorners[nci].utv[NC_IN_IDX], ut,
+                c->nibcorners[nci].utv[NC_OUT_IDX], false) ) {
+	if ( is_ccw )
+	    inout = NC_IN_IDX;
+	else
+	    inout = NC_OUT_IDX;
+	*curved = false;
+    } else {
+	assert( UTanVecsSequent(c->nibcorners[nci].utv[NC_OUT_IDX], ut,
+	        c->nibcorners[ncni].utv[NC_IN_IDX], false) );
+	if ( is_ccw )
+	    inout = NC_OUT_IDX;
+	else {
+	    nci = ncni;
+	    inout = NC_IN_IDX;
+	}
+	*curved = true;
     }
+    return BP_REV_IF(reverse, c->nibcorners[nci].utv[inout]);
 }
 
-
 static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
-		                 int nci, int is_ccw, BasePoint *cur_ut,
-				 int *curved, int reverse) {
-    int next_curved, next_nci = nci, ncni = NC_NEXTI(c, nci), next_io_idx;
-    bigreal next_t, inflect_t;
-    BasePoint next_ut, adj_ut;
+		                 int is_ccw, BasePoint *cur_ut,
+				 int *curved, int reverse, int nci_hint) {
+    int next_curved, nci, inout, at_line, icnt;
+    bigreal next_t, inflect_t = -1;
+    extended poi[2], tp;
+    BasePoint next_ut;
 
     assert( cur_ut!=NULL && curved!=NULL );
 
-    adj_ut = BP_REV_IF(reverse, *cur_ut);
-
-    if ( BPNEAR(adj_ut, c->nibcorners[nci].utv[NC_IN_IDX]) ) {
-	next_io_idx = NC_IN_IDX;
-	SplineStrokeNextAngle(c, &next_nci, &next_io_idx, is_ccw, &next_curved);
-    } else if ( BPNEAR(adj_ut, c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
-	next_io_idx = NC_OUT_IDX;
-	SplineStrokeNextAngle(c, &next_nci, &next_io_idx, is_ccw, &next_curved);
-    } else if ( BPNEAR(*cur_ut, c->nibcorners[ncni].utv[NC_IN_IDX]) ) {
-	next_io_idx = NC_IN_IDX;
-	next_nci = ncni;
-	SplineStrokeNextAngle(c, &next_nci, &next_io_idx, is_ccw, &next_curved);
-    } else if ( UTanVecsSequent(c->nibcorners[nci].utv[NC_IN_IDX], adj_ut,
-                c->nibcorners[nci].utv[NC_OUT_IDX], false) ) {
-	next_curved = false;
-	if ( is_ccw )
-	    next_io_idx = NC_IN_IDX;
-	else
-	    next_io_idx = NC_OUT_IDX;
-    } else {
-	assert( UTanVecsSequent(c->nibcorners[nci].utv[NC_OUT_IDX], adj_ut,
-	        c->nibcorners[ncni].utv[NC_IN_IDX], false) );
-	next_curved = true;
-	if ( is_ccw )
-	    next_io_idx = NC_OUT_IDX;
-	else {
-	    next_io_idx = NC_IN_IDX;
-	    next_nci = ncni;
-	}
-    }
-
+    next_ut = SplineStrokeNextAngle(c, *cur_ut, is_ccw, &next_curved, reverse, nci_hint);
     // Check for t of angle;
-    // Check for t of inflection point
-    // If latter is less, call again for opposite direction
-    next_ut = BP_REV_IF(reverse, c->nibcorners[next_nci].utv[next_io_idx]);
     next_t = SplineSolveForUTanVec(s, next_ut, cur_t);
 
-    // If we reach cur_ut before next_ut there's an inflection point, 
-    // Change the direction of search and try again
-    inflect_t = SplineSolveForUTanVec(s, *cur_ut, cur_t);
-    printf("next_t:%lf, inflect_t:%lf, cur_t:%lf\n", next_t, inflect_t, cur_t);
-    if ( inflect_t!=-1 && (next_t==-1 || inflect_t<next_t) )
-	return SplineStrokeNextT(c, s, inflect_t, nci, !is_ccw, cur_ut, curved, reverse);
+    // If we reach cur_ut before next_ut there's an inflection point
+    // change the direction of search and try again
+    if ( icnt = Spline2DFindPointsOfInflection(s, poi) ) {
+	if ( icnt==2 && poi[0] > poi[1] ) {
+	    tp = poi[0];
+	    poi[0] = poi[1];
+	    poi[1] = tp;
+	}
+	if ( poi[0] > cur_t && !RealNear(poi[0], cur_t) && (next_t==-1 || poi[0] < next_t) )
+	    inflect_t = poi[0];
+	else if ( poi[1] > cur_t && !RealNear(poi[1], cur_t) && (next_t==-1 || poi[1] < next_t) )
+	    inflect_t = poi[1];
+    }
+    if ( inflect_t!=-1 )
+	return SplineStrokeNextT(c, s, inflect_t, !is_ccw, cur_ut, curved, reverse, nci_hint);
 
+    printf("next_t:%lf, inflect_t:%lf, cur_t:%lf, next_curved:%d\n", next_t, inflect_t, cur_t, next_curved);
     *cur_ut = next_ut;
     *curved = next_curved;
     return next_t;
@@ -627,10 +606,13 @@ static SplinePoint *AddJoint(StrokeContext *c, BasePoint sxy, SplinePoint *start
     SplinePoint *sp;
     // assert( BPNEAR((BP_ADD(nos->off[nos_idx], sxy)), start_p->me) );
 
-    printf("is_ccw_s=%d, is_ccw_e=%d, ncis=%d, ncie=%d\n", is_ccw_s, is_ccw_e, nos->nci, noe->nci);
-    // XXX Do these ccws need nots?
-    sp = AppendCubicSplineSetPortion(c->nibcorners[nos->nci[is_ccw_s]].on_nib, nos->nt,
-                                     c->nibcorners[noe->nci[is_ccw_e]].on_nib, noe->nt, start_p, bk);
+    printf("is_ccw_s=%d, is_ccw_e=%d, ncis=%d, ncie=%d\n", is_ccw_s, is_ccw_e, nos->nci[is_ccw_s], noe->nci[is_ccw_e]);
+    if ( bk ) 
+	sp = AppendCubicSplineSetPortion(c->nibcorners[nos->nci[is_ccw_s]].on_nib->next->to, nos->nt,
+	                                 c->nibcorners[noe->nci[is_ccw_e]].on_nib->next->to, noe->nt, start_p, true);
+    else
+	sp = AppendCubicSplineSetPortion(c->nibcorners[nos->nci[is_ccw_s]].on_nib, nos->nt,
+	                                 c->nibcorners[noe->nci[is_ccw_e]].on_nib, noe->nt, start_p, false);
     return sp;
 }
 
@@ -660,7 +642,7 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
     BasePoint ut_ini = { 2,0 }, ut_start, ut_mid, ut_end, ut_endlast;
     BasePoint oxy, sxy;
     bigreal last_t, t;
-    int is_right, linear, curved, is_ccw, was_ccw;
+    int is_right, linear, curved, is_ccw_start, is_ccw_mid, was_ccw;
     int closed = ss->first->prev!=NULL;
 
     if ( !c->remove_outer || !closed )
@@ -681,10 +663,10 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	linear = SplineIsLinearish(s);
 	if ( linear ) {
 	    ut_end = ut_start;
-	    is_ccw = 0;
+	    is_ccw_start = 0;
 	} else {
 	    ut_end = SplineUTanVecAt(s, 1.0);
-	    is_ccw = SplineTurningCCWAt(s, 0.0);
+	    is_ccw_start = SplineTurningCCWAt(s, 0.0);
 	}
 
 	// Left then right
@@ -701,22 +683,22 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	    }
 
 	    sxy = SPLINEPVAL(s, 0.0);
-	    CalcNibOffset(c, BP_REV_IF(is_right, ut_start), &no, -1);
-	    oxy = BP_ADD(sxy, no.off[is_ccw]);
+	    CalcNibOffset(c, ut_start, is_right, &no, -1);
+	    oxy = BP_ADD(sxy, no.off[is_ccw_start]);
 
 	    // Create or verify initial spline point
-	    printf("is_right=%d nci=%d is_ccw:%d nc.x=%lf nc.y=%lf x=%lf, y=%lf, ut_start=%lf,%lf\n", is_right, no.nci, is_ccw, c->nibcorners[no.nci[is_ccw]].on_nib->me.x, c->nibcorners[no.nci[is_ccw]].on_nib->me.y, oxy.x, oxy.y, ut_start.x, ut_start.y);
+	    printf("is_right=%d nci=%d is_ccw:%d nc.x=%lf nc.y=%lf x=%lf, y=%lf, ut_start=%lf,%lf\n", is_right, no.nci[is_ccw_start], is_ccw_start, c->nibcorners[no.nci[is_ccw_start]].on_nib->me.x, c->nibcorners[no.nci[is_ccw_start]].on_nib->me.y, oxy.x, oxy.y, ut_start.x, ut_start.y);
 
 	    if ( cur->first==NULL ) {
 		cur->first = SplinePointCreate(oxy.x, oxy.y);
 		cur->last = cur->first;
-	    } else if ( !BPNEAR(cur->last->me, oxy) ) {
+	    } else if ( !BPWITHIN(cur->last->me, oxy, 1e-1) ) {
 		if ( JointBendsCW(ut_endlast, ut_start) == !is_right ) {
 		    sp = SplinePointCreate(oxy.x, oxy.y);
 		    SplineMake3(cur->last, sp);
 		} else {
-		    CalcNibOffset(c, ut_endlast, &no_last, -1);
-		    sp = AddJoint(c, sxy, cur->last, &no_last, was_ccw, &no, is_ccw, !is_right);
+		    CalcNibOffset(c, ut_endlast, is_right, &no_last, -1);
+		    sp = AddJoint(c, sxy, cur->last, &no_last, was_ccw, &no, is_ccw_start, !is_ccw_start==is_right);
 		}
 		cur->last = sp;
 	    }
@@ -724,31 +706,32 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	    // The path for this spline
 	    if ( linear ) {
 		sxy = SPLINEPVAL(s, 1.0);
-		oxy = BP_ADD(sxy, no.off[is_ccw]);
+		oxy = BP_ADD(sxy, no.off[is_ccw_start]);
 		sp = SplinePointCreate(oxy.x, oxy.y);
 		SplineMake3(cur->last, sp);
 		cur->last = sp;
 	    } else {
 		t = 0.0;
 		ut_mid = ut_start;
+		is_ccw_mid = is_ccw_start;
 		while ( t < 1.0 ) {
 		    last_t = t;
-		    t = SplineStrokeNextT(c, s, t, no.nci[is_ccw], is_ccw, &ut_mid, &curved, is_right);
+		    t = SplineStrokeNextT(c, s, t, is_ccw_mid, &ut_mid, &curved, is_right, no.nci[is_ccw_mid]);
 		    assert( t==-1.0 || t > last_t );
 		    if ( t==-1.0 ) // No relevant slope found -- copy rest of spline
 			t = 1.0;
-		    printf("nci: %d, ut_mid=%lf,%lf, t=%.15lf\n", no.nci[is_ccw], ut_mid.x, ut_mid.y, t);
+		    printf("nci: %d, ut_mid=%lf,%lf, t=%.15lf\n", no.nci[is_ccw_mid], ut_mid.x, ut_mid.y, t);
 		    if ( curved )
-			sp = TraceAndFitSpline(c, s, last_t, t, cur->last, no.nci[is_ccw], is_right);
+			sp = TraceAndFitSpline(c, s, last_t, t, cur->last, no.nci[is_ccw_mid], is_right);
 		    else
 			sp = AppendCubicSplinePortion(s, last_t, t, cur->last);
 		    cur->last = sp;
 		    if (t < 1.0) {
 			sxy = SPLINEPVAL(s, t);
-			is_ccw = SplineTurningCCWAt(s, t);
-			CalcNibOffset(c, BP_REV_IF(is_right, ut_mid), &no, no.nci[is_ccw]);
-			printf("nci=%d, lowx=%lf, lowy=%lf, highx=%lf, highy=%lf\n", no.nci[is_ccw], no.off[false].x, no.off[false].y, no.off[true].x, no.off[true].y);
-			oxy = BP_ADD(sxy, no.off[is_ccw]);
+			is_ccw_mid = SplineTurningCCWAt(s, t);
+			CalcNibOffset(c, ut_mid, is_right, &no, no.nci[is_ccw_mid]);
+			printf("nci=%d, lowx=%lf, lowy=%lf, highx=%lf, highy=%lf\n", no.nci[is_ccw_mid], no.off[false].x, no.off[false].y, no.off[true].x, no.off[true].y);
+			oxy = BP_ADD(sxy, no.off[is_ccw_mid]);
 			if ( !BPNEAR(cur->last->me, oxy) ) {
 			    // One of the two points should be the same
 			    //assert(BPNEAR(cur->last->me, BP_ADD(sxy, no.off[(no_idx+1)%2])));
@@ -1124,12 +1107,12 @@ void SplineStrokeTests() {
     for (i=0; i<360; ++i)
 	for (j = 0; j<360; ++j)
 	    for (k = 0; k<360; ++k) {
-		if ( i==k )
-		    continue;
 		a = UTanVecsSequent(ut[i], ut[j], ut[k], false);
 		b = UTanVecsSequent(ut[i], ut[j], ut[k], true);
-		if ( i==j || j==k )
+		if ( i==j )
 		    assert(a && b);
+		else if ( j==k || i==k )
+		    assert(!a && !b);
 		else {
 		    x = atan2(ut[i].x, ut[i].y);
 		    y = atan2(ut[j].x, ut[j].y);
