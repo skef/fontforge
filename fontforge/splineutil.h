@@ -222,7 +222,6 @@ extern int HashKerningClassNamesFlex(SplineFont *sf, struct glif_name_index * cl
 #define SPLINE1DPTANVAL(s, t) ((3*(s)->a*(t) + 2*(s)->b)*(t) + (s)->c)
 #define SPLINEPTANVAL(s, t) (BasePoint) { SPLINE1DPTANVAL(&(s)->splines[0], t), SPLINE1DPTANVAL(&(s)->splines[1], t) }
 #define BPWITHIN(bp1, bp2, f) (RealWithin((bp1).x, (bp2).x, f) && RealWithin((bp1).y, (bp2).y, f))
-#define BPNEAR(bp1, bp2) BPWITHIN(bp1, bp2, 1e-8)
 
 
 #endif /* FONTFORGE_SPLINEUTIL_H */

@@ -7972,7 +7972,7 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
         return -1;
 
     // Only check t==0 if min_t is negative
-    if ( min_t<0 && BPNEAR(ut, SplineUTanVecAt(spl, 0.0)) )
+    if ( min_t<0 && BPWITHIN(ut, SplineUTanVecAt(spl, 0.0), 1e-8) )
        return 0.0;
 
     // Copy the spline and rotate back to bring the slope to zero
@@ -8004,15 +8004,15 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
 
     BasePoint tmp1 = SplineUTanVecAt(spl, te1), tmp2 = SplineUTanVecAt(spl, te2);
 
-    printf("target: %.15lf,%.15lf, te1: %.15lf, slope1: %.15lf,%.15lf, near1: %d, te2: %.15lf, slope2: %.15lf,%.15lf, near2=%d\n", ut.x, ut.y, (double)te1, tmp1.x, tmp1.y, (double)te2, tmp2.x, tmp2.y, (int)BPNEAR(ut, SplineUTanVecAt(spl, te1)), BPNEAR(ut, SplineUTanVecAt(spl, te2)));
+    printf("target: %.15lf,%.15lf, te1: %.15lf, slope1: %.15lf,%.15lf, near1: %d, te2: %.15lf, slope2: %.15lf,%.15lf, near2=%d\n", ut.x, ut.y, (double)te1, tmp1.x, tmp1.y, (double)te2, tmp2.x, tmp2.y, (int)BPWITHIN(ut, SplineUTanVecAt(spl, te1), 1e-8), BPWITHIN(ut, SplineUTanVecAt(spl, te2), 1e-8));
 
-    if (te1 != -1 && te1 > (min_t+1e-9) && BPNEAR(ut, SplineUTanVecAt(spl, te1)))
+    if (te1 != -1 && te1 > (min_t+1e-9) && BPWITHIN(ut, SplineUTanVecAt(spl, te1), 1e-8))
 	return te1;
-    if (te2 != -1 && te2 > (min_t+1e-9) && BPNEAR(ut, SplineUTanVecAt(spl, te2)))
+    if (te2 != -1 && te2 > (min_t+1e-9) && BPWITHIN(ut, SplineUTanVecAt(spl, te2), 1e-8))
 	return te2;
 
     // Check t==1
-    if ( (min_t+1e-9) < 1 && BPNEAR(ut, SplineUTanVecAt(spl, 1.0)) )
+    if ( (min_t+1e-9) < 1 && BPWITHIN(ut, SplineUTanVecAt(spl, 1.0), 1e-8) )
         return 1.0;
 
     // Nothing found
