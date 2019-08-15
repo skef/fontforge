@@ -352,9 +352,11 @@ static char *editablelayers[] = {
 };
 static real raddiam_x = 20, raddiam_y = 20, rotate_by=0;
 static StrokeInfo expand = {
-    25, lj_round, lc_butt, si_centerline,
+    25, lj_round, lc_butt, si_centerline, srmov_layer,
     false, /* removeexternal */
     false, /* removeinternal */
+    false,
+    false,
     false, /* leave users */
     3.1415926535897932/4, 25, NULL, 50,
     0.0, 0, 0, NULL, NULL

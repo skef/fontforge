@@ -1725,6 +1725,7 @@ static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
     Spline *s;
     SplinePoint *sp, *sp2;
     double t, t2, calc_t;
+    extended e, e2;
     int p, p2, bk, i;
     BasePoint theta;
     char *str;
@@ -1755,7 +1756,8 @@ static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
 	sp2 = ss2->first;
 	for (i=0; i<p2; ++i)
 	    sp2 = sp2->next->to;
-	sp = AppendCubicSplineSetPortion(sp, t, sp2, t2, ss->last, bk);
+	sp = AppendCubicSplineSetPortion(sp->next, t, sp2->next, t2,
+	                                 ss->last, bk);
 	ss->last = sp;
 	obj = (PyObject *) ContourFromSS(ss, NULL);
 	SplinePointListFree(ss);
@@ -1788,7 +1790,12 @@ static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
 	ss = SSFromContour((PyFF_Contour *) obj, NULL);
 	if ( ss==NULL )
 	    return NULL;
+	ss2 = SSFromContour((PyFF_Contour *) obj2, NULL);
+	if ( ss2==NULL )
+	    return NULL;
 	s = ss->first->next;
+	SplineFindExtrema(&ss->first->next->splines[1], &e, &e2);
+	SplineFindExtrema(&ss2->first->next->splines[1], &e, &e2);
         return( Py_BuildValue("i", 1 ) );
     }
     PyErr_Format(PyExc_ValueError, "Not Recognized");

@@ -7994,10 +7994,12 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
     _BpTransform(&t_to.prevcp, &spl->to->prevcp, transform, tpmask_dontTrimValues);
     t_to.noprevcp = spl->to->noprevcp;
 
+    // printf("SPLINE: %.20lf,%.20lf %.20lf,%.20lf %.20lf,%.20lf %.20lf,%.20lf\n", t_from.me.x, t_from.me.y, t_from.nextcp.x, t_from.nextcp.y, t_to.prevcp.x, t_to.prevcp.y, t_to.me.x, t_to.me.y);
     t_spline.from = &t_from; t_spline.to = &t_to;
     t_from.next = t_to.prev = &t_spline;
-    // XXX Needs to be updated to support order 2 trace
-    SplineRefigure3(&t_spline);
+    t_spline.order2 = spl->order2;
+    // XXX test with order2
+    SplineRefigure(&t_spline);
 
     // After rotating by theta the desired angle will be at a y extrema
     SplineFindExtrema(&t_spline.splines[1], &te1, &te2);

@@ -164,13 +164,20 @@ enum linejoin {
     lj_miter,		/* Extend lines until they meet */
     lj_round,		/* circle centered at the join of expand radius */
     lj_bevel,		/* Straight line between the ends of next and prev */
+    lj_nib,		/* Join with the nib shape */
     lj_inherited
 };
 enum linecap {
     lc_butt,		/* equiv to lj_bevel, straight line extends from one side to other */
     lc_round,		/* semi-circle */
     lc_square,		/* Extend lines by radius, then join them */
+    lc_nib,		/* cap with the nib shape */
     lc_inherited
+};
+enum stroke_rmov {
+    srmov_layer = 0,
+    srmov_contour = 1,
+    srmov_none = 2
 };
 enum spreadMethod {
     sm_pad, sm_reflect, sm_repeat
@@ -231,8 +238,11 @@ typedef struct strokeinfo {
     enum linejoin join;
     enum linecap cap;
     enum si_type stroke_type;
+    enum stroke_rmov rmov;
     unsigned int removeinternal: 1;
     unsigned int removeexternal: 1;
+    unsigned int nosimplify: 1;
+    unsigned int noextrema: 1;
     unsigned int leave_users_center: 1;			/* Don't move the pen so its center is at the origin */
     real penangle;
     real minorradius;
