@@ -640,7 +640,7 @@ static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
 		                 int is_ccw, BasePoint *cur_ut,
 				 int *curved, int reverse, int nci_hint) {
     int next_curved, nci, inout, at_line, icnt, i;
-    bigreal next_t, inflect_t = -1;
+    bigreal next_t;
     extended poi[2], tp;
     BasePoint next_ut;
 
@@ -650,23 +650,25 @@ static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
                                     reverse, nci_hint);
     next_t = SplineSolveForUTanVec(s, next_ut, cur_t);
 
-    // If we reach cur_ut before next_ut there's an inflection point
-    // then go past it, change the direction of search, and try again.
     if ( icnt = Spline2DFindPointsOfInflection(s, poi) ) {
 	assert ( icnt < 2 || poi[0] < poi[1] );
 	for ( i=0; i<2; ++i )
 	    if (    poi[i] > cur_t
 	         && !RealNear(poi[i], cur_t)
 	         && (next_t==-1 || poi[i] < next_t) ) {
-		inflect_t = poi[i];
+		next_t = poi[i];
+		next_ut = SplineUTanVecAt(s, next_t);
 		break;
+	    }
     }
-    if ( inflect_t!=-1 )
+    // If we reach cur_ut before next_ut there's an inflection point
+    // then go past it, change the direction of search, and try again.
+/*    if ( inflect_t!=-1 )
 	return SplineStrokeNextT(c, s, inflect_t, !is_ccw, cur_ut,
-	                         curved, reverse, nci_hint);
+	                         curved, reverse, nci_hint); */
 
-    printf("next_t:%lf, inflect_t:%lf, cur_t:%lf, next_curved:%d\n",
-           next_t, inflect_t, cur_t, next_curved);
+    printf("next_t:%lf, cur_t:%lf, next_curved:%d\n", next_t, cur_t,
+           next_curved);
 
     if ( next_t==-1 ) {
 	next_t = 1.0;

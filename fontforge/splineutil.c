@@ -7975,7 +7975,9 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
     if ( min_t<0 && BPWITHIN(ut, SplineUTanVecAt(spl, 0.0), 1e-8) )
        return 0.0;
 
-    // Copy the spline and rotate back to bring the slope to zero
+    // Copy the spline and rotate back to bring the slope to zero.
+    // The following through SplineFindExtrema() could be slightly
+    // optimized by calculating splines[1] directly 
     transform[0] = ut.x;
     transform[1] = -ut.y;
     transform[2] = ut.y;
