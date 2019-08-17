@@ -637,6 +637,7 @@ typedef struct strokedlg {
     int dontexpand;
 } StrokeDlg;
 extern void StrokeCharViewInits(StrokeDlg *sd,int cid);
+extern void StrokeSetConvexNib(SplineSet *ss);
 
 struct lksubinfo {
     struct lookup_subtable *subtable;

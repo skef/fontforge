@@ -54,6 +54,7 @@
 #define BP_ADD(v1, v2) (BasePoint) { (v1).x + (v2).x, (v1).y + (v2).y } 
 #define BP_UNINIT ((BasePoint) { -INFINITY, INFINITY })
 #define BP_IS_UNINIT(v) ((v).x==-INFINITY && (v).y==INFINITY)
+#define NORMANGLE(a) ((a)>PI?(a)-2*PI:(a)<-PI?(a)+2*PI:(a))
 
 #define UTMIN ((BasePoint) { -1, -DBL_MIN })
 #define BPNEAR(bp1, bp2) BPWITHIN(bp1, bp2, INTRASPLINE_MARGIN)
@@ -327,77 +328,60 @@ static NibOffset *CalcNibOffset(StrokeContext *c, BasePoint ut, int reverse,
  */
 
 enum ShapeType NibIsValid(SplineSet *ss) {
-    /* For each vertex: */
-    /*  Remove that vertex from the polygon, and then test if the vertex is */
-    /*  inside the resultant poly. If it is inside, then the polygon is not */
-    /*  convex */
-    /* If all verteces are outside then we have a convex poly */
-    /* If one vertex is on an edge, then we have a poly with an unneeded vertex */
-/*
-    bigreal nx,ny;
-    int i,j,ni;
+    Spline *s;
+    int n = 1;
+    bigreal anglesum = 0, angle, pangle, d, pcpangle, ncpangle;
 
+    if ( ss->first==NULL )
+	return Shape_TooFewPoints;
+    if ( ss->first->prev==NULL )
+	return Shape_NotClosed;
+    if ( !SplinePointListIsClockwise(ss) )
+	return Shape_CCW;
+
+    s = ss->first->prev;
+    pangle = atan2(s->to->me.y - s->from->me.y, s->to->me.x - s->from->me.x);
+    s = ss->first->next;
+    SplinePointListSelect(ss, false);
+    while ( true ) {
+	s->from->selected = true;
+	if ( BPWITHIN(s->from->me, s->to->me,1e-2) )
+	    return Shape_TinySpline;
+	angle = atan2(s->to->me.y - s->from->me.y, s->to->me.x - s->from->me.x);
+	if ( RealWithin(angle, pangle, 1e-4) )
+	    return Shape_PointOnEdge;
+	d = pangle-angle;
+	d = NORMANGLE(d);
+	if ( d<0 )
+	    return Shape_CCWTurn;
+	anglesum += d;
+	if ( !s->from->noprevcp ) {
+	    pcpangle = atan2(s->to->prevcp.y - s->to->me.y,
+	                     s->to->prevcp.x - s->to->me.x);
+	    d = pcpangle-pangle;
+	    d = NORMANGLE(d);
+	    printf("prevcp angle: %lf, d1: %lf, d2:%lf\n", pcpangle, d, NORMANGLE(pcpangle-angle));
+	} else
+	    pcpangle = pangle;
+	if ( !s->from->nonextcp ) {
+	    ncpangle = atan2(s->to->nextcp.y - s->to->me.y,
+	                     s->to->nextcp.x - s->to->me.x);
+	    d = ncpangle-pcpangle;
+	    d = NORMANGLE(d);
+	    printf("nextcp angle: %lf, d1: %lf, d2:%lf\n", ncpangle, d, NORMANGLE(angle-ncpangle));
+	}
+	s->from->selected = false;
+	s=s->to->next;
+	pangle = angle;
+	if ( s==ss->first->next )
+	    break;
+	++n;
+    }
     if ( n<3 )
-return( Shape_TooFewPoints );
-    // All the points might lie on one line. That wouldn't be a polygon
-    nx = -(poly[1].y-poly[0].y);
-    ny = (poly[1].x-poly[0].x);
-    for ( i=2; i<n; ++i ) {
-	if ( (poly[i].x-poly[0].x)*ny - (poly[i].y-poly[0].y)*nx != 0 )
-    break;
-    }
-    if ( i==n )
-return( Shape_Line );		// Colinear
-    if ( n==3 ) {
-	// Triangles are always convex
-return( Shape_Convex );
-    }
-
-    for ( j=0; j<n; ++j ) {
-	// Test to see if poly[j] is inside the polygon poly[0..j-1,j+1..n]
-	// Basically the hit test code above modified to ignore poly[j]
-	int outside = 0, zero_cnt=0, sign=0;
-	bigreal sx, sy, dx,dy, dot;
-
-	for ( i=0; ; ++i ) {
-	    if ( i==j )
-	continue;
-	    ni = i+1;
-	    if ( ni==n ) ni=0;
-	    if ( ni==j ) {
-		++ni;
-		if ( ni==n )
-		    ni=0;		// Can't be j, because it already was
-	    }
-
-	    sx = poly[ni].x - poly[i].x;
-	    sy = poly[ni].y - poly[i].y;
-	    dx = poly[j ].x - poly[i].x;
-	    dy = poly[j ].y - poly[i].y;
-	    // Only care about signs, so I don't need unit vectors
-	    dot = dx*sy - dy*sx;
-	    if ( dot==0 )
-		++zero_cnt;
-	    else if ( sign==0 )
-		sign= dot;
-	    else if ( (dot<0 && sign>0) || (dot>0 && sign<0)) {
-		outside = true;
-	break;
-	    }
-	    if ( ni==0 )
-	break;
-	}
-	if ( !outside ) {
-//	    if ( badpointindex!=NULL )
-//		*badpointindex = j;
-	    if ( zero_cnt>0 )
-return( Shape_PointOnEdge );
-	    else
-return( Shape_Concave );
-	}
-    }
-    */
-return( Shape_Convex );
+	return Shape_TooFewPoints;
+    if ( !RealWithin(anglesum, 2*PI, 1e-1) )
+	return Shape_SelfIntersects;
+    return Shape_Convex;
 }
 
 /* Copies the portion of s from t_start to t_end and then translates
@@ -650,6 +634,17 @@ static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
                                     reverse, nci_hint);
     next_t = SplineSolveForUTanVec(s, next_ut, cur_t);
 
+    // If there is an inflection point before next_t stop there first
+    // so that tracing and splicing doesn't have to worry about inflections
+    // and the traced curve will have fewer of them. The curved value returned
+    // by SplineStrokeNextAngle is accurate for that portion of the curve
+    //
+    // The alternative would be to call
+    //
+    // SplineStrokeNextT(c, s, inflect_t, !is_ccw, cur_ut,
+    //                   curved, reverse, nci_hint);
+    //
+    // to look for the next angle after the inflection turning the other way.
     if ( icnt = Spline2DFindPointsOfInflection(s, poi) ) {
 	assert ( icnt < 2 || poi[0] < poi[1] );
 	for ( i=0; i<2; ++i )
@@ -661,11 +656,6 @@ static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
 		break;
 	    }
     }
-    // If we reach cur_ut before next_ut there's an inflection point
-    // then go past it, change the direction of search, and try again.
-/*    if ( inflect_t!=-1 )
-	return SplineStrokeNextT(c, s, inflect_t, !is_ccw, cur_ut,
-	                         curved, reverse, nci_hint); */
 
     printf("next_t:%lf, cur_t:%lf, next_curved:%d\n", next_t, cur_t,
            next_curved);
@@ -928,7 +918,6 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	SplineSetJoin(left, true, FIXUP_MARGIN, &closed);
 	if ( !closed )
 	     LogError( _("Warning: Contour did not close as expected\n") );
-	/*
 	CalcNibOffset(c, ut_ini, true, &no_last, -1);
 	CalcNibOffset(c, ut_ini, false, &no, -1);
         sp = AddJoint(c, left->last, &no, is_ccw_start, &no_last,
@@ -939,7 +928,6 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 	     LogError( _("Warning: Contour did not close as expected\n") );
 	else if ( c->rmov==srmov_contour )
 	    left = SplineSetRemoveOverlap(NULL,left,over_remove);
-	    */
     } else {
 	// This can fail if the source contours are closed in a strange way
 	if ( left!=NULL ) {

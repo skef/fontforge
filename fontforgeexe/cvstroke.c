@@ -81,6 +81,8 @@ extern const int input_em_cnt;
 #define CID_SquareCap	1032
 #define CID_RoundJoin	1033
 
+static SplineSet *old_convex;
+
 static void CVStrokeIt(void *_cv, StrokeInfo *si, int justapply) {
     CharView *cv = _cv;
     int anypoints;
@@ -177,28 +179,21 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
 	    msg = NULL;
 	    selectall = false;
 	    for ( ss=si->nib ; ss!=NULL && !err; ss=ss->next ) {
-		if ( ss->first->prev==NULL ) {
-		    msg = _("The selected contour is open, but it must be a closed convex shape.");
-		    err = selectall = true;
-		} else {
-		    if ( err )
-			/* Already handled */;
-		    else {
-			enum ShapeType pt;
-			pt = NibIsValid(ss);
-			if ( pt==Shape_Line ) {
-			    msg = _("This is a line; it must enclose some area.");
-			    err = selectall = true;
-			} else if ( pt==Shape_TooFewPoints ) {
-			    msg = _("There aren't enough vertices to be a convex shape.");
-			    err = selectall = true;
-			} else if ( pt!=Shape_Convex ) {
-			    err = true;
-			    if ( pt==Shape_PointOnEdge )
-				msg = _("There are at least 3 colinear vertices. Please remove (Edit->Merge) the selected point.");
-			    else
-				msg = _("The selected vertex makes this a concave shape. Please remove (Edit->Merge) it.");
-			}
+		if ( err )
+		    /* Already handled */;
+		else {
+		    enum ShapeType pt;
+		    pt = NibIsValid(ss);
+		    if ( pt==Shape_NotClosed ) {
+			msg = _("The selected contour is open, but it must be a closed convex shape.");
+			err = selectall = true;
+		     } else if ( pt==Shape_TooFewPoints ) {
+			msg = _("There aren't enough vertices to be a convex shape.");
+			err = selectall = true;
+		    } else if ( pt!=Shape_Convex ) {
+			printf("Nib not valid: %d\n", (int)pt);
+			err = true;
+			msg = _("The selected vertex makes this a concave shape. Please remove (Edit->Merge) it.");
 		    }
 		}
 		if ( selectall ) {
@@ -629,9 +624,10 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
     StrokeInfo *def = si?si:&defaults;
     char anglebuf[20], widthbuf[20], axisbuf[20];
 
-    if ( strokeit!=NULL )
+    if ( strokeit!=NULL ) {
 	sd = &strokedlg;
-    else {
+	sd->old_convex = old_convex;
+    } else {
 	sd = &freehand_dlg;
 	memset(&freehand_dlg,0,sizeof(freehand_dlg));
 	sd->si = si;
@@ -1081,6 +1077,10 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	GDrawSetVisible(sd->gw,false);
     else
 	GDrawDestroyWindow(sd->gw);
+    if ( sd==&strokedlg ) {
+	old_convex = sd->old_convex;
+	sd->old_convex = NULL;
+    }
 }
 
 void CVStroke(CharView *cv) {
@@ -1097,6 +1097,12 @@ void FVStroke(FontView *fv) {
 
 void FreeHandStrokeDlg(StrokeInfo *si) {
     MakeStrokeDlg(NULL,NULL,si);
+}
+
+void StrokeSetConvexNib(SplineSet *ss) {
+    if ( old_convex!=NULL )
+	SplinePointListsFree(old_convex);
+    old_convex = ss;
 }
 
 /* ************************************************************************** */

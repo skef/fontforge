@@ -339,6 +339,44 @@ return( NULL );
 Py_RETURN_NONE;
 }
 
+extern int NibCheck(SplineSet *nib);
+
+static PyObject *PyFF_setConvexNib(PyObject *UNUSED(self), PyObject *args) {
+    SplineSet *ss;
+    PyObject *obj;
+
+    if ( no_windowing_ui ) {
+	PyErr_Format(PyExc_EnvironmentError, "No user interface");
+	return( NULL );
+    }
+
+    if ( !PyArg_ParseTuple(args,"O", &obj ) )
+	return( NULL );
+
+    if ( PyType_IsSubtype(&PyFF_LayerType, Py_TYPE(obj)) ) {
+	if ( ((PyFF_Layer *) obj)->is_quadratic ) {
+	    PyErr_Format(PyExc_TypeError, "Layer is quadratic, must be cubic");
+	    return( NULL );
+	}
+	ss = SSFromLayer( (PyFF_Layer *) obj);
+    } else if ( PyType_IsSubtype(&PyFF_ContourType, Py_TYPE(obj)) ) {
+	if ( ((PyFF_Contour *) obj)->is_quadratic ) {
+	    PyErr_Format(PyExc_TypeError, "Contour is quadratic, must be cubic");
+	    return( NULL );
+	}
+	ss = SSFromContour( (PyFF_Contour *) obj, NULL);
+    } else {
+	PyErr_Format(PyExc_TypeError, "Argument must be a layer or a contour" );
+	return( NULL );
+    }
+
+    if ( !NibCheck(ss) )
+	return ( NULL );
+
+    StrokeSetConvexNib(ss);
+    Py_RETURN_NONE;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -372,6 +410,7 @@ copyUIMethodsToBaseTable( PyMethodDef* ui, PyMethodDef* md )
 void PythonUI_Init(void) {
     TRACE("PythonUI_Init()\n"); 
     FfPy_Replace_MenuItemStub(PyFF_registerMenuItem);
+    FfPy_Replace_SetConvexStub(PyFF_setConvexNib);
 
     copyUIMethodsToBaseTable( module_fontforge_ui_methods, module_fontforge_methods );
 }

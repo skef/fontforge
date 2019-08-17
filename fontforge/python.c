@@ -280,10 +280,8 @@ static void PyFF_PickleTypesInit(void);
 
 
 static int SSSelectOnCurve(SplineSet *ss,int pos);
-static SplineSet *SSFromContour(PyFF_Contour *, int *start);
 static SplineSet *_SSFromContour(PyFF_Contour *, int *start, int flags);
 static PyFF_Contour *ContourFromSS(SplineSet *,PyFF_Contour *);
-static SplineSet *SSFromLayer(PyFF_Layer *);
 static SplineSet *_SSFromLayer(PyFF_Layer *, int flags);
 static PyFF_Layer *LayerFromSS(SplineSet *,PyFF_Layer *);
 static PyFF_Layer *LayerFromLayer(Layer *,PyFF_Layer *);
@@ -1142,6 +1140,16 @@ static PyObject *PyFF_GetScriptPath(PyObject *UNUSED(self), PyObject *UNUSED(arg
     return ret;
 }
 
+static PyObject *PyFF_GetUserConfigPath(PyObject *UNUSED(self), PyObject *UNUSED(args)) {
+    PyObject *ret;
+    const char *userdir;
+
+    userdir = getFontForgeUserDir(Config);
+    ret=Py_BuildValue("s",userdir);
+
+    return ret;
+}
+
 static PyObject *PyFF_FontTuple(PyObject *UNUSED(self), PyObject *UNUSED(args)) {
     FontViewBase *fv;
     int cnt;
@@ -1594,6 +1602,10 @@ Py_RETURN_NONE;
     reto = DECODE_UTF8(ret,strlen(ret),NULL);
     free(ret);
 return( reto );
+}
+
+static PyObject *PyFF_setConvexNibStub(PyObject *UNUSED(self), PyObject *args) {
+    Py_RETURN_NONE;
 }
 
 static PyObject *PyFF_ask(PyObject *UNUSED(self), PyObject *args) {
@@ -3703,7 +3715,7 @@ static PyMethodDef PyFFContour_methods[] = {
     PYMETHODDEF_EMPTY  /* Sentinel */
 };
 
-static PyTypeObject PyFF_ContourType = {
+PyTypeObject PyFF_ContourType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "fontforge.contour",       /*tp_name*/
     sizeof(PyFF_Contour),      /*tp_basicsize*/
@@ -4380,31 +4392,26 @@ return( NULL );
 Py_RETURN( self );
 }
 
-static int NibCheck(SplineSet *nib) {
+int NibCheck(SplineSet *nib) {
     SplineSet *ss;
     SplinePoint *sp;
     int cnt;
 
     for ( ss=nib ; ss!=NULL; ss=ss->next ) {
-	if ( ss->first->prev==NULL ) {
-	    PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one is not closed." );
-	    return( false );
-	} else {
-	    enum ShapeType pt;
-	    pt = NibIsValid(ss);
-	    if ( pt==Shape_Line ) {
-		PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one is a line." );
-		return( false );
-	    } else if ( pt==Shape_TooFewPoints ) {
-		PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one has too few points." );
-		return( false );
-	    } else if ( pt!=Shape_Convex ) {
-		if ( pt==Shape_PointOnEdge )
-		    PyErr_Format(PyExc_ValueError, "There are at least 3 colinear vertices in the brush.");
-		else
-		    PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one is concave." );
-		return( false );
-	    }
+	enum ShapeType pt;
+	pt = NibIsValid(ss);
+	if ( pt==Shape_NotClosed ) {
+	    PyErr_Format(PyExc_ValueError, "The nib must be a closed, convex shape. This one is not closed." );
+	    return false;
+	} else if ( pt==Shape_TooFewPoints ) {
+	    PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one has too few points." );
+	    return false;
+	} else if ( pt==Shape_PointOnEdge ) {
+	    PyErr_Format(PyExc_ValueError, "There are at least 3 colinear vertices in the brush.");
+	    return false;
+	} else if ( pt!=Shape_Convex ) {
+	    PyErr_Format(PyExc_ValueError, "The nib must be a closed, convex shape. This one is not." );
+	    return false;
 	}
     }
     return( true );
@@ -4903,7 +4910,7 @@ static PyMethodDef PyFFLayer_methods[] = {
     PYMETHODDEF_EMPTY /* Sentinel */
 };
 
-static PyTypeObject PyFF_LayerType = {
+PyTypeObject PyFF_LayerType = {
     PyVarObject_HEAD_INIT(NULL, 0)
     "fontforge.layer",         /* tp_name */
     sizeof(PyFF_Layer),        /* tp_basicsize */
@@ -5231,7 +5238,7 @@ return( NULL );
     return( ss );
 }
 
-static SplineSet *SSFromContour(PyFF_Contour *c,int *tt_start) {
+SplineSet *SSFromContour(PyFF_Contour *c,int *tt_start) {
 	return _SSFromContour(c, tt_start, pconvert_flag_none);
 }
 
@@ -5334,7 +5341,7 @@ static SplineSet *_SSFromLayer(PyFF_Layer *layer, int flags) {
     return( head );
 }
 
-static SplineSet *SSFromLayer(PyFF_Layer *layer) {
+SplineSet *SSFromLayer(PyFF_Layer *layer) {
 	return _SSFromLayer(layer, pconvert_flag_none);
 }
 
@@ -18540,6 +18547,7 @@ PyMethodDef module_fontforge_methods[] = {
     { "version", PyFF_Version, METH_NOARGS, "Returns a string containing the current version of FontForge, as 20061116" },
     { "runInitScripts", PyFF_RunInitScripts, METH_NOARGS, "Run the system and user initialization scripts, if not already run" },
     { "scriptPath", PyFF_GetScriptPath, METH_NOARGS, "Returns a list of the directories searched for scripts"},
+    { "userConfigPath", PyFF_GetUserConfigPath, METH_NOARGS, "Returns the path to the user's FontForge configuration directory, which should be writable."},
     { "fonts", PyFF_FontTuple, METH_NOARGS, "Returns a tuple of all loaded fonts" },
     { "fontsInFile", PyFF_FontsInFile, METH_VARARGS, "Returns a tuple containing the names of any fonts in an external file"},
     { "open", PyFF_OpenFont, METH_VARARGS, "Opens a font and returns it" },
@@ -18557,6 +18565,7 @@ PyMethodDef module_fontforge_methods[] = {
     { "hasUserInterface", PyFF_hasUserInterface, METH_NOARGS, "Returns whether this fontforge session has a user interface (True if it has opened windows) or is just running a script (False)"},
     { "registerImportExport", PyFF_registerImportExport, METH_VARARGS, "Adds an import/export spline conversion module"},
     { "registerMenuItem", PyFF_registerMenuItemStub, METH_VARARGS, "Adds a menu item (which runs a python script) to the font or glyph (or both) windows -- in the Tools menu"},
+    { "setConvexNib", PyFF_setConvexNibStub, METH_VARARGS, "Sets the 'Convex' nib in the stroke dialog to the layer argument."},
     { "logWarning", PyFF_logError, METH_VARARGS, "Adds a non-fatal message to the Warnings window"},
     { "postError", PyFF_postError, METH_VARARGS, "Pops up an error dialog box with the given title and message" },
     { "postNotice", PyFF_postNotice, METH_VARARGS, "Pops up an notice window with the given title and message" },
@@ -18653,6 +18662,15 @@ return;
 	}
 }
 
+void FfPy_Replace_SetConvexStub(PyObject *(*func)(PyObject *,PyObject *)) {
+    int i;
+    PyMethodDef *methods = module_fontforge_methods;
+    for ( i=0; methods[i].ml_name!=NULL; ++i )
+	if ( strcmp(methods[i].ml_name,"setConvexNib")==0 ) {
+	    methods[i].ml_meth = func;
+return;
+	}
+}
 
 static PyObject *PyPS_Identity(PyObject *UNUSED(noself), PyObject *UNUSED(args)) {
 return( Py_BuildValue("(dddddd)",  1.0, 0.0, 0.0,  1.0, 0.0, 0.0));

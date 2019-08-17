@@ -5,10 +5,13 @@
 
 enum ShapeType {
 	Shape_Convex,
-	Shape_Concave,
+	Shape_CCWTurn,
+	Shape_CCW,
 	Shape_PointOnEdge,
 	Shape_TooFewPoints,
-	Shape_Line
+	Shape_NotClosed,
+	Shape_TinySpline,
+	Shape_SelfIntersects
 };
 
 extern enum ShapeType NibIsValid(SplineSet *);
