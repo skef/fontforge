@@ -7996,7 +7996,6 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
     _BpTransform(&t_to.prevcp, &spl->to->prevcp, transform, tpmask_dontTrimValues);
     t_to.noprevcp = spl->to->noprevcp;
 
-    // printf("SPLINE: %.20lf,%.20lf %.20lf,%.20lf %.20lf,%.20lf %.20lf,%.20lf\n", t_from.me.x, t_from.me.y, t_from.nextcp.x, t_from.nextcp.y, t_to.prevcp.x, t_to.prevcp.y, t_to.me.x, t_to.me.y);
     t_spline.from = &t_from; t_spline.to = &t_to;
     t_from.next = t_to.prev = &t_spline;
     t_spline.order2 = spl->order2;
@@ -8005,10 +8004,6 @@ bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t) {
 
     // After rotating by theta the desired angle will be at a y extrema
     SplineFindExtrema(&t_spline.splines[1], &te1, &te2);
-
-    BasePoint tmp1 = SplineUTanVecAt(spl, te1), tmp2 = SplineUTanVecAt(spl, te2);
-
-    printf("target: %.15lf,%.15lf, te1: %.15lf, slope1: %.15lf,%.15lf, near1: %d, te2: %.15lf, slope2: %.15lf,%.15lf, near2=%d\n", ut.x, ut.y, (double)te1, tmp1.x, tmp1.y, (double)te2, tmp2.x, tmp2.y, (int)BPWITHIN(ut, SplineUTanVecAt(spl, te1), 1e-8), BPWITHIN(ut, SplineUTanVecAt(spl, te2), 1e-8));
 
     if (te1 != -1 && te1 > (min_t+1e-9) && BPWITHIN(ut, SplineUTanVecAt(spl, te1), 1e-8))
 	return te1;

@@ -5204,11 +5204,7 @@ BasePoint SplineUTanVecAt(Spline *s, bigreal t) {
 	raw.y = s->to->me.y - s->from->me.y;
     } else {
 	raw = SPLINEPTANVAL(s, t);
-
-	/* For missing slopes take a very small step away (smaller than BasePointNear())
-	 * and try again. The common (only?) source of a missing slope is when one
-	 * control point is co-located with is on-curve point and the other isn't.
-	 */
+	// For missing slopes take a very small step away and try again.
 	if ( raw.x==0 && raw.y==0 )
 	    raw = SPLINEPTANVAL(s, (t+1e-9 <= 1.0) ? t+1e-9 : t-1e-9);
     }
@@ -5217,9 +5213,8 @@ BasePoint SplineUTanVecAt(Spline *s, bigreal t) {
 
 int SplineTurningCCWAt(Spline *s, bigreal t) {
     bigreal tmp = SecondDerivative(s, t);
-
+    // For missing curvatures take a very small step away and try again.
     if ( tmp==0 )
 	tmp = SecondDerivative(s, (t+1e-9 <= 1.0) ? t+1e-9 : t-1e-9 );
-
     return tmp > 0;
 }
