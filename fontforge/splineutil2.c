@@ -5188,7 +5188,8 @@ return( false );
 int SplineTurningCCWAt(Spline *s, bigreal t) {
     bigreal tmp = SecondDerivative(s, t);
     // For missing curvatures take a very small step away and try again.
-    if ( tmp==0 )
-	tmp = SecondDerivative(s, (t+1e-9 <= 1.0) ? t+1e-9 : t-1e-9 );
+    if ( RealWithin(tmp,0,1e-9) ) {
+	tmp = SecondDerivative(s, (t+1e-8 <= 1.0) ? t+1e-8 : t-1e-8 );
+    }
     return tmp > 0;
 }

@@ -610,7 +610,7 @@ static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
     //
     // to look for the next angle turning the other way after the inflection.
     if ( icnt = Spline2DFindPointsOfInflection(s, poi) ) {
-	assert ( icnt < 2 || poi[0] < poi[1] );
+	assert ( icnt < 2 || poi[0] <= poi[1] );
 	for ( i=0; i<2; ++i )
 	    if (    poi[i] > cur_t
 	         && !RealNear(poi[i], cur_t)
