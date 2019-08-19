@@ -60,6 +60,7 @@ set(FONTFORGE_NOINST_HEADERS
   tottfgpos.h
   tottfvar.h
   ttfspecial.h
+  utanvec.h
   winfonts.h
   woff.h
   zapfnomen.h
@@ -200,6 +201,7 @@ add_library(fontforge
   ttfspecial.c
   ufo.c
   unicoderange.c
+  utanvec.c
   winfonts.c
   woff.c
   zapfnomen.c

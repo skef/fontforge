@@ -80,6 +80,7 @@
 #include "ttfinstrs.h"
 #include "unicodelibinfo.h"
 #include "ustring.h"
+#include "utanvec.h"
 #include "utype.h"
 
 #include <dirent.h>
@@ -1729,8 +1730,6 @@ Py_RETURN_NONE;
 return( reto );
 }
 
-extern void SplineStrokeTests();
-
 static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
     SplineSet *ss, *ss2;
     PyObject *obj, *obj2;
@@ -1779,7 +1778,7 @@ static PyObject *PyFF_testCode(PyObject *UNUSED(self), PyObject *args) {
     PyErr_Clear();
     if ( PyArg_ParseTuple(args,"s",&str) ) {
 	if (strcmp(str, "asserts") == 0) {
-	    SplineStrokeTests();
+	    UTanVecTests();
 	    Py_RETURN_NONE;
 	}
     }

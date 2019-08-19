@@ -37,6 +37,7 @@
 #include "splineoverlap.h"
 #include "splineutil.h"
 #include "splineutil2.h"
+#include "utanvec.h"
 
 #include <math.h>
 #include <assert.h>
@@ -48,15 +49,7 @@
 #define INTRASPLINE_MARGIN (1e-8)
 #define FIXUP_MARGIN (1e-2)
 
-#define BP_LENGTHSQ(v) ((v).x*(v).x+(v).y*(v).y)
-#define BP_REV(v) (BasePoint) { -(v).x, -(v).y }
-#define BP_REV_IF(t, v) (t ? (BasePoint) { -(v).x, -(v).y } : (v))
-#define BP_ADD(v1, v2) (BasePoint) { (v1).x + (v2).x, (v1).y + (v2).y } 
-#define BP_UNINIT ((BasePoint) { -INFINITY, INFINITY })
-#define BP_IS_UNINIT(v) ((v).x==-INFINITY && (v).y==INFINITY)
 #define NORMANGLE(a) ((a)>PI?(a)-2*PI:(a)<-PI?(a)+2*PI:(a))
-
-#define UTMIN ((BasePoint) { -1, -DBL_MIN })
 #define BPNEAR(bp1, bp2) BPWITHIN(bp1, bp2, INTRASPLINE_MARGIN)
 
 enum pentype { pt_circle, pt_square, pt_convex };
@@ -111,61 +104,6 @@ typedef struct niboffset {
 } NibOffset;
 
 static char *glyphname=NULL;
-
-/* Orders unit tangent vectors on an absolute -PI+e to PI
- * equivalent basis
- */
-static int UTanVecGreater(BasePoint uta, BasePoint utb) {
-    assert(    RealNear(BP_LENGTHSQ(uta),1)
-            && RealNear(BP_LENGTHSQ(utb),1) );
-
-    if (uta.y >= 0) {
-	if (utb.y < 0)
-	    return true;
-	return uta.x < utb.x && !BPNEAR(uta, utb);
-    }
-    if (utb.y >= 0)
-	return false;
-    return uta.x > utb.x && !BPNEAR(uta, utb);
-}
-
-/* True if rotating from ut1 to ut3 in the specified direction
- * the angle passes through ut2.
- *
- * Note: Returns true if ut1 is near ut2 but false if ut2 is
- * near ut3
- */
-static int UTanVecsSequent(BasePoint ut1, BasePoint ut2, BasePoint ut3,
-                           int ccw) {
-    BasePoint tmp;
-
-    if ( BPNEAR(ut1, ut2) )
-	return true;
-
-    if ( BPNEAR(ut2, ut3) || BPNEAR(ut1, ut3) )
-	return false;
-
-    if (ccw) {
-	tmp = ut1;
-	ut1 = ut3;
-	ut3 = tmp;
-    }
-
-    if ( UTanVecGreater(ut1, ut3) ) {
-	return UTanVecGreater(ut1, ut2) && UTanVecGreater(ut2, ut3);
-    } else {
-	return    (UTanVecGreater(ut1, ut2) && UTanVecGreater(ut3, ut2))
-	       || (UTanVecGreater(ut2, ut1) && UTanVecGreater(ut2, ut3));
-    }
-}
-
-static int JointBendsCW(BasePoint ut_ref, BasePoint ut_vec) {
-    // magnitude of cross product
-    bigreal r = ut_ref.x*ut_vec.y - ut_ref.y*ut_vec.x;
-    if ( RealWithin(r, 0.0, 1e-8) )
-	return false;
-    return r > 0;
-}
 
 static SplineSet *SplineContourOuterCCWRemoveOverlap(SplineSet *ss) {
     DBounds b;
@@ -1246,63 +1184,4 @@ void FVStrokeItScript(void *_fv, StrokeInfo *si,int pointless_argument) {
     }
  glyphname = NULL;
     ff_progress_end_indicator();
-}
-
-void SplineStrokeTests() {
-    int i, j, k, a, b;
-    bigreal r, x, y, z;
-    BasePoint ut[361], utmax = { -1, 0 }, utmin = UTMIN;
-
-    printf("Spline Stroke Tests\n");
-
-    for (i = 0; i<=360; i++) {
-	r = ((180-i) * PI / 180);
-	ut[i] = UTanVectorize(cos(r), sin(r));
-//	printf("i:%d, i.x:%lf, i.y:%lf\n", i, ut[i].x, ut[i].y);
-    }
-
-    for (i=0; i<360; ++i) {
-	for (j = 0; j<360; ++j) {
-	    if ( i==j )
-		continue;
-	    if ( i<j )
-		assert(    UTanVecGreater(ut[i], ut[j])
-		       && !UTanVecGreater(ut[j], ut[i]));
-	    else
-		assert(    UTanVecGreater(ut[j], ut[i])
-		       	&& !UTanVecGreater(ut[i], ut[j]));
-	    assert(!BPNEAR(ut[i], ut[j]));
-	    x = atan2(ut[i].x, ut[i].y);
-	    y = atan2(ut[j].x, ut[j].y);
-	    z = x-y;
-	    z = atan2(sin(z), cos(z));
-	    if ( RealNear(z, PI) || RealNear(z, -PI) )
-		continue;
-	    assert( (z>0) == JointBendsCW(ut[i], ut[j]) );
-	}
-	assert( i==0 || UTanVecGreater(utmax, ut[i]) );
-	assert( UTanVecGreater(ut[i], utmin) );
-    }
-
-    for (i=0; i<360; ++i)
-	for (j = 0; j<360; ++j)
-	    for (k = 0; k<360; ++k) {
-		a = UTanVecsSequent(ut[i], ut[j], ut[k], false);
-		b = UTanVecsSequent(ut[i], ut[j], ut[k], true);
-		if ( i==j )
-		    assert(a && b);
-		else if ( j==k || i==k )
-		    assert(!a && !b);
-		else {
-		    x = atan2(ut[i].x, ut[i].y);
-		    y = atan2(ut[j].x, ut[j].y);
-		    z = atan2(ut[k].x, ut[k].y);
-		    y = fmod(4*PI+y-x,2*PI);
-		    z = fmod(4*PI+z-x,2*PI);
-		    if ( y<z )
-			assert( a && !b );
-		    else
-			assert( !a && b );
-		}
-	    }
 }

@@ -68,9 +68,6 @@ extern void SPLNearlyHvLines(SplineChar *sc, SplineSet *ss, bigreal err);
 extern void SPLsStartToLeftmost(SplineChar *sc, int layer);
 extern void SPLStartToLeftmost(SplineChar *sc, SplinePointList *spl, int *changed);
 extern void SPSmoothJoint(SplinePoint *sp);
-
-extern BasePoint UTanVectorize(bigreal x, bigreal y);
-extern BasePoint SplineUTanVecAt(Spline *s, bigreal t);
 extern int SplineTurningCCWAt(Spline *s, bigreal t);
 
 /**

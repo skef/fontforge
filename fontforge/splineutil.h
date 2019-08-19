@@ -96,7 +96,6 @@ extern SplineSet *LayerAllSplines(Layer *layer);
 extern SplineSet *LayerUnAllSplines(Layer *layer);
 extern Spline *SplineMake3(SplinePoint *from, SplinePoint *to);
 extern Spline *SplineSplit(Spline *spline, extended ts[3]);
-extern bigreal SplineSolveForUTanVec(Spline *spl, BasePoint s, bigreal min_t);
 extern struct baselangextent *BaseLangCopy(struct baselangextent *extent);
 extern struct ff_glyphclasses *SFGetGroup(const struct splinefont *sf, int index, const char *name);
 extern struct glyphvariants *GlyphVariantsCopy(struct glyphvariants *gv);
@@ -222,6 +221,5 @@ extern int HashKerningClassNamesFlex(SplineFont *sf, struct glif_name_index * cl
 #define SPLINE1DPTANVAL(s, t) ((3*(s)->a*(t) + 2*(s)->b)*(t) + (s)->c)
 #define SPLINEPTANVAL(s, t) (BasePoint) { SPLINE1DPTANVAL(&(s)->splines[0], t), SPLINE1DPTANVAL(&(s)->splines[1], t) }
 #define BPWITHIN(bp1, bp2, f) (RealWithin((bp1).x, (bp2).x, f) && RealWithin((bp1).y, (bp2).y, f))
-
 
 #endif /* FONTFORGE_SPLINEUTIL_H */

@@ -5185,32 +5185,6 @@ return( true );
 return( false );
 }
 
-BasePoint UTanVectorize(bigreal x, bigreal y) {
-    BasePoint ret = { 0.0, 0.0 };
-    bigreal len = x*x + y*y;
-    if ( len!=0 ) {
-	len = sqrt(len);
-	ret.x = x/len;
-	ret.y = y/len;
-    }
-    return ret;
-}
-
-BasePoint SplineUTanVecAt(Spline *s, bigreal t) {
-    BasePoint raw;
-
-    if ( SplineIsLinear(s) ) {
-	raw.x = s->to->me.x - s->from->me.x;
-	raw.y = s->to->me.y - s->from->me.y;
-    } else {
-	raw = SPLINEPTANVAL(s, t);
-	// For missing slopes take a very small step away and try again.
-	if ( raw.x==0 && raw.y==0 )
-	    raw = SPLINEPTANVAL(s, (t+1e-9 <= 1.0) ? t+1e-9 : t-1e-9);
-    }
-    return UTanVectorize(raw.x, raw.y);
-}
-
 int SplineTurningCCWAt(Spline *s, bigreal t) {
     bigreal tmp = SecondDerivative(s, t);
     // For missing curvatures take a very small step away and try again.
