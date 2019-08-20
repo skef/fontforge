@@ -60,7 +60,7 @@ typedef struct {			/* Taken from spiro.h because I want */
 # define bigreal	double
 #endif
 
-#define extended	__float128
+#define extended	double
 	/* Solaris wants to define extended to be unsigned [3] unless we do this*/
 #define _EXTENDED
 

@@ -304,10 +304,19 @@ static NibOffset *CalcNibOffset(StrokeContext *c, BasePoint ut, int reverse,
     ncpi = NC_PREVI(c, nci);
     ncni = NC_NEXTI(c, nci);
 
-    // The only case where one of two points might draw the same angle,
-    // and therefore the only case where the array values differ
-    if (   c->nibcorners[ncpi].linear
-        && BPNEAR(ut, c->nibcorners[ncpi].utv[NC_OUT_IDX]) ) {
+    // The two cases where one of two points might draw the same angle
+    // and therefore the only cases where the array values differ
+    if (   c->nibcorners[nci].linear
+        && BPNEAR(ut, c->nibcorners[ncni].utv[NC_IN_IDX])
+        && BPNEAR(ut, c->nibcorners[nci].utv[NC_IN_IDX]) ) {
+	no->nt = 0.0;
+	no->off[NIBOFF_CCW_IDX] = c->nibcorners[nci].on_nib->me;
+	no->off[NIBOFF_CW_IDX] = c->nibcorners[ncni].on_nib->me;
+	no->nci[NIBOFF_CW_IDX] = ncni;
+	no->at_line = true;
+	no->curve = false;
+    } else if (   c->nibcorners[ncpi].linear
+               && BPNEAR(ut, c->nibcorners[ncpi].utv[NC_OUT_IDX]) ) {
 	no->nt = 0.0;
 	no->off[NIBOFF_CCW_IDX] = c->nibcorners[ncpi].on_nib->me;
 	no->nci[NIBOFF_CCW_IDX] = ncpi;
@@ -532,31 +541,34 @@ static BasePoint SplineStrokeNextAngle(StrokeContext *c, BasePoint ut,
 	} else { // CW
 	    if ( BPNEAR(c->nibcorners[nci].utv[NC_IN_IDX],
 	                c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
+		if ( BPNEAR(c->nibcorners[nci].utv[NC_IN_IDX],
+		            c->nibcorners[ncni].utv[NC_IN_IDX]) ) {
+		    assert(c->nibcorners[nci].linear);
+		    printf("Got here!\n");
+		    inout = NC_OUT_IDX;
+		    *curved = true;
+		} else {
+		    inout = NC_IN_IDX;
+		    *curved = !c->nibcorners[nci].linear;
+		}
 		nci = ncni;
-		inout = NC_IN_IDX;
-		*curved = true;
 	    } else {
 		inout = NC_OUT_IDX;
 		*curved = false;
 	    }
 	}
     } else if ( BPNEAR(ut, c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
+	assert( ! BPNEAR(c->nibcorners[nci].utv[NC_IN_IDX],
+	                 c->nibcorners[nci].utv[NC_OUT_IDX]) );
 	if ( is_ccw ) {
-	    if ( BPNEAR(c->nibcorners[nci].utv[NC_IN_IDX],
-	                c->nibcorners[nci].utv[NC_OUT_IDX]) ) {
-		nci = ncpi;
-		inout = NC_OUT_IDX;
-		*curved = true;
-	    } else {
-		inout = NC_IN_IDX;
-		*curved = false;
-	    }
+	    inout = NC_IN_IDX;
+	    *curved = false;
 	} else { // CW
 	    if ( BPNEAR(c->nibcorners[nci].utv[NC_OUT_IDX],
 	                c->nibcorners[ncni].utv[NC_IN_IDX]) ) {
 		assert(c->nibcorners[nci].linear);
 		inout = NC_OUT_IDX;
-		*curved = false;
+		*curved = !c->nibcorners[ncni].linear;
 	    } else {
 		inout = NC_IN_IDX;
 		*curved = true;
@@ -794,6 +806,8 @@ static SplineSet *SplinesToContours(SplineSet *ss, StrokeContext *c) {
 		    t = SplineStrokeNextT(c, s, t, is_ccw_mid, &ut_mid, &curved,
 		                          is_right, no.nci[is_ccw_mid]);
 		    assert( t > last_t && t <= 1.0 );
+
+		    printf("nci: %d, ut_mid=%lf,%lf, t=%.15lf, curved=%d\n", no.nci[is_ccw_mid], ut_mid.x, ut_mid.y, t, curved);
 
 		    if ( curved )
 			sp = TraceAndFitSpline(c, s, last_t, t, cur->last,
