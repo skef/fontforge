@@ -4418,6 +4418,7 @@ int NibCheck(SplineSet *nib) {
 
 /* Linecap type: see 'enum linecap' in splinefont.h */
 struct flaglist linecap[] = {
+    { "nib", lc_nib },
     { "butt", lc_butt },
     { "round", lc_round },
     { "square", lc_square },
@@ -4426,6 +4427,7 @@ struct flaglist linecap[] = {
 
 /* Linejoin type: see 'enum linejoin' in splinefont.h */
 struct flaglist linejoin[] = {
+    { "nib", lj_nib },
     { "miter", lj_miter },
     { "round", lj_round },
     { "bevel", lj_bevel },
@@ -4435,12 +4437,16 @@ struct flaglist linejoin[] = {
 struct flaglist strokeflags[] = {
     { "removeinternal", 1 },
     { "removeexternal", 2 },
-    { "cleanup", 4 },
+    { "do_not_simplify", 4 },
+    { "no_extrema", 8 },
+    { "rmov_layer", 16 },
+    { "rmov_contour", 32 },
+    { "rmov_none", 64 },
     FLAGLIST_EMPTY /* Sentinel */
 };
 
 static int Stroke_Parse(StrokeInfo *si, PyObject *args) {
-    const char *str, *cap="butt", *join="round";
+    const char *str, *cap="nib", *join="nib";
     double width=0, minor=1, angle=0;
     int c, j, f;
     PyObject *flagtuple=NULL;
@@ -4473,25 +4479,35 @@ return( -1 );
     } else if ( strcmp(str,"eliptical")==0 ) {
 	if ( !PyArg_ParseTuple(args,"sddd|ssO", &str, &width, &minor, &angle, &cap, &join, &flagtuple ) ) {
 	    ENDPYGETSTR();
-return( -1 );
+	    return( -1 );
 	}
 	si->stroke_type = si_std;
     } else if ( strcmp(str,"caligraphic")==0 || strcmp(str,"square")==0 ) {
-	if ( !PyArg_ParseTuple(args,"sddd|O", &str, &width, &minor, &angle, &flagtuple ) ) {
-	    ENDPYGETSTR();
-return( -1 );
+	if ( !PyArg_ParseTuple(args,"sdddss|O", &str, &width, &minor, &angle, &cap, &join, &flagtuple ) ) {
+	    PyErr_Clear();
+	    if ( !PyArg_ParseTuple(args,"sdddss|O", &str, &width, &minor, &angle, &cap, &join, &flagtuple ) ) {
+		PyErr_Clear();
+		if ( !PyArg_ParseTuple(args,"sddd|O", &str, &width, &minor, &angle, &flagtuple ) ) {
+		    ENDPYGETSTR();
+		    return( -1 );
+		}
+	    }
 	}
 	si->stroke_type = si_caligraphic;
-    } else if ( strcmp(str,"polygonal")==0 || strcmp(str,"poly")==0 ) {
-	if ( !PyArg_ParseTuple(args,"sO|O", &str, &nib, &flagtuple ) ) {
-	    ENDPYGETSTR();
-return( -1 );
+    } else if ( strcmp(str,"polygonal")==0 || strcmp(str,"poly")==0 || 
+                strcmp(str,"convex")==0 ) {
+	if ( !PyArg_ParseTuple(args,"sOd|ssO", &str, &nib, &angle, &cap, &join, &flagtuple ) ) {
+	    PyErr_Clear();
+	    if ( !PyArg_ParseTuple(args,"sO|O", &str, &nib, &flagtuple ) ) {
+		ENDPYGETSTR();
+		return( -1 );
+	    }
 	}
 	si->stroke_type = si_nib;
     } else {
-	    ENDPYGETSTR();
+	ENDPYGETSTR();
         PyErr_Format(PyExc_ValueError, "Unknown stroke type %s", str );
-return( -1 );
+	return( -1 );
     }
     ENDPYGETSTR();
 
@@ -4548,8 +4564,16 @@ return( -1 );
 	si->removeinternal = true;
     if ( f&2 )
 	si->removeexternal = true;
-/*  if ( f&4 )
-	si->removeoverlapifneeded = true; */	/* Obsolete */
+    if ( f&4 )
+	si->nosimplify = true;
+    if ( f&8 )
+	si->noextrema = true;
+    if ( f&16 )
+	si->rmov = srmov_layer;
+    if ( f&32 )
+	si->rmov = srmov_contour;
+    if ( f&64 )
+	si->rmov = srmov_none;
     si->penangle = angle;
     si->minorradius = minor/2;
 

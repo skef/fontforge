@@ -1065,7 +1065,7 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     int max_pc;
     StrokeContext c;
     SplineSet *nibs, *nib, *bnext, *first, *last, *cur;
-    bigreal sn = 0.0, co = 1.0; // zero degree defaults
+    bigreal sn = 0.0, co = 1.0, mr;
     DBounds b;
     real trans[6];
     static struct simplifyinfo smpl = { sf_normal, 0.75, 0.2, 0, 0, 0, 0 };
@@ -1083,6 +1083,10 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     c.extrema = !si->noextrema;
     c.simplify = !si->nosimplify;
     c.rmov = si->rmov;
+    if ( si->minorradius!=0 )
+	mr = si->minorradius;
+    else
+	mr = si->radius;
     //c.scaled_or_rotated = si->factor!=NULL;
 
     c.leave_users_center = 1;
@@ -1103,8 +1107,8 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
 	nibs = UnitShape(si->stroke_type==si_std ? 0 : -4);
 	trans[0] *= si->radius;
 	trans[1] *= si->radius;
-	trans[2] *= si->minorradius;
-	trans[3] *= si->minorradius;
+	trans[2] *= mr;
+	trans[3] *= mr;
     } else {
 	c.pentype = pt_convex;
 	max_pc = 20; // a guess
