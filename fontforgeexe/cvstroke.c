@@ -626,7 +626,12 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 
     if ( strokeit!=NULL ) {
 	sd = &strokedlg;
-	sd->old_convex = old_convex;
+	if ( sd->sc_stroke.layers!=NULL &&
+	     sd->sc_stroke.layers[ly_fore].splines!=NULL ) {
+	    SplinePointListsFree(sd->sc_stroke.layers[ly_fore].splines);
+	    sd->sc_stroke.layers[ly_fore].splines = old_convex;
+	} else
+	    sd->old_convex = old_convex;
     } else {
 	sd = &freehand_dlg;
 	memset(&freehand_dlg,0,sizeof(freehand_dlg));
