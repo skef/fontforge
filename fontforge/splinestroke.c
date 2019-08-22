@@ -160,7 +160,8 @@ static SplineSet *SplineContourOuterCCWRemoveOverlap(SplineSet *ss) {
 enum ShapeType NibIsValid(SplineSet *ss) {
     Spline *s;
     int n = 1;
-    bigreal anglesum = 0, angle, pangle, d, pcpangle, ncpangle;
+    bigreal d, anglesum = 0, angle, last_angle;
+    bigreal pcp_angle, ncp_angle, last_pcp_angle;
 
     if ( ss->first==NULL )
 	return Shape_TooFewPoints;
@@ -170,7 +171,14 @@ enum ShapeType NibIsValid(SplineSet *ss) {
 	return Shape_CCW;
 
     s = ss->first->prev;
-    pangle = atan2(s->to->me.y - s->from->me.y, s->to->me.x - s->from->me.x);
+    last_angle = atan2(s->to->me.y - s->from->me.y,
+                       s->to->me.x - s->from->me.x);
+    if ( ! SplineIsLinear(s) )
+	last_pcp_angle = atan2(s->to->me.y - s->to->prevcp.y,
+	                       s->to->me.x - s->to->prevcp.x);
+    else
+	last_pcp_angle = last_angle;
+
     s = ss->first->next;
     SplinePointListSelect(ss, false);
     while ( true ) {
@@ -178,31 +186,51 @@ enum ShapeType NibIsValid(SplineSet *ss) {
 	if ( BPWITHIN(s->from->me, s->to->me,1e-2) )
 	    return Shape_TinySpline;
 	angle = atan2(s->to->me.y - s->from->me.y, s->to->me.x - s->from->me.x);
-	if ( RealWithin(angle, pangle, 1e-4) )
+	if ( RealWithin(angle, last_angle, 1e-4) )
 	    return Shape_PointOnEdge;
-	d = pangle-angle;
+	d = last_angle-angle;
 	d = NORMANGLE(d);
 	if ( d<0 )
 	    return Shape_CCWTurn;
 	anglesum += d;
-	if ( !s->from->noprevcp ) {
-	    pcpangle = atan2(s->to->prevcp.y - s->to->me.y,
-	                     s->to->prevcp.x - s->to->me.x);
-	    d = pcpangle-pangle;
+	if ( last_pcp_angle != last_angle ) {
+	    d = last_pcp_angle-angle;
 	    d = NORMANGLE(d);
-	    printf("prevcp angle: %lf, d1: %lf, d2:%lf\n", pcpangle, d, NORMANGLE(pcpangle-angle));
-	} else
-	    pcpangle = pangle;
-	if ( !s->from->nonextcp ) {
-	    ncpangle = atan2(s->to->nextcp.y - s->to->me.y,
-	                     s->to->nextcp.x - s->to->me.x);
-	    d = ncpangle-pcpangle;
-	    d = NORMANGLE(d);
-	    printf("nextcp angle: %lf, d1: %lf, d2:%lf\n", ncpangle, d, NORMANGLE(angle-ncpangle));
+	    if ( d<0 )
+		return Shape_BadPrevCP;
 	}
-	s->from->selected = false;
+	if ( !SplineIsLinear(s) ) {
+	    if ( s->from->nonextcp || BPNEAR(s->from->nextcp, s->from->me) )
+		return Shape_HalfLinear;
+	    ncp_angle = atan2(s->from->nextcp.y - s->from->me.y,
+	                      s->from->nextcp.x - s->from->me.x);
+	    d = ncp_angle-last_pcp_angle; // Outer limit
+	    d = NORMANGLE(d);
+	    if ( d > 0.0 )
+		return Shape_BadNextCP;
+	    d = angle-ncp_angle; // Inner limit
+	    d = NORMANGLE(d);
+	    if ( d > 0.0 )
+		return Shape_BadNextCP;
+	    printf("nextcp angle: %lf, dout: %lf, din:%lf\n", ncp_angle, d, NORMANGLE(angle-ncp_angle));
+	    s->from->selected = false;
+	    s->to->selected = true;
+	    if ( s->to->noprevcp || BPNEAR(s->to->prevcp, s->to->me) ) 
+		return Shape_HalfLinear;
+	    pcp_angle = atan2(s->to->me.y - s->to->prevcp.y,
+	                      s->to->me.x - s->to->prevcp.x);
+	    d = pcp_angle-angle; // Inner limit
+	    d = NORMANGLE(d);
+	    if ( d > 0.0 )
+		return Shape_BadPrevCP;
+	    printf("prevcp angle: %lf, dout: %lf\n", pcp_angle, d);
+	    s->from->selected = false;
+	} else
+	    pcp_angle = angle;
+	s->from->selected = s->to->selected = false;
 	s=s->to->next;
-	pangle = angle;
+	last_angle = angle;
+	last_pcp_angle = pcp_angle;
 	if ( s==ss->first->next )
 	    break;
 	++n;

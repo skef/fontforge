@@ -11,6 +11,9 @@ enum ShapeType {
 	Shape_TooFewPoints,
 	Shape_NotClosed,
 	Shape_TinySpline,
+	Shape_HalfLinear,
+	Shape_BadNextCP,
+	Shape_BadPrevCP,
 	Shape_SelfIntersects
 };
 

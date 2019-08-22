@@ -626,12 +626,17 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 
     if ( strokeit!=NULL ) {
 	sd = &strokedlg;
-	if ( sd->sc_stroke.layers!=NULL &&
-	     sd->sc_stroke.layers[ly_fore].splines!=NULL ) {
-	    SplinePointListsFree(sd->sc_stroke.layers[ly_fore].splines);
-	    sd->sc_stroke.layers[ly_fore].splines = old_convex;
-	} else
-	    sd->old_convex = old_convex;
+	if ( old_convex!=NULL ) {
+	    if ( sd->sc_stroke.layers!=NULL &&
+	         sd->sc_stroke.layers[ly_fore].splines!=NULL ) {
+		SplinePointListsFree(sd->sc_stroke.layers[ly_fore].splines);
+		sd->sc_stroke.layers[ly_fore].splines = old_convex;
+		old_convex = NULL;
+	    } else {
+		sd->old_convex = old_convex;
+		old_convex = NULL;
+	    }
+	}
     } else {
 	sd = &freehand_dlg;
 	memset(&freehand_dlg,0,sizeof(freehand_dlg));
@@ -1082,10 +1087,6 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	GDrawSetVisible(sd->gw,false);
     else
 	GDrawDestroyWindow(sd->gw);
-    if ( sd==&strokedlg ) {
-	old_convex = sd->old_convex;
-	sd->old_convex = NULL;
-    }
 }
 
 void CVStroke(CharView *cv) {
