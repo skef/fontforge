@@ -100,15 +100,6 @@ typedef struct dbasepoint {
 #define DBASEPOINT_EMPTY { (bigreal)0.0, (bigreal)0.0 }
 
 
-typedef struct tpoint {
-    real x;
-    real y;
-    real t;
-} TPoint;
-
-#define TPOINT_EMPTY { (real)0.0, (real)0.0, (real)0.0 }
-
-
 typedef struct dbounds {
     real minx, maxx;
     real miny, maxy;
@@ -2252,8 +2243,6 @@ extern extended SplineSolveFixup(const Spline1D *sp, real tmin, real tmax, exten
 
 #define CURVATURE_ERROR	-1e9
 
-extern Spline *ApproximateSplineFromPoints(SplinePoint *from, SplinePoint *to,
-	TPoint *mid, int cnt,int order2);
 extern bigreal SplineLength(Spline *spline);
 extern int SplineIsLinear(Spline *spline);
 extern void SFOrderBitmapList(SplineFont *sf);

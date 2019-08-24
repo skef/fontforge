@@ -45,6 +45,7 @@ set(FONTFORGE_NOINST_HEADERS
   sfd.h
   spiro.h
   splinefill.h
+  splinefit.h
   splineorder2.h
   splineoverlap.h
   splinerefigure.h
@@ -181,6 +182,7 @@ add_library(fontforge
   spiro.c
   splinechar.c
   splinefill.c
+  splinefit.c
   splinefont.c
   splineorder2.c
   splineoverlap.c

@@ -1,4 +1,4 @@
-/* Copyright (C) 2019 by Skef Iterum */
+/* Copyright (C) 2000-2012 by George Williams, 2019 by Skef Iterum */
 /*
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -25,28 +25,31 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef FONTFORGE_UTANVEC_H
-#define FONTFORGE_UTANVEC_H
+#ifndef FONTFORGE_SPLINEFIT_H
+#define FONTFORGE_SPLINEFIT_H
 
 #include <fontforge-config.h>
 
 #include "splinefont.h"
 
-#define BP_LENGTHSQ(v) (pow((v).x,2)+pow((v).y,2))
-#define BP_REV(v) (BasePoint) { -(v).x, -(v).y }
-#define BP_REV_IF(t, v) (t ? (BasePoint) { -(v).x, -(v).y } : (v))
-#define BP_ADD(v1, v2) (BasePoint) { (v1).x + (v2).x, (v1).y + (v2).y } 
-#define BP_UNINIT ((BasePoint) { -INFINITY, INFINITY })
-#define BP_IS_UNINIT(v) ((v).x==-INFINITY && (v).y==INFINITY)
-#define UTMIN ((BasePoint) { -1, -DBL_MIN })
+typedef struct fitpoint {
+    BasePoint p;
+    BasePoint ut;
+    bigreal t;
+} FitPoint;
 
-extern BasePoint MakeUTanVec(bigreal x, bigreal y);
-extern int UTanVecGreater(BasePoint uta, BasePoint utb);
-extern int UTanVecsSequent(BasePoint ut1, BasePoint ut2, BasePoint ut3,
-                           int ccw);
-extern int JointBendsCW(BasePoint ut_ref, BasePoint ut_vec);
-extern BasePoint SplineUTanVecAt(Spline *s, bigreal t);
-extern bigreal SplineSolveForUTanVec(Spline *spl, BasePoint ut, bigreal min_t);
-extern void UTanVecTests();
+#define FITPOINT_EMPTY { {0.0, 0.0}, {0.0, 0.0}, 0.0 }
 
-#endif // FONTFORGE_UTANVEC_H
+typedef int (*GenPointsP)(void *vinfo, bigreal t_start, bigreal t_end, FitPoint **fpp);
+
+extern Spline *ApproximateSplineFromPoints(SplinePoint *from, SplinePoint *to,
+                                           FitPoint *mid, int cnt, int order2);
+extern Spline *ApproximateSplineFromPointsSlopes(SplinePoint *from, SplinePoint *to,
+                                                 FitPoint *mid, int cnt, int order2);
+extern Spline *ApproximateSplineFromPointsSlopes(SplinePoint *from, SplinePoint *to,
+                                                 FitPoint *mid, int cnt, int order2);
+extern SplinePoint *ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
+                                                bigreal start_t, bigreal end_t, 
+                                                GenPointsP genp, void *tok, int order2);
+
+#endif /* FONTFORGE_SPLINEFIT_H */

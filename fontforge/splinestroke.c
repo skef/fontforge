@@ -32,6 +32,7 @@
 #include "baseviews.h"
 #include "cvundoes.h"
 #include "fontforge.h"
+#include "splinefit.h"
 #include "splinefont.h"
 #include "splineorder2.h"
 #include "splineoverlap.h"
@@ -498,48 +499,61 @@ static SplinePoint *AddNibPortion(StrokeContext *c, SplinePoint *start_p,
     return sp;
 }
 
+typedef struct stroketraceinfo {
+    StrokeContext *c;
+    Spline *s;
+    int nci_hint;
+    unsigned int is_right: 1;
+} StrokeTraceInfo;
+
 #define NIPOINTS 30
 
-SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start,
-                               bigreal t_end, SplinePoint *start,
-			       int nci_hint, int is_right) {
-    NibOffset no;
-    TPoint tp[NIPOINTS];
-    bigreal nidiff, t, nt;
+int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end, FitPoint **fpp) {
+    StrokeTraceInfo *stip = (StrokeTraceInfo *)vinfo;
     int i, is_ccw;
+    NibOffset no;
+    FitPoint *fp;
+    bigreal nidiff, t, nt;
     BasePoint xy, ut, txy, ut_s, ut_e;
-    SplinePoint *sp;
 
+    fp = calloc(NIPOINTS, sizeof(FitPoint));
     nidiff = (t_end - t_start) / (NIPOINTS-1);
 
-    is_ccw = SplineTurningCCWAt(s, t_start);
-    no.nci[0] = no.nci[1] = nci_hint;
+    is_ccw = SplineTurningCCWAt(stip->s, t_start);
+    no.nci[0] = no.nci[1] = stip->nci_hint;
     for ( i=0, t=t_start; i<NIPOINTS; ++i, t+= nidiff ) {
-	xy = SPLINEPVAL(s, t);
-	ut = SplineUTanVecAt(s, t);
+	xy = SPLINEPVAL(stip->s, t);
+	fp[i].ut = SplineUTanVecAt(stip->s, t);
 	if ( i==0 )
 	    ut_s = ut;
 	if ( i==(NIPOINTS-1) ) {
 	    ut_e = ut;
 	    is_ccw = !is_ccw; // Stop at the closer corner
 	}
-	CalcNibOffset(c, ut, is_right, &no, no.nci[is_ccw]);
-	tp[i].x = xy.x + no.off[is_ccw].x;
-	tp[i].y = xy.y + no.off[is_ccw].y;
-	tp[i].t = (bigreal)i/(NIPOINTS-1);
-	// printf("TPoints i=%d, t(x=%lf, y=%lf, tp.t=%lf), spline t=%lf sxy=%lf,%lf, off=%lf,%lf\n, ut=%lf,%lf", i, tp[i].x, tp[i].y, tp[i].t, t, xy.x, xy.y, no.off[is_ccw].x, no.off[is_ccw].y, ut.x, ut.y);
+	CalcNibOffset(stip->c, fp[i].ut, stip->is_right, &no, no.nci[is_ccw]);
+	fp[i].p.x = xy.x + no.off[is_ccw].x;
+	fp[i].p.y = xy.y + no.off[is_ccw].y;
+	fp[i].t = (bigreal)i/(NIPOINTS-1);
+	// printf("FitPoints i=%d, t(x=%lf, y=%lf, fp.t=%lf), spline t=%lf sxy=%lf,%lf, off=%lf,%lf\n, ut=%lf,%lf", i, fp[i].p.x, fp[i].p.y, fp[i].t, t, xy.x, xy.y, no.off[is_ccw].x, no.off[is_ccw].y, ut.x, ut.y);
     }
-    if ( !BPWITHIN(start->me, ((BasePoint) { tp[0].x, tp[0].y }),
-                   FIXUP_MARGIN) )
-	LogError(_("Warning: Coordinate diff %lf greater than margin %lf\n"),
-                 fmax(fabs(start->me.x-tp[0].x), fabs(start->me.y-tp[0].y)),
-		 FIXUP_MARGIN);
-    start->nextcp = BP_ADD(start->me, ut_s);
-    start->nonextcp = false;
-    sp = SplinePointCreate(tp[NIPOINTS-1].x, tp[NIPOINTS-1].y);
-    sp->prevcp = BP_ADD(sp->me, BP_REV(ut_e));
-    sp->noprevcp = false;
-    ApproximateSplineFromPointsSlopes(start,sp,tp+1,NIPOINTS-2,false);
+    *fpp = fp;
+    return NIPOINTS;
+}
+
+SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start,
+                               bigreal t_end, SplinePoint *start,
+			       int nci_hint, int is_right) {
+    SplinePoint *sp;
+    StrokeTraceInfo sti;
+
+    sti.c = c;
+    sti.s = s;
+    sti.nci_hint = nci_hint;
+    sti.is_right = is_right;
+
+    sp = ApproximateSplineSetFromGen(start, NULL, t_start, t_end, 
+                                     &GenStrokeTracePoints, (void *) &sti,
+                                     false);
 
     return sp;
 }
