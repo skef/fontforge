@@ -46,7 +46,7 @@
 #define PI      3.1415926535897932
 
 // Rounding makes even slope-continuous splines only approximately so. 
-#define INTERSPLINE_MARGIN .5
+#define INTERSPLINE_MARGIN 1e-1 
 #define INTRASPLINE_MARGIN (1e-8)
 #define FIXUP_MARGIN (1e-2)
 
@@ -499,6 +499,29 @@ static SplinePoint *AddNibPortion(StrokeContext *c, SplinePoint *start_p,
     return sp;
 }
 
+/* Put the new endpoint exactly where the NibOffset calculation says it
+ * should be to avoid cumulative append errors.
+ */
+static void SplineStrokeAppendFixup(SplinePoint *endp, BasePoint sxy,
+                                    NibOffset *noe, int is_ccw) {
+    int i = 0;
+    bigreal mg;
+    BasePoint oxy, dxy;
+
+    oxy = BP_ADD(sxy, noe->off[is_ccw]);
+    dxy = BP_ADD(oxy, BP_REV(endp->me));
+    mg = fmax(fabs(dxy.x), fabs(dxy.y));
+
+    assert( mg < 1 );
+    if ( mg > FIXUP_MARGIN ) {
+	LogError(_("Warning: Coordinate diff %lf greater than margin %lf\n"),
+	         mg, FIXUP_MARGIN);
+    }
+
+    endp->nextcp = BP_ADD(endp->nextcp, dxy);
+    endp->me = oxy;
+}
+
 typedef struct stroketraceinfo {
     StrokeContext *c;
     Spline *s;
@@ -506,7 +529,7 @@ typedef struct stroketraceinfo {
     unsigned int is_right: 1;
 } StrokeTraceInfo;
 
-#define NIPOINTS 30
+#define NIPOINTS 10
 
 int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end, FitPoint **fpp) {
     StrokeTraceInfo *stip = (StrokeTraceInfo *)vinfo;
@@ -533,8 +556,9 @@ int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end, FitPoint *
 	CalcNibOffset(stip->c, fp[i].ut, stip->is_right, &no, no.nci[is_ccw]);
 	fp[i].p.x = xy.x + no.off[is_ccw].x;
 	fp[i].p.y = xy.y + no.off[is_ccw].y;
-	fp[i].t = (bigreal)i/(NIPOINTS-1);
-	// printf("FitPoints i=%d, t(x=%lf, y=%lf, fp.t=%lf), spline t=%lf sxy=%lf,%lf, off=%lf,%lf\n, ut=%lf,%lf", i, fp[i].p.x, fp[i].p.y, fp[i].t, t, xy.x, xy.y, no.off[is_ccw].x, no.off[is_ccw].y, ut.x, ut.y);
+	// fp[i].t = (bigreal)i/(NIPOINTS-1);
+	fp[i].t = t;
+	// printf("FitPoints i=%d, (x=%lf, y=%lf, t=%lf), spline t=%lf sxy=%lf,%lf, off=%lf,%lf\n, ut=%lf,%lf", i, fp[i].p.x, fp[i].p.y, fp[i].t, t, xy.x, xy.y, no.off[is_ccw].x, no.off[is_ccw].y, ut.x, ut.y);
     }
     *fpp = fp;
     return NIPOINTS;
@@ -685,30 +709,6 @@ static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
 
     *curved = next_curved;
     return next_t;
-}
-
-/* Put the new endpoint exactly where the NibOffset calculation says it
- * should be to avoid cumulative append errors.
- */
-static void SplineStrokeAppendFixup(SplinePoint *endp, BasePoint sxy,
-                                    NibOffset *noe, int is_ccw) {
-    int i = 0;
-    bigreal mg;
-    BasePoint oxy, dxy;
-
-    oxy = BP_ADD(sxy, noe->off[is_ccw]);
-    dxy = BP_ADD(oxy, BP_REV(endp->me));
-    mg = fmax(fabs(dxy.x), fabs(dxy.y));
-
-    assert( mg < 2.0 );
-    if ( mg > FIXUP_MARGIN ) {
-	LogError(_("Warning: Coordinate diff %lf greater than margin %lf\n"),
-	         mg, FIXUP_MARGIN);
-	return;
-    }
-
-    endp->nextcp = BP_ADD(endp->nextcp, dxy);
-    endp->me = oxy;
 }
 
 static void HandleFlat(SplineSet *cur, BasePoint sxy, NibOffset *noi,

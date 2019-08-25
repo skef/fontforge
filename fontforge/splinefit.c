@@ -973,26 +973,88 @@ return( spline );
 #undef TRY_CNT
 #undef DECIMATION
 
-SplinePoint *ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
-                                         bigreal start_t, bigreal end_t,
-                                         GenPointsP genp, void *tok, int order2) {
-    int cnt;
+#define TOLER .1
+SplinePoint *_ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
+                                          bigreal start_t, bigreal end_t,
+                                          GenPointsP genp, void *tok,
+                                          int order2, int depth) {
+    int cnt, i, maxerri=0, created = false;
+    bigreal errsum=0, maxerr=0, d, mid_t;
     FitPoint *fp;
+    SplinePoint *mid, *r;
 
     cnt = (*genp)(tok, start_t, end_t, &fp);
     if ( cnt < 2 )
 	return NULL;
 
+    // Rescale zero to one
+    for ( i=0; i<cnt; ++i )
+	fp[i].t = (fp[i].t-start_t)/(end_t-start_t);
+    fp[0].t = 0.0;
+    fp[cnt-1].t = 1.0;
+
     from->nextcp.x = from->me.x + fp[0].ut.x;
     from->nextcp.y = from->me.y + fp[0].ut.y;
     from->nonextcp = false;
     if ( to!=NULL )
-	to->me = fp[0].p;
-    else 
+	to->me = fp[cnt-1].p;
+    else  {
 	to = SplinePointCreate(fp[cnt-1].p.x, fp[cnt-1].p.y);
+	created = true;
+    }
     to->prevcp.x = to->me.x - fp[cnt-1].ut.x;
     to->prevcp.y = to->me.y - fp[cnt-1].ut.y;
     to->noprevcp = false;
     ApproximateSplineFromPointsSlopes(from,to,fp+1,cnt-2,order2);
+
+    for ( i=0; i<cnt; ++i ) {
+	d = SplineMinDistanceToPoint(from->next, &fp[i].p);
+	errsum += d*d;
+	if ( d>maxerr ) {
+	    maxerr = d;
+	    maxerri = i;
+	}
+    }
+    printf("   Error sum %lf at depth %d\n", errsum, depth);
+
+    if ( errsum > TOLER && depth < 6 ) {
+	mid_t = fp[maxerri].t * (end_t-start_t) + start_t;
+	free(fp);
+	SplineFree(from->next);
+	from->next = NULL;
+	to->prev = NULL;
+	mid = _ApproximateSplineSetFromGen(from, NULL, start_t, mid_t,
+	                                   genp, tok, order2, depth+1);
+	if ( mid ) {
+	    r = _ApproximateSplineSetFromGen(mid, to, mid_t, end_t, genp, tok,
+	                                     order2, depth+1);
+	    if ( r )
+		return r;
+	    else {
+		if ( created )
+		    SplinePointFree(to);
+		else
+		    to->prev = NULL;
+		SplinePointFree(mid);
+		SplineFree(from->next);
+		from->next = NULL;
+		return NULL;
+	    }
+	} else {
+	    if ( created )
+		SplinePointFree(to);
+	    return NULL;
+	}
+    } else if ( errsum > TOLER ) {
+	printf("Error sum %lf exceeds %lf at max depth %d\n", errsum, 0.1, depth);
+    }
+    free(fp);
     return to;
+}
+
+SplinePoint *ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
+                                          bigreal start_t, bigreal end_t,
+                                          GenPointsP genp, void *tok, int order2) {
+    return _ApproximateSplineSetFromGen(from, to, start_t, end_t, genp, tok,
+                                        order2, 0);
 }
