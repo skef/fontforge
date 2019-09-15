@@ -988,8 +988,8 @@ SplinePoint *_ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
 	return NULL;
 
     // Rescale zero to one
-    for ( i=0; i<cnt; ++i )
-	fp[i].t = (fp[i].t-start_t)/(end_t-start_t);
+    for ( i=1; i<(cnt-1); ++i )
+	fp[i].t = (fp[i].t-fp[0].t)/(fp[cnt-1].t-fp[0].t);
     fp[0].t = 0.0;
     fp[cnt-1].t = 1.0;
 
