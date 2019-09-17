@@ -374,6 +374,23 @@ static NibOffset *CalcNibOffset(StrokeContext *c, BasePoint ut, int reverse,
     return no;
 }
 
+/* This is a convenience function that also concisely demonstrates
+ * the mechanics of calculating an offseted value
+ */
+BasePoint SplineOffsetAt(StrokeContext *c, Spline *s, bigreal t, int is_right) {
+    int is_ccw;
+    BasePoint xy, ut;
+    NibOffset no;
+
+    xy = SPLINEPVAL(s, t);
+    is_ccw = SplineTurningCCWAt(s, t);
+
+    ut = SplineUTanVecAt(s, t);
+    CalcNibOffset(c, ut, is_right, &no, -1);
+
+    return BP_ADD(xy, no.off[is_ccw]);
+}
+
 /* Copies the portion of s from t_start to t_end and then translates
  * and appends it to t_start. The new end point is returned. "Reversing"
  * t_start and t_end reverses the copy's direction.
@@ -605,7 +622,6 @@ int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end,
 	CalcNibOffset(stip->c, fp[i].ut, stip->is_right, &no, no.nci[is_ccw]);
 	fp[i].p = BP_ADD(xy, no.off[is_ccw]);
 	fp[i].t = t;
-	printf("BLAH %.15lf %.15lf %.15lf %.15lf %.15lf\n", fp[i].p.x, fp[i].p.y, fp[i].ut.x, fp[i].ut.y, fp[i].t);
 	if ( stip->first_pass ) {
 	    on_cusp = OffsetOnCuspAt(stip->c, stip->s, t, &no,
 	                             stip->is_right, is_ccw);
@@ -630,27 +646,19 @@ int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end,
 	    fp[i].ut = BP_REV(fp[i].ut);
 	// printf("FitPoints i=%d, (x=%lf, y=%lf, t=%lf), spline t=%lf sxy=%lf,%lf, off=%lf,%lf\n, ut=%lf,%lf", i, fp[i].p.x, fp[i].p.y, fp[i].t, t, xy.x, xy.y, no.off[is_ccw].x, no.off[is_ccw].y, ut.x, ut.y);
     }
-/*    if ( stip->starts_on_cusp ) {
-	for ( i=0; i<(NIPOINTS/2); ++i ) {
-	    tmp_fp = fp[i];
-	    fp[i] = fp[NIPOINTS-1-i];
-	    fp[NIPOINTS-1-i] = tmp_fp;
-	    fp[NIPOINTS-1-i].t = 1-fp[NIPOINTS-1-i].t;
-	    fp[i].t = 1-fp[i].t;
-	    fp[i].ut = BP_REV(fp[i].ut);
-	    fp[NIPOINTS-1-i].ut = BP_REV(fp[NIPOINTS-1-i].ut);
-	}
-    } */
     *fpp = fp;
     stip->first_pass = false;
     return NIPOINTS;
 }
 
+#define TRACE_CUSPS false
 SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start,
                                bigreal t_end, SplinePoint *start,
 			       int nci_hint, int is_right, int *on_cusp) {
-    SplinePoint *sp;
+    SplinePoint *sp = NULL;
     StrokeTraceInfo sti;
+    FitPoint *fpp;
+    BasePoint xy;
 
     sti.c = c;
     sti.s = s;
@@ -660,26 +668,41 @@ SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start,
     sti.starts_on_cusp = *on_cusp;
     sti.found_trans = false;
 
-    sp = ApproximateSplineSetFromGen(start, NULL, t_start, t_end, 
-                                     &GenStrokeTracePoints, (void *) &sti,
-                                     false);
-    if ( sp!=NULL )
+    if ( *on_cusp && !TRACE_CUSPS )
+	GenStrokeTracePoints((void *)&sti, t_start, t_end, &fpp);
+    else 
+	sp = ApproximateSplineSetFromGen(start, NULL, t_start, t_end, 
+	                                 &GenStrokeTracePoints, (void *) &sti,
+	                                 false);
+    if ( !sti.found_trans ) {
+	if ( sp==NULL ) {
+	    assert( *on_cusp && !TRACE_CUSPS );
+	    xy = SplineOffsetAt(c, s, t_end, is_right);
+	    sp = SplinePointCreate(xy.x, xy.y);
+	    SplineMake3(start, sp);
+	}
    	return sp;
+    }
 
-    assert ( sti.found_trans );
+    assert ( sti.found_trans && sp==NULL );
     assert ( sti.cusp_trans >= t_start && sti.cusp_trans <= t_end );
-    sti.first_pass = false;
-    sp = ApproximateSplineSetFromGen(start, NULL, t_start, sti.cusp_trans, 
-                                     &GenStrokeTracePoints, (void *) &sti,
-                                     false);
+    if ( *on_cusp && !TRACE_CUSPS ) {
+	xy = SplineOffsetAt(c, s, sti.cusp_trans, is_right);
+	sp = SplinePointCreate(xy.x, xy.y);
+	SplineMake3(start, sp);
+    } else {
+	sti.first_pass = false;
+	sp = ApproximateSplineSetFromGen(start, NULL, t_start, sti.cusp_trans, 
+	                                 &GenStrokeTracePoints, (void *) &sti,
+	                                 false);
+    }
     assert( sp!=NULL );
-    if ( sp->noprevcp )
-	printf("FOOBAR!\n");
     sp->pointtype = pt_corner;
     *on_cusp = !*on_cusp;
     return TraceAndFitSpline(c, s, sti.cusp_trans, t_end, sp, nci_hint,
                              is_right, on_cusp);
 }
+#undef TRACE_CUSPS
 
 static BasePoint SplineStrokeNextAngle(StrokeContext *c, BasePoint ut,
                                        int is_ccw, int *curved, int reverse,
