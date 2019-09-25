@@ -4463,7 +4463,7 @@ return( -1 );
 return( -1 );
     }
     PYGETSTR(PySequence_GetItem(args,0), str, -1);
-    memset(si,0,sizeof(*si));
+    InitializeStrokeInfo(si);
     if ( str==NULL ) {
 	ENDPYGETSTR();
 return( -1 );
@@ -4473,7 +4473,7 @@ return( -1 );
 	    ENDPYGETSTR();
 return( -1 );
 	}
-	si->stroke_type = si_std;
+	si->stroke_type = si_round;
 	minor = width;
 	angle = 0;
     } else if ( strcmp(str,"eliptical")==0 ) {
@@ -4481,7 +4481,7 @@ return( -1 );
 	    ENDPYGETSTR();
 	    return( -1 );
 	}
-	si->stroke_type = si_std;
+	si->stroke_type = si_round;
     } else if ( strcmp(str,"caligraphic")==0 || strcmp(str,"square")==0 ) {
 	if ( !PyArg_ParseTuple(args,"sdddss|O", &str, &width, &minor, &angle, &cap, &join, &flagtuple ) ) {
 	    PyErr_Clear();

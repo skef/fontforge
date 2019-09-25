@@ -153,16 +153,19 @@ struct pschars {
 
 enum linejoin {
     lj_miter,		/* Extend lines until they meet */
-    lj_round,		/* circle centered at the join of expand radius */
+    lj_miterclip,	/* Extend lines until they meet */
+    lj_round,		/* connect with arc (not w/ stroking - see "nib") */
     lj_bevel,		/* Straight line between the ends of next and prev */
     lj_nib,		/* Join with the nib shape */
+    lj_arcs,
     lj_inherited
 };
 enum linecap {
-    lc_butt,		/* equiv to lj_bevel, straight line extends from one side to other */
-    lc_round,		/* semi-circle */
-    lc_square,		/* Extend lines by radius, then join them */
+    lc_butt,		/* Finish with line perpendicular to end tangent */
+    lc_round,		/* semi-circle (not w/ stroking - see "nib") */
     lc_nib,		/* cap with the nib shape */
+    lc_square,		/* Not used w/ stroking - use lc_butt w/ extend */
+    lc_bevel,		/* Just join endpoints with a line */
     lc_inherited
 };
 enum stroke_rmov {
@@ -221,9 +224,9 @@ struct pen {
 };
 
 struct spline;
-enum si_type { si_std, si_caligraphic, si_nib, si_centerline };
+enum si_type { si_round, si_caligraphic, si_nib, si_centerline };
 /* If you change this structure you may need to update MakeStrokeDlg */
-/*  and cvpalettes.c both contain statically initialized StrokeInfos */
+/*  and cvpalettes.c -- both contain statically initialized StrokeInfos */
 typedef struct strokeinfo {
     real radius;			/* or major axis of pen */
     enum linejoin join;
@@ -234,18 +237,24 @@ typedef struct strokeinfo {
     unsigned int removeexternal: 1;
     unsigned int nosimplify: 1;
     unsigned int noextrema: 1;
-    unsigned int leave_users_center: 1;			/* Don't move the pen so its center is at the origin */
+    unsigned int leave_users_center: 1; /* Don't change pen origin */
+    unsigned int jl_is_length: 1;
+    unsigned int ec_is_relative: 1;
     real penangle;
     real minorradius;
+    real extendcap;
+    real joinlimit;
+    real accuracy_target;
     struct splinepointlist *nib;
-    real resolution;
-/* For freehand tool */
+/* For freehand tool, not currently used in practice */
     real radius2;
     int pressure1, pressure2;
-/* End freehand tool */
     void *data;
     bigreal (*factor)(void *data,struct spline *spline,real t);
+/* End freehand */
 } StrokeInfo;
+
+extern StrokeInfo *InitializeStrokeInfo(StrokeInfo *sip);
 
 enum overlap_type { over_remove, over_rmselected, over_intersect, over_intersel,
 	over_exclude, over_findinter, over_fisel };

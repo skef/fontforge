@@ -2922,7 +2922,8 @@ return( head );
 
     for ( layer=ly_fore; layer<sc->layer_cnt; ++layer ) {
 	if ( sc->layers[layer].dostroke ) {
-	    memset(&si,'\0',sizeof(si));
+	    InitializeStrokeInfo(&si);
+	    // XXX adapt arguments
 	    si.join = sc->layers[layer].stroke_pen.linejoin;
 	    si.cap = sc->layers[layer].stroke_pen.linecap;
 	    si.radius = sc->layers[layer].stroke_pen.width/2.0f;
@@ -3133,7 +3134,8 @@ SplinePointList *SplinesFromEntityChar(EntityChar *ec,int *flags,int is_stroked)
 		/* How do we implement that? Special case: If filled and stroked 0, then */
 		/*  ignore the stroke. This idiom is used by MetaPost sometimes and means */
 		/*  no stroke */
-		memset(&si,'\0',sizeof(si));
+		InitializeStrokeInfo(&si);
+		// XXX adapt arguments
 		si.join = ent->u.splines.join;
 		si.cap = ent->u.splines.cap;
 		si.radius = ent->u.splines.stroke_width/2;

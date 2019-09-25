@@ -1600,9 +1600,9 @@ static void ChangeGlyph( SplineChar *sc_sc, SplineChar *orig_sc, int layer, stru
 	    scale[3] = 1.;
 	}
 	SplinePointListTransform( sc_sc->layers[layer].splines,scale,tpt_AllPoints );
-
-	memset( &si,0,sizeof( si ));
-	si.stroke_type = si_std;
+	InitializeStrokeInfo(&si);
+	// XXX Adapt arguments
+	si.stroke_type = si_round;
 	si.join = lj_miter;
 	si.cap = lc_square;
 	if ( add >=0 ) {
@@ -4037,8 +4037,9 @@ static void SCEmbolden(SplineChar *sc, struct lcg_zones *zones, int layer) {
     DBounds old, new;
     int adjust_counters;
 
-    memset(&si,0,sizeof(si));
-    si.stroke_type = si_std;
+    InitializeStrokeInfo(&si);
+    // XXX Adapt arguments
+    si.stroke_type = si_round;
     si.join = lj_miter;
     si.cap = lc_square;
     if ( zones->stroke_width>=0 ) {

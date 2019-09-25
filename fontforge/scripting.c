@@ -5086,10 +5086,10 @@ static void bExpandStroke(Context *c) {
 	else
 	    ScriptError(c,"Bad argument type");
     }
-    memset(&si,0,sizeof(si));
+    InitializeStrokeInfo(&si);
     si.radius = args[1]/2.;
     si.minorradius = si.radius;
-    si.stroke_type = si_std;
+    si.stroke_type = si_round;
     if ( c->a.argc==2 ) {
 	si.join = lj_round;
 	si.cap = lc_butt;
