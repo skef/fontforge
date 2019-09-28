@@ -255,6 +255,8 @@ typedef struct strokeinfo {
 } StrokeInfo;
 
 extern StrokeInfo *InitializeStrokeInfo(StrokeInfo *sip);
+extern void SITranslatePSArgs(StrokeInfo *sip, enum linejoin lj,
+                              enum linecap lc);
 
 enum overlap_type { over_remove, over_rmselected, over_intersect, over_intersel,
 	over_exclude, over_findinter, over_fisel };

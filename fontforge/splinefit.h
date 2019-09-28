@@ -50,6 +50,7 @@ extern Spline *ApproximateSplineFromPointsSlopes(SplinePoint *from, SplinePoint 
                                                  FitPoint *mid, int cnt, int order2);
 extern SplinePoint *ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
                                                 bigreal start_t, bigreal end_t, 
+                                                bigreal toler, int toler_is_sumsq,
                                                 GenPointsP genp, void *tok, int order2);
 
 #endif /* FONTFORGE_SPLINEFIT_H */

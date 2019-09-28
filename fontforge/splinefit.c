@@ -973,9 +973,9 @@ return( spline );
 #undef TRY_CNT
 #undef DECIMATION
 
-#define TOLER .1
 SplinePoint *_ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
                                           bigreal start_t, bigreal end_t,
+                                          bigreal toler, int toler_is_sumsq,
                                           GenPointsP genp, void *tok,
                                           int order2, int depth) {
     int cnt, i, maxerri=0, created = false;
@@ -1015,18 +1015,20 @@ SplinePoint *_ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
 	    maxerri = i;
 	}
     }
-    printf("   Error sum %lf at depth %d\n", errsum, depth);
+    printf("   Error sum %lf, max error %lf at depth %d\n", errsum, maxerr, depth);
 
-    if ( errsum > TOLER && depth < 6 ) {
+    if ( (toler_is_sumsq ? errsum : maxerr) > toler && depth < 6 ) {
 	mid_t = fp[maxerri].t * (end_t-start_t) + start_t;
 	free(fp);
 	SplineFree(from->next);
 	from->next = NULL;
 	to->prev = NULL;
-	mid = _ApproximateSplineSetFromGen(from, NULL, start_t, mid_t,
-	                                   genp, tok, order2, depth+1);
+	mid = _ApproximateSplineSetFromGen(from, NULL, start_t, mid_t, toler,
+	                                   toler_is_sumsq, genp, tok, order2,
+	                                   depth+1);
 	if ( mid ) {
-	    r = _ApproximateSplineSetFromGen(mid, to, mid_t, end_t, genp, tok,
+	    r = _ApproximateSplineSetFromGen(mid, to, mid_t, end_t, toler,
+	                                     toler_is_sumsq, genp, tok,
 	                                     order2, depth+1);
 	    if ( r )
 		return r;
@@ -1045,8 +1047,10 @@ SplinePoint *_ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
 		SplinePointFree(to);
 	    return NULL;
 	}
-    } else if ( errsum > TOLER ) {
-	printf("Error sum %lf exceeds %lf at max depth %d\n", errsum, 0.1, depth);
+    } else if ( (toler_is_sumsq ? errsum : maxerr) > toler ) {
+	printf("%s %lf exceeds %lf at maximum depth %d\n",
+	       toler_is_sumsq ? "Sum of squared errors" : "Maximum error length",
+	       toler_is_sumsq ? errsum : maxerr, toler, depth);
     }
     free(fp);
     return to;
@@ -1054,7 +1058,9 @@ SplinePoint *_ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
 
 SplinePoint *ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
                                           bigreal start_t, bigreal end_t,
-                                          GenPointsP genp, void *tok, int order2) {
-    return _ApproximateSplineSetFromGen(from, to, start_t, end_t, genp, tok,
-                                        order2, 0);
+                                          bigreal toler, int toler_is_sumsq,
+                                          GenPointsP genp, void *tok,
+                                          int order2) {
+    return _ApproximateSplineSetFromGen(from, to, start_t, end_t, toler, 
+                                        toler_is_sumsq, genp, tok, order2, 0);
 }

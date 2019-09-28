@@ -736,6 +736,7 @@ return( NULL );
 	InitializeStrokeInfo(&si);
 	si.removeexternal = true;
 	si.radius = outline_width;
+	si.rmov = srmov_none;
 	temp = SplinePointListCopy(spl);	/* SplineSetStroke confuses the direction I think */
 	internal = SplineSetStroke(temp,&si,order2);
 	SplinePointListsFree(temp);

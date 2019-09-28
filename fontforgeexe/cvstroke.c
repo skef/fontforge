@@ -605,8 +605,8 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	    *joincaparray[4][11], *overlaparray[10], *swarray[4][7],
 	    *pens[10], *checkarray[3][4], *jlexarray[3][6], *accarray[2][4];
     GTextInfo label[51];
-    int yoff=0;
-    int gcdoff, mi, swpos, tfpos[3];
+    int yoff=0, i;
+    int gcdoff, mi, swpos, tfpos[6];
     StrokeInfo *def;
     static StrokeInfo *defaults = NULL;
     char anglebuf[20], ecbuf[20], jlbuf[20], accbuf[20];
@@ -961,6 +961,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	gcd[gcdoff].gd.flags = gg_enabled | gg_visible;
 	gcd[gcdoff].gd.cid = CID_JoinLimitVal;
 	gcd[gcdoff].gd.handle_controlevent = Stroke_TextChanged;
+	tfpos[3] = gcdoff;
 	gcd[gcdoff++].creator = GTextFieldCreate;
 	jlexarray[0][1] = &gcd[gcdoff-1];
 
@@ -999,6 +1000,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	gcd[gcdoff].gd.flags = gg_enabled | gg_visible;
 	gcd[gcdoff].gd.cid = CID_ExtendCapVal;
 	gcd[gcdoff].gd.handle_controlevent = Stroke_TextChanged;
+	tfpos[4] = gcdoff;
 	gcd[gcdoff++].creator = GTextFieldCreate;
 	jlexarray[1][1] = &gcd[gcdoff-1];
 
@@ -1051,7 +1053,8 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	gcd[gcdoff].gd.handle_controlevent = Stroke_TextChanged;
 	gcd[gcdoff].gd.popup_msg = (unichar_t *) _(
 	    "The stroke algorithm will attempt to be (at least)\n"
-	    "this accurate, but there may be some exceptions.");
+	    "this accurate, but there may be exceptions.");
+	tfpos[5] = gcdoff;
 	gcd[gcdoff++].creator = GTextFieldCreate;
 	accarray[0][1] = &gcd[gcdoff-1];
 	accarray[0][2] = GCD_Glue;
@@ -1191,17 +1194,11 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 
 	GGadgetsCreate(gw,boxes);
 	GHVBoxSetExpandableRow(boxes[0].ret,1);
-	GHVBoxSetExpandableCol(boxes[2].ret,gb_expandglue);
-	GHVBoxSetExpandableCol(boxes[3].ret,gb_expandglue);
-	GHVBoxSetExpandableCol(boxes[4].ret,gb_expandglue);
-	GHVBoxSetExpandableCol(boxes[5].ret,gb_expandglue);
-	GHVBoxSetExpandableCol(boxes[6].ret,gb_expandglue);
-	GHVBoxSetExpandableCol(boxes[6].ret,gb_expandglue);
-	GHVBoxSetExpandableCol(boxes[7].ret,gb_expandglue);
+	for (i=2; i<=7; ++i)
+	    GHVBoxSetExpandableCol(boxes[i].ret,gb_expandglue);
 	GHVBoxSetExpandableCol(boxes[8].ret,gb_expandgluesame);
-	GGadgetSetSkipUnQualifiedHotkeyProcessing(gcd[tfpos[0]].ret, 1);
-	GGadgetSetSkipUnQualifiedHotkeyProcessing(gcd[tfpos[1]].ret, 1);
-	GGadgetSetSkipUnQualifiedHotkeyProcessing(gcd[tfpos[2]].ret, 1);
+	for (i=0; i<6; ++i)
+	    GGadgetSetSkipUnQualifiedHotkeyProcessing(gcd[tfpos[i]].ret, 1);
 
 	StrokeCharViewInits(sd,CID_Nib);
 	sd->cv_stroke.showfore = true;

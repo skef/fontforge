@@ -46,10 +46,11 @@
 #define PI      3.1415926535897932
 
 // Rounding makes even slope-continuous splines only approximately so. 
-#define INTERSPLINE_MARGIN 1e-1 
+#define INTERSPLINE_MARGIN (1e-1)
 #define INTRASPLINE_MARGIN (1e-8)
 #define FIXUP_MARGIN (1e-2)
-#define CUSPD_MARGIN 0.00001
+#define CUSPD_MARGIN (1e-5)
+#define MIN_ACCURACY (1e-5)
 
 #define NORMANGLE(a) ((a)>PI?(a)-2*PI:(a)<-PI?(a)+2*PI:(a))
 #define BPNEAR(bp1, bp2) BPWITHIN(bp1, bp2, INTRASPLINE_MARGIN)
@@ -91,6 +92,7 @@ typedef struct strokecontext {
     unsigned int leave_users_center: 1;	// Don't center the nib when stroking
     unsigned int simplify:1;
     unsigned int extrema:1;
+    unsigned int contour_was_ccw:1;
 } StrokeContext;
 
 #define NIBOFF_CW_IDX 0
@@ -138,6 +140,29 @@ StrokeInfo *InitializeStrokeInfo(StrokeInfo *sip) {
     };
 
     return sip;
+}
+
+void SITranslatePSArgs(StrokeInfo *sip, enum linejoin lj, enum linecap lc) {
+    sip->extendcap = 0;
+    switch (lc) {
+	case lc_round:
+	    sip->cap = lc_nib;
+	    break;
+	case lc_square:
+	    sip->cap = lc_butt;
+	    sip->extendcap = 1;
+	    sip->ec_is_relative = true;
+	    break;
+	default:
+	    sip->cap = lc;
+    }
+    switch (lj) {
+	case lc_round:
+	    sip->join = lj_nib;
+	    break;
+	default:
+	    sip->join = lj;
+    }
 }
 
 static SplineSet *SplineContourOuterCCWRemoveOverlap(SplineSet *ss) {
@@ -410,7 +435,7 @@ static NibOffset *CalcNibOffset(StrokeContext *c, BasePoint ut, int reverse,
 }
 
 /* This is a convenience function that also concisely demonstrates
- * the mechanics of calculating an offseted value
+ * the calculation of an offseted point
  */
 BasePoint SplineOffsetAt(StrokeContext *c, Spline *s, bigreal t, int is_right) {
     int is_ccw;
@@ -494,7 +519,7 @@ SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_start, bigreal t_end,
 }
 
 /* Copies the splines between s_start (at t_start) and s_end (at t_end)
- * after point dst_start. Backward (and therefore forward) is relative
+ * after point dst_start. "backward" (and therefore forward) is relative
  * to next/prev rather than clockwise/counter-clockwise.
  */
 SplinePoint *AppendCubicSplineSetPortion(Spline *s_start, bigreal t_start,
@@ -596,7 +621,7 @@ static int OffsetOnCuspAt(StrokeContext *c, Spline *s, bigreal t,
     }
     cn = SplineCurvature(c->nibcorners[nop->nci[is_ccw]].on_nib->next, nop->nt);
 
-    printf("t: %lf, SplineCurvature: %lf and %lf, right: %d, ccw: %d\n", t, cs, cn, is_right, is_ccw);
+    // printf("t: %lf, SplineCurvature: %lf and %lf, right: %d, ccw: %d\n", t, cs, cn, is_right, is_ccw);
     return RealWithin(cn, 0, 1e-6) ? false : is_right ? (cn >= cs) : (cn >= -cs);
 }
 
@@ -627,13 +652,12 @@ typedef struct stroketraceinfo {
     Spline *s;
     bigreal cusp_trans;
     int nci_hint;
+    int num_points;
     unsigned int is_right: 1;
     unsigned int starts_on_cusp: 1;
     unsigned int first_pass: 1;
     unsigned int found_trans: 1;
 } StrokeTraceInfo;
-
-#define NIPOINTS 10
 
 int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end,
                          FitPoint **fpp) {
@@ -644,15 +668,15 @@ int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end,
     bigreal nidiff, t, csd;
     BasePoint xy, rel_ut;
 
-    fp = calloc(NIPOINTS, sizeof(FitPoint));
-    nidiff = (t_end - t_start) / (NIPOINTS-1);
+    fp = calloc(stip->num_points, sizeof(FitPoint));
+    nidiff = (t_end - t_start) / (stip->num_points-1);
 
     nib_ccw = SplineTurningCCWAt(stip->s, t_start);
     no.nci[0] = no.nci[1] = stip->nci_hint;
-    for ( i=0, t=t_start; i<NIPOINTS; ++i, t+= nidiff ) {
-	if ( i==(NIPOINTS-1) ) {
+    for ( i=0, t=t_start; i<stip->num_points; ++i, t+= nidiff ) {
+	if ( i==(stip->num_points-1) ) {
 	    nib_ccw = !nib_ccw; // Stop at the closer corner
-	    t = t_end; // takes care of nidiff rounding errors
+	    t = t_end; // side-step nidiff rounding errors
 	}
 	xy = SPLINEPVAL(stip->s, t);
 	fp[i].ut = SplineUTanVecAt(stip->s, t);
@@ -672,7 +696,6 @@ int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end,
 		printf("Found %s cusp transition at %lf\n", stip->starts_on_cusp ? "1 to 0" : "0 to 1", stip->cusp_trans);
 		return 0;
 	    }
-	    // printf("BLAH %lf %lf %d\n", fp[i].p.x, fp[i].p.y, on_cusp);
 	} else {
 #ifndef NODEBUG
 	;
@@ -682,11 +705,10 @@ int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end,
 	}
 	if ( stip->starts_on_cusp )
 	    fp[i].ut = BP_REV(fp[i].ut);
-	// printf("FitPoints i=%d, (x=%lf, y=%lf, t=%lf), spline t=%lf sxy=%lf,%lf, off=%lf,%lf\n, ut=%lf,%lf", i, fp[i].p.x, fp[i].p.y, fp[i].t, t, xy.x, xy.y, no.off[is_ccw].x, no.off[is_ccw].y, ut.x, ut.y);
     }
     *fpp = fp;
     stip->first_pass = false;
-    return NIPOINTS;
+    return stip->num_points;
 }
 
 #define TRACE_CUSPS false
@@ -701,6 +723,7 @@ SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start,
     sti.c = c;
     sti.s = s;
     sti.nci_hint = nci_hint;
+    sti.num_points = 10;
     sti.is_right = is_right;
     sti.first_pass = true;
     sti.starts_on_cusp = on_cusp;
@@ -710,6 +733,7 @@ SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start,
 	GenStrokeTracePoints((void *)&sti, t_start, t_end, &fpp);
     else 
 	sp = ApproximateSplineSetFromGen(start, NULL, t_start, t_end, 
+	                                 c->acctarget, false,
 	                                 &GenStrokeTracePoints, (void *) &sti,
 	                                 false);
     if ( !sti.found_trans ) {
@@ -731,6 +755,7 @@ SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start,
     } else {
 	sti.first_pass = false;
 	sp = ApproximateSplineSetFromGen(start, NULL, t_start, sti.cusp_trans, 
+	                                 c->acctarget, false,
 	                                 &GenStrokeTracePoints, (void *) &sti,
 	                                 false);
     }
@@ -961,9 +986,9 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
     int is_ccw_ini, is_ccw_start, is_ccw_mid, was_ccw;
     int closed = ss->first->prev!=NULL;
 
-    if ( !c->remove_outer || !closed )
+    if ( (c->contour_was_ccw ? !c->remove_inner : !c->remove_outer) || !closed )
 	left = chunkalloc(sizeof(SplineSet));
-    if ( !c->remove_inner || !closed )
+    if ( (c->contour_was_ccw ? !c->remove_outer : !c->remove_inner) || !closed )
 	right = chunkalloc(sizeof(SplineSet));
 
     for ( s=ss->first->next; s!=NULL && s!=first; s=s->to->next ) {
@@ -1055,7 +1080,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
     }
     if (    (left!=NULL && left->first==NULL) 
          || (right!=NULL && right->first==NULL) ) {
-	// Presumably the path had only zero-length splines
+	// The path (presumably) had only zero-length splines
 	LogError( _("Warning: No stroke output for contour\n") );
 	assert(    (left==NULL || left->first==NULL)
 	        && (right==NULL || right->first==NULL) );
@@ -1130,16 +1155,18 @@ static BasePoint SquareCorners[] = {
     { -1, -1 },
 };
 
+#define CIRCOFF 0.551915
 static struct shapedescrip {
     BasePoint me, prevcp, nextcp;
 }
 unitcircle[] = {
-    { { -1, 0 }, { -1, -0.552 }, { -1, 0.552 } },
-    { { 0 , 1 }, { -0.552, 1 }, { 0.552, 1 } },
-    { { 1, 0 }, { 1, 0.552 }, { 1, -0.552 } },
-    { { 0, -1 }, { 0.552, -1 }, { -0.552, -1 } },
+    { { -1, 0 }, { -1, -CIRCOFF }, { -1, CIRCOFF } },
+    { { 0 , 1 }, { -CIRCOFF, 1 }, { CIRCOFF, 1 } },
+    { { 1, 0 }, { 1, CIRCOFF }, { 1, -CIRCOFF } },
+    { { 0, -1 }, { CIRCOFF, -1 }, { -CIRCOFF, -1 } },
     { { 0, 0 }, { 0, 0 }, { 0, 0 } }
 };
+#undef CIRCOFF
 
 static SplinePoint *SpOnCircle(int i,bigreal radius,BasePoint *center) {
     SplinePoint *sp = SplinePointCreate(unitcircle[i].me.x*radius + center->x,
@@ -1244,7 +1271,9 @@ static SplineSet *SplineSet_Stroke(SplineSet *ss,struct strokecontext *c,
     SplineSet *base = ss;
     SplineSet *ret;
     int copied = 0;
-    int is_ccw = base->first->prev!=NULL && !SplinePointListIsClockwise(base);
+
+    c->contour_was_ccw = (   base->first->prev!=NULL
+                          && !SplinePointListIsClockwise(base) );
 
     if ( base->first->next==NULL )
 	ret = SinglePointStroke(base->first, c);
@@ -1253,7 +1282,7 @@ static SplineSet *SplineSet_Stroke(SplineSet *ss,struct strokecontext *c,
 	    base = SSPSApprox(ss);
 	    copied = 1;
 	}
-	if ( is_ccw )
+	if ( c->contour_was_ccw )
 	    SplineSetReverse(base);
 	ret = OffsetSplineSet(base, c);
     }
@@ -1261,7 +1290,7 @@ static SplineSet *SplineSet_Stroke(SplineSet *ss,struct strokecontext *c,
 	ret = SplineSetsConvertOrder(ret,order2);
     if ( copied )
 	SplinePointListFree(base);
-    else if ( is_ccw )
+    else if ( c->contour_was_ccw )
 	SplineSetReverse(base);
 
     return(ret);
@@ -1292,7 +1321,7 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     bigreal sn = 0.0, co = 1.0, mr;
     DBounds b;
     real trans[6];
-    static struct simplifyinfo smpl = { sf_normal, 0.75, 0.2, 0, 0, 0, 0 };
+    struct simplifyinfo smpl = { sf_forcelines&sf_mergelines&sf_smoothcurves&sf_ignoreslopes, 0.25, 0.1, .005, 0, 0, 0 };
 
     if ( si->stroke_type==si_centerline )
 	IError("centerline not handled");
@@ -1316,6 +1345,12 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     else
 	mr = si->radius;
     //c.scaled_or_rotated = si->factor!=NULL;
+    
+    if ( c.acctarget<MIN_ACCURACY ) {
+         LogError( _("Warning: Accuracy target %lf less than minimum %lf, using %lf instead\n"), c.acctarget, MIN_ACCURACY );
+	 c.acctarget = MIN_ACCURACY;
+    }
+    smpl.err = c.acctarget;
 
     if ( si->penangle!=0 ) {
 	sn = sin(si->penangle);
