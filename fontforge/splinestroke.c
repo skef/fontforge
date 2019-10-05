@@ -50,10 +50,13 @@
 #define INTRASPLINE_MARGIN (1e-8)
 #define FIXUP_MARGIN (1e-2)
 #define CUSPD_MARGIN (1e-5)
+// About .25 degrees
+#define COS_MARGIN (1e-5)
 #define MIN_ACCURACY (1e-5)
 
 #define NORMANGLE(a) ((a)>PI?(a)-2*PI:(a)<-PI?(a)+2*PI:(a))
 #define BPNEAR(bp1, bp2) BPWITHIN(bp1, bp2, INTRASPLINE_MARGIN)
+#define BP_DIST(bp1, bp2) sqrt(pow((bp1).x-(bp2).x,2)+pow((bp1).y-(bp2).y,2))
 
 enum pentype { pt_circle, pt_square, pt_convex };
 
@@ -85,6 +88,7 @@ typedef struct strokecontext {
     SplineSet *nib;
     int n;
     NibCorner *nibcorners;
+    BasePoint pseudo_origin;
     unsigned int jl_is_length: 1;
     unsigned int ec_is_relative: 1;
     unsigned int remove_inner: 1;
@@ -124,12 +128,12 @@ StrokeInfo *InitializeStrokeInfo(StrokeInfo *sip) {
 	false,        // nosimplify
 	false,        // noextrema
         false,        // leave users center
-        false,        // ml_is_relative
+        false,        // el_is_length
         false,        // ec_is_relative
         0.0,          // pen angle
         0.0,          // minor radius (0: major)
 	0.0,          // extend cap
-	0.0,          // join limit
+	20.0,         // join limit
 	0.25,         // accuracy target
         NULL,         // nib (SplineSet for si_nib)
         0.0,          // freehand: radius 2
@@ -923,43 +927,184 @@ static void HandleFlat(SplineSet *cur, BasePoint sxy, NibOffset *noi,
     }
 }
 
-static int HandleJoint(StrokeContext *c, SplineSet *cur,
-                       BasePoint sxy, NibOffset *noi, int is_ccw,
-                       BasePoint ut_endlast, int was_ccw,
-                       int is_right) {
+static bigreal FalseStrokeWidth(StrokeContext *c, BasePoint ut) {
+    SplineSet *tss;
+    DBounds b;
+    real trans[6];
+
+    assert( RealNear(BP_LENGTHSQ(ut),1) );
+    // Rotate nib and grab height as span
+    trans[0] = trans[3] = ut.x;
+    trans[1] = ut.y;
+    trans[2] = -ut.y;
+    trans[4] = trans[5] = 0;
+    tss = SplinePointListCopy(c->nib);
+    SplinePointListTransformExtended(tss, trans, tpt_AllPoints,
+	                             tpmask_dontTrimValues);
+    SplineSetFindBounds(tss,&b);
+    SplinePointListFree(tss);
+    // printf("maxy: %lf, miny: %lf\n", b.maxy, b.miny);
+    return b.maxy - b.miny;
+}
+
+static bigreal CalcJoinLength(bigreal fsw, BasePoint ut1, BasePoint ut2) {
+    bigreal costheta = BP_DOT(ut1, ut2);
+
+    // Angle of interest is pi - theta, so formula is fsw/sin((pi - theta)/2)
+    //   = sin(pi/2 - theta/2) = sin(pi/2)cos(theta/2) - cos(pi/2)sin(theta/2)
+    //   = 1 * cos(theta/2) - 0 * sin(theta/2) = cos(theta/2)
+    //   = sqrt((1 + costheta)/2)
+    return fsw / sqrt((1 + costheta)/2);
+}
+
+static bigreal CalcJoinLimit(StrokeContext *c, bigreal fsw) {
+    if (c->joinlimit <= 0)
+	return DBL_MAX;
+
+    if (c->jl_is_length)
+	return c->joinlimit;
+
+    return c->joinlimit * fsw / 2;
+}
+
+typedef struct joinparams {
+    StrokeContext *c;
+    SplineSet *cur;
+    BasePoint sxy, oxy, ut_endlast;
+    NibOffset  *noi;
+    int is_ccw, was_ccw, is_right, bend_is_ccw;
+} JoinParams;
+
+static void BevelJoin(JoinParams *jpp) {
+    SplinePoint *sp = SplinePointCreate(jpp->oxy.x, jpp->oxy.y);
+    SplineMake3(jpp->cur->last, sp);
+    jpp->cur->last = sp;
+}
+
+static void NibJoin(JoinParams *jpp) {
     NibOffset now;
     SplinePoint *sp;
-    BasePoint oxy;
-    int jcw, is_flat = false;
 
-    oxy = BP_ADD(sxy, noi->off[is_ccw]);
-    // Create or verify initial spline point
+    CalcNibOffset(jpp->c, jpp->ut_endlast, jpp->is_right, &now, -1);
+    sp = AddNibPortion(jpp->c, jpp->cur->last, &now, jpp->was_ccw, jpp->noi,
+                       jpp->is_ccw, !jpp->bend_is_ccw);
+    SplineStrokeAppendFixup(sp, jpp->sxy, jpp->noi, jpp->is_ccw);
+    jpp->cur->last = sp;
+}
+
+static void DoubleBackJoin(JoinParams *jpp) {
+}
+
+static void MiterJoin(JoinParams *jpp) {
+    BasePoint ixy, refp, cow, coi, clip1, clip2, ut, oxy = jpp->oxy;
+    int intersects;
+    SplinePoint *sp;
+    SplineSet *cur = jpp->cur;
+    bigreal fsw, jlen, jlim, refd;
+
+    cow = BP_ADD(cur->last->me, jpp->ut_endlast);
+    coi = BP_ADD(oxy, jpp->noi->utanvec);
+    intersects = IntersectLines(&ixy, &cur->last->me, &cow, &coi, &oxy);
+    assert(intersects);
+    fsw = FalseStrokeWidth(jpp->c, NormVec(BP_ADD(jpp->ut_endlast,
+                                                  jpp->noi->utanvec)));
+    jlim = CalcJoinLimit(jpp->c, fsw);
+    jlen = CalcJoinLength(fsw, jpp->ut_endlast, jpp->noi->utanvec);
+
+    printf("%lf,%lf to %lf,%lf and %lf,%lf to %lf,%lf fsw=%lf, jlim=%lf, jl=%lf\n", cur->last->me.x, cur->last->me.y, cow.x, cow.y, coi.x, coi.y, oxy.x, oxy.y, fsw, jlim, jlen);
+
+    if ( jlen<=jlim ) {
+	// Normal miter join
+	sp = SplinePointCreate(ixy.x, ixy.y);
+	SplineMake3(cur->last, sp);
+	cur->last = sp;
+	sp = SplinePointCreate(oxy.x, oxy.y);
+	SplineMake3(cur->last, sp);
+    } else {
+	if ( jpp->c->join==lj_miter ) {
+	    BevelJoin(jpp);
+	    return;
+	}
+	refp = BP_AVG(cur->last->me, oxy);
+	refd = BP_DIST(refp, ixy);
+	if ( jlen-jlim >= refd ) {
+	    // Don't trim past bevel
+	    BevelJoin(jpp);
+	    return;
+	}
+	// Clipped miter join
+	ut = NormVec(BP_ADD(cur->last->me, BP_REV(oxy)));
+	ut = jpp->bend_is_ccw ? UT_90CW(ut) : UT_90CCW(ut);
+	printf("jlen-jlim: %lf, refd: %lf, bend_is_ccw: %d\n", jlen-jlim, refd, jpp->bend_is_ccw);
+	clip1 = BP_ADD(refp, BP_SCALE(ut, refd - (jlen-jlim)));
+	clip2 = BP_ADD(clip1, UT_90CW(ut));
+	intersects = IntersectLines(&ixy, &cur->last->me, &cow, &clip1, &clip2);
+	assert(intersects);
+	sp = SplinePointCreate(ixy.x, ixy.y);
+	SplineMake3(cur->last, sp);
+	cur->last = sp;
+	intersects = IntersectLines(&ixy, &oxy, &coi, &clip1, &clip2);
+	assert(intersects);
+	sp = SplinePointCreate(ixy.x, ixy.y);
+	SplineMake3(cur->last, sp);
+	cur->last = sp;
+	sp = SplinePointCreate(oxy.x, oxy.y);
+	SplineMake3(cur->last, sp);
+	cur->last = sp;
+    }
+}
+
+static int _HandleJoin(JoinParams *jpp) {
+    SplineSet *cur = jpp->cur;
+    BasePoint oxy = jpp->oxy;
+    StrokeContext *c = jpp->c;
+    int is_flat = false;
+    bigreal costheta = BP_DOT(jpp->ut_endlast, jpp->noi->utanvec);
+
     if ( cur->first==NULL ) {
+	// Create initial spline point
 	cur->first = SplinePointCreate(oxy.x, oxy.y);
 	cur->last = cur->first;
     } else if ( BPWITHIN(cur->last->me, oxy, INTERSPLINE_MARGIN) ) {
-	SplineStrokeAppendFixup(cur->last, sxy, noi, is_ccw);
+	// Close enough to just move the point
+	SplineStrokeAppendFixup(cur->last, jpp->sxy, jpp->noi, jpp->is_ccw);
 	is_flat = true;
+    } else if ( RealWithin(costheta, 1, COS_MARGIN) ) {
+        HandleFlat(jpp->cur, jpp->sxy, jpp->noi, jpp->is_ccw);
+	is_flat = true;
+    } else if ( !jpp->bend_is_ccw == !jpp->is_right ) {
+	// Join is under nib, just connect for later removal
+	BevelJoin(jpp);
+    } else if ( c->join==lj_bevel ) {
+	BevelJoin(jpp);
+    } else if ( c->join==lj_miter || c->join==lj_miterclip ) {
+	if ( RealWithin(costheta, -1, COS_MARGIN) ) {
+	    if ( c->join==lj_miter )
+		BevelJoin(jpp);
+	    else
+		DoubleBackJoin(jpp);
+	} else
+	    MiterJoin(jpp);
     } else {
-	jcw = JointBendsCW(ut_endlast, noi->utanvec);
-	if ( BPNEAR(ut_endlast, noi->utanvec) ) {
-	    sp = SplinePointCreate(oxy.x, oxy.y);
-	    SplineMake3(cur->last, sp);
-	    is_flat = true;
-	} else if ( jcw == !is_right ) {
-	    // XXX Mark for cleanup
-	    sp = SplinePointCreate(oxy.x, oxy.y);
-	    SplineMake3(cur->last, sp);
-	} else {
-	    CalcNibOffset(c, ut_endlast, is_right, &now, -1);
-	    sp = AddNibPortion(c, cur->last, &now, was_ccw, noi, is_ccw, jcw);
-	    SplineStrokeAppendFixup(sp, sxy, noi, is_ccw);
-	}
-	cur->last = sp;
-    }
+	if ( c->join!=lj_nib && c->join!=lj_inherited )
+	    LogError( _("Warning: Unrecognized or unsupported join type, defaulting to 'nib'.\n") );
+	NibJoin(jpp);
+    } 
     return is_flat;
 }
 
+static int HandleJoin(StrokeContext *c, SplineSet *cur,
+                      BasePoint sxy, NibOffset *noi, int is_ccw,
+                      BasePoint ut_endlast, int was_ccw,
+                      int is_right) {
+    JoinParams jp = { c, cur, sxy, BP_UNINIT, ut_endlast, noi,
+                      is_ccw, was_ccw, is_right, false };
+    jp.oxy = BP_ADD(sxy, noi->off[is_ccw]);
+    jp.bend_is_ccw = !JointBendsCW(ut_endlast, noi->utanvec);
+    return _HandleJoin(&jp);
+}
+
+   
 static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
                       BasePoint ut, int is_ccw, int is_right) {
     NibOffset nof, not;
@@ -968,7 +1113,7 @@ static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
     CalcNibOffset(c, ut, false, &nof, -1);
     CalcNibOffset(c, ut, true, &not, -1);
     sp = AddNibPortion(c, cur->last, &nof, is_ccw, &not, is_ccw, !is_right);
-    SplineStrokeAppendFixup(sp, sxy, &not, is_ccw);
+    // SplineStrokeAppendFixup(sp, sxy, &not, is_ccw);
     cur->last = sp;
 }
 
@@ -1028,8 +1173,8 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 	    sxy = SPLINEPVAL(s, 0.0);
 	    CalcNibOffset(c, ut_start, is_right, &no, -1);
 
-	    if ( !HandleJoint(c, cur, sxy, &no, is_ccw_start, ut_endlast,
-	                      was_ccw, is_right) )
+	    if ( !HandleJoin(c, cur, sxy, &no, is_ccw_start, ut_endlast,
+	                     was_ccw, is_right) )
 		// Handle cusp value change here
 		;
 	    on_cusp = OffsetOnCuspAt(c, s, 0.0, &no, is_right, is_ccw_start);
@@ -1111,8 +1256,8 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 	// This can fail if the source contour is closed in a strange way
 	if ( left!=NULL ) {
 	    CalcNibOffset(c, ut_ini, false, &no, -1);
-	    HandleJoint(c, left, ss->first->me, &no, is_ccw_ini, ut_endlast,
-	                was_ccw, false);
+	    HandleJoin(c, left, ss->first->me, &no, is_ccw_ini, ut_endlast,
+	               was_ccw, false);
             left = SplineSetJoin(left, true, INTERSPLINE_MARGIN, &closed);
 	    if ( !closed )
 		LogError( _("Warning: Left contour did not close\n") );
@@ -1123,8 +1268,8 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 	}
 	if ( right!=NULL ) {
 	    CalcNibOffset(c, ut_ini, true, &no, -1);
-	    HandleJoint(c, right, ss->first->me, &no, is_ccw_ini, ut_endlast,
-	                was_ccw, true);
+	    HandleJoin(c, right, ss->first->me, &no, is_ccw_ini, ut_endlast,
+	               was_ccw, true);
             right = SplineSetJoin(right, true, INTERSPLINE_MARGIN, &closed);
 	    if ( !closed )
 		LogError( _("Warning: Right contour did not close\n") );
@@ -1245,8 +1390,6 @@ return( ret );
 static SplinePointList *SinglePointStroke(SplinePoint *sp,
                                           struct strokecontext *c) {
     SplineSet *ret;
-    SplinePoint *sp1, *sp2;
-    int i;
     real trans[6];
 
     if ( c->pentype==pt_circle && c->cap==lc_butt ) {
@@ -1329,7 +1472,7 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     memset(&c,0,sizeof(c));
     c.join = si->join;
     c.cap  = si->cap;
-    c.joinlimit = si->joinlimit; /* -cos(theta) -.98 (~11 degrees, PS miterlimit=10) */;
+    c.joinlimit = si->joinlimit;
     c.extendcap = si->extendcap;
     c.acctarget = si->accuracy_target;
     c.remove_inner = si->removeinternal;
@@ -1374,10 +1517,13 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
 	c.pentype = pt_convex;
 	max_pc = 20; // a guess
 	nibs = SplinePointListCopy(si->nib);
+	SplineSetFindBounds(nibs,&b);
 	if ( !c.leave_users_center ) {
-	    SplineSetQuickBounds(nibs,&b);
 	    trans[4] = -(b.minx+b.maxx)/2;
 	    trans[5] = -(b.miny+b.maxy)/2;
+	} else {
+	    c.pseudo_origin.x = b.minx+b.maxx/2;
+	    c.pseudo_origin.y = b.miny+b.maxy/2;
 	}
     }
     SplinePointListTransformExtended(nibs,trans,tpt_AllPoints,

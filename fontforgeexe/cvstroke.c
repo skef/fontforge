@@ -58,7 +58,7 @@ extern const int input_em_cnt;
 #define CID_Convex	1012
 #define CID_JoinLimitVal 1013
 #define CID_JoinLimitLen 1014
-#define CID_JoinLimitDeg 1015
+#define CID_JoinLimitRel 1015
 #define CID_MinorAxisTxt 1016
 	/* For Kanou (& me) */
 #define CID_RmInternal	1019
@@ -965,21 +965,21 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	gcd[gcdoff++].creator = GTextFieldCreate;
 	jlexarray[0][1] = &gcd[gcdoff-1];
 
-	label[gcdoff].text = (unichar_t *) _("as Angle");
-	label[gcdoff].text_is_1byte = true;
-	label[gcdoff].text_in_resource = true;
-	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!def->jl_is_length?gg_cb_on:0);
-	gcd[gcdoff].gd.cid = CID_JoinLimitDeg;
-	gcd[gcdoff++].creator = GRadioCreate;
-	jlexarray[0][2] = &gcd[gcdoff-1];
-
 	label[gcdoff].text = (unichar_t *) _("as Length");
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
 	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->jl_is_length?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_JoinLimitLen;
+	gcd[gcdoff++].creator = GRadioCreate;
+	jlexarray[0][2] = &gcd[gcdoff-1];
+
+	label[gcdoff].text = (unichar_t *) _("* Nib Span/2");
+	label[gcdoff].text_is_1byte = true;
+	label[gcdoff].text_in_resource = true;
+	gcd[gcdoff].gd.label = &label[gcdoff];
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!def->jl_is_length?gg_cb_on:0);
+	gcd[gcdoff].gd.cid = CID_JoinLimitRel;
 	gcd[gcdoff++].creator = GRadioCreate;
 	jlexarray[0][3] = &gcd[gcdoff-1];
 	jlexarray[0][4] = GCD_Glue; jlexarray[0][5] = NULL;

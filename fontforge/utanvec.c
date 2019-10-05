@@ -51,6 +51,10 @@ BasePoint MakeUTanVec(bigreal x, bigreal y) {
     return ret;
 }
 
+BasePoint NormVec(BasePoint v) {
+    return MakeUTanVec(v.x, v.y);
+}
+
 /* Orders unit tangent vectors on an absolute -PI+e to PI
  * equivalent basis
  */

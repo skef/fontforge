@@ -34,13 +34,19 @@
 
 #define BP_LENGTHSQ(v) (pow((v).x,2)+pow((v).y,2))
 #define BP_REV(v) (BasePoint) { -(v).x, -(v).y }
-#define BP_REV_IF(t, v) (t ? (BasePoint) { -(v).x, -(v).y } : (v))
+#define BP_REV_IF(t, v) ((t) ? (BasePoint) { -(v).x, -(v).y } : (v))
 #define BP_ADD(v1, v2) (BasePoint) { (v1).x + (v2).x, (v1).y + (v2).y } 
+#define BP_SCALE(v, f) (BasePoint) { (f)*(v).x, (f)*(v).y } 
+#define BP_AVG(v1, v2) (BasePoint) { ((v1).x + (v2).x)/2, ((v1).y + (v2).y)/2 }
+#define BP_DOT(v1, v2) ( ((v1).x * (v2).x) + ((v1).y * (v2).y) )
 #define BP_UNINIT ((BasePoint) { -INFINITY, INFINITY })
 #define BP_IS_UNINIT(v) ((v).x==-INFINITY && (v).y==INFINITY)
 #define UTMIN ((BasePoint) { -1, -DBL_MIN })
+#define UT_90CCW(v) (BasePoint) { -(v).y, (v).x }
+#define UT_90CW(v) (BasePoint) { (v).y, -(v).x }
 
 extern BasePoint MakeUTanVec(bigreal x, bigreal y);
+extern BasePoint NormVec(BasePoint v);
 extern int UTanVecGreater(BasePoint uta, BasePoint utb);
 extern int UTanVecsSequent(BasePoint ut1, BasePoint ut2, BasePoint ut3,
                            int ccw);
