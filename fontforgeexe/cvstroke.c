@@ -80,13 +80,13 @@ extern const int input_em_cnt;
 #define CID_ExtendCapLen 1035
 #define CID_ExtendCapRel 1036
 #define CID_AccTar       1037
+#define CID_RoundJoin	1038
 
 	/* For freehand */
 #define CID_CenterLine	1040
 
 /* Used in other structures and tools */
 #define CID_SquareCap	1041
-#define CID_RoundJoin	1042
 #define CID_LineJoinTxt 1043
 #define CID_LineCapTxt  1044
 
@@ -249,6 +249,7 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
     si->join = GGadgetIsChecked( GWidgetGetControl(sw,CID_BevelJoin))?lj_bevel:
                GGadgetIsChecked( GWidgetGetControl(sw,CID_MiterJoin))?lj_miter:
                GGadgetIsChecked( GWidgetGetControl(sw,CID_MiterClipJoin))?lj_miterclip:
+               GGadgetIsChecked( GWidgetGetControl(sw,CID_RoundJoin))?lj_round:
                GGadgetIsChecked( GWidgetGetControl(sw,CID_ArcsJoin))?lj_arcs:
                lj_nib;
     si->rmov = GGadgetIsChecked( GWidgetGetControl(sw,CID_RmOvNone))?srmov_none:
@@ -901,14 +902,26 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[1][4] = &gcd[gcdoff-1]; joincaparray[1][5] = GCD_Glue;
 
+	label[gcdoff].text = (unichar_t *) _("Round");
+	label[gcdoff].text_is_1byte = true;
+	label[gcdoff].text_in_resource = true;
+	gcd[gcdoff].gd.label = &label[gcdoff];
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->join==lj_round?gg_cb_on:0);
+	gcd[gcdoff].gd.cid = CID_RoundJoin;
+	gcd[gcdoff++].creator = GRadioCreate;
+	joincaparray[1][6] = &gcd[gcdoff-1]; joincaparray[1][7] = GCD_Glue;
+
 	label[gcdoff].text = (unichar_t *) _("Arcs");
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->join==lj_arcs?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_visible; // | (def->join==lj_arcs?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_ArcsJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
-	joincaparray[1][6] = &gcd[gcdoff-1]; joincaparray[1][7] = GCD_Glue;
+	joincaparray[1][8] = &gcd[gcdoff-1]; joincaparray[1][9] = GCD_Glue;
+	joincaparray[1][10] = NULL;
+
+	joincaparray[2][0] = joincaparray[2][1] = GCD_Glue;
 
 	label[gcdoff].text = (unichar_t *) _("_Miter");
 	label[gcdoff].text_is_1byte = true;
@@ -918,8 +931,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->join==lj_miter?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_MiterJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
-	joincaparray[1][8] = &gcd[gcdoff-1]; joincaparray[1][9] = GCD_Glue;
-	joincaparray[1][10] = NULL;
+	joincaparray[2][2] = &gcd[gcdoff-1]; joincaparray[2][3] = GCD_Glue;
 
 	label[gcdoff].text = (unichar_t *) _("_Miter Clip");
 	label[gcdoff].text_is_1byte = true;
@@ -928,10 +940,9 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->join==lj_miterclip?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_MiterClipJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
-	joincaparray[2][0] = joincaparray[2][1] = GCD_Glue;
-	joincaparray[2][2] = &gcd[gcdoff-1];
-	joincaparray[2][3] = joincaparray[2][4] = GCD_ColSpan;
-	joincaparray[2][5] = NULL;
+	joincaparray[2][4] = &gcd[gcdoff-1];
+	joincaparray[2][5] = joincaparray[2][6] = GCD_ColSpan;
+	joincaparray[2][7] = NULL;
 	joincaparray[3][0] = NULL;
 
 	boxes[4].gd.flags = gg_enabled|gg_visible;

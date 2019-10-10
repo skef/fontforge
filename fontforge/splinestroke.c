@@ -913,6 +913,12 @@ static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
     return next_t;
 }
 
+static void SplineSetLineTo(SplineSet *cur, BasePoint xy) {
+    SplinePoint *sp = SplinePointCreate(xy.x, xy.y);
+    SplineMake3(cur->last, sp);
+    cur->last = sp;
+}
+
 static void HandleFlat(SplineSet *cur, BasePoint sxy, NibOffset *noi,
                        int is_ccw) {
     BasePoint oxy;
@@ -921,9 +927,7 @@ static void HandleFlat(SplineSet *cur, BasePoint sxy, NibOffset *noi,
     oxy = BP_ADD(sxy, noi->off[is_ccw]);
     if ( !BPNEAR(cur->last->me, oxy) ) {
 	assert( BPNEAR(cur->last->me, (BP_ADD(sxy, noi->off[!is_ccw]))) );
-	sp = SplinePointCreate(oxy.x, oxy.y);
-	SplineMake3(cur->last, sp);
-	cur->last = sp;
+	SplineSetLineTo(cur, oxy);
     }
 }
 
@@ -967,6 +971,95 @@ static bigreal CalcJoinLimit(StrokeContext *c, bigreal fsw) {
     return c->joinlimit * fsw / 2;
 }
 
+static bigreal CalcCapExtend(StrokeContext *c, bigreal cw) {
+    if (c->extendcap <= 0)
+	return 0;
+
+    if (!c->ec_is_relative)
+	return c->extendcap;
+
+    return c->extendcap * cw / 2;
+}
+
+static int LineSameSide(BasePoint l1, BasePoint l2, BasePoint p, BasePoint r) {
+    bigreal t1, t2;
+
+    t1 = (l2.x-l1.x)*(r.y-l1.y) - (r.x-l1.x)*(l2.y-l1.y);
+    t2 = (l2.x-l1.x)*(p.y-l1.y) - (p.x-l1.x)*(l2.y-l1.y);
+
+    return    !RealWithin(t1, 0, 1e-4) && !RealWithin(t2, 0, 1e-4)
+           && (t1>0)==(t2>0);
+}
+
+static bigreal LineDist(BasePoint l1, BasePoint l2, BasePoint p) {
+    assert (l1.x!=l2.x || l1.y!=l2.y);
+    return   abs((l2.y-l1.y)*p.x - (l2.x-l1.x)*p.y + l2.x*l1.y -l2.y*l1.x)
+           / BP_DIST(l1, l2);
+}
+
+/*
+static void CalcDualBasis(BasePoint v1, BasePoint v2, BasePoint *q1,
+                          BasePoint *q2) {
+    if ( v1.x==0 ) {
+	assert( v1.y!=0 && v2.x!=0 );
+	q2->y = 0;
+	q2->x = 1/v2.x;
+	q1->y = 1/v1.y;
+	q1->x = -v2.y / ( v1.y * v2.x );
+    } else if ( v1.y==0 ) { 
+	assert( v2.y!=0 );
+	q2->x = 0;
+	q2->y = 1/v2.y;
+	q1->x = 1/v1.x;
+	q1->y = -v2.x / ( v1.x * v2.y );
+    } else if ( v2.x==0 ) {
+	assert( v2.y!=0 );
+	q1->y = 0;
+	q1->x = 1/v1.x;
+	q2->y = 1/v2.y;
+	q2->x = -v1.y / ( v2.y * v1.x );
+    } else if ( v2.y==0 ) { 
+	q1->x = 0;
+	q1->y = 1/v1.y;
+	q2->x = 1/v2.x;
+	q2->y = -v1.x / ( v2.x * v1.y );
+    } else {
+	q1->y = 1 / (v1.y - (v1.x * v2.y / v2.x));
+	q2->y = 1 / (v2.y - (v2.x * v1.y / v1.x));
+	q1->x = -v2.y * q1->y / v2.x;
+	q2->x = -v1.y * q2->y / v1.x;
+    }
+    assert(    RealNear(BP_DOT(v1,*q1), 1) && RealNear(BP_DOT(v2,*q2), 1)
+            && RealNear(BP_DOT(v1,*q2), 0) && RealNear(BP_DOT(v2,*q1), 0) );
+}
+*/
+
+static void CalcExtend(BasePoint refp, BasePoint ut, BasePoint op1,
+                       BasePoint op2, bigreal min,
+                       BasePoint *np1, BasePoint *np2) {
+    bigreal extra=0, tmp;
+    int intersects;
+    BasePoint cop1 = BP_ADD(op1, ut), cop2 = BP_ADD(op2, ut);
+    BasePoint clip1 = BP_ADD(refp, BP_SCALE(ut, min));
+    BasePoint clip2 = BP_ADD(clip1, UT_90CW(ut));
+
+    if ( !LineSameSide(clip1, clip2, op1, refp) )
+	extra = LineDist(clip1, clip2, op1);
+    if ( !LineSameSide(clip1, clip2, op2, refp) ) {
+	tmp = LineDist(clip1, clip2, op2);
+	if (tmp > extra)
+	    extra = tmp;
+    }
+    if (extra > 0) {
+	clip1 = BP_ADD(refp, BP_SCALE(ut, min+extra));
+	clip2 = BP_ADD(clip1, UT_90CW(ut));
+    }
+    intersects = IntersectLines(np1, &op1, &cop1, &clip1, &clip2);
+    assert(intersects);
+    intersects = IntersectLines(np2, &op2, &cop2, &clip1, &clip2);
+    assert(intersects);
+}
+
 typedef struct joinparams {
     StrokeContext *c;
     SplineSet *cur;
@@ -976,9 +1069,7 @@ typedef struct joinparams {
 } JoinParams;
 
 static void BevelJoin(JoinParams *jpp) {
-    SplinePoint *sp = SplinePointCreate(jpp->oxy.x, jpp->oxy.y);
-    SplineMake3(jpp->cur->last, sp);
-    jpp->cur->last = sp;
+    SplineSetLineTo(jpp->cur, jpp->oxy);
 }
 
 static void NibJoin(JoinParams *jpp) {
@@ -993,64 +1084,99 @@ static void NibJoin(JoinParams *jpp) {
 }
 
 static void DoubleBackJoin(JoinParams *jpp) {
+    BasePoint refp, p1, p2;
+    bigreal fsw, jlim, d1 = 0, d2 = 0;
+
+    assert( jpp->c->join==lj_miterclip || jpp->c->join==lj_arcs );
+    assert( RealWithin( BP_DOT(jpp->ut_endlast, jpp->noi->utanvec),
+                        -1, COS_MARGIN) );
+    refp = BP_ADD(jpp->sxy, jpp->c->pseudo_origin);
+    fsw = FalseStrokeWidth(jpp->c, NormVec(BP_ADD(jpp->ut_endlast,
+                                                  jpp->noi->utanvec)));
+    jlim = CalcJoinLimit(jpp->c, fsw);
+    CalcExtend(refp, jpp->ut_endlast, jpp->cur->last->me, jpp->oxy, jlim/2,
+               &p1, &p2);
+    SplineSetLineTo(jpp->cur, p1);
+    SplineSetLineTo(jpp->cur, p2);
+    SplineSetLineTo(jpp->cur, jpp->oxy);
 }
 
+static void RoundJoin(JoinParams *jpp) {
+    BasePoint c, cut, ut1, ut2;
+    bigreal alpha, B, C, E, mu, nu, B2AC, maj, min, tmp, tmp2;
+    int intersects;
+
+    c = BP_AVG(jpp->cur->last->me, jpp->oxy);
+    cut = NormVec(BP_ADD(BP_REV(jpp->cur->last->me), jpp->oxy));
+    alpha = BP_DIST(jpp->cur->last->me, jpp->oxy)/2;
+    ut1 = BP_ROT(BP_REV(jpp->ut_endlast), UT_NEG(cut));
+    ut2 = BP_ROT(jpp->noi->utanvec, UT_NEG(cut));
+    BasePoint pp1 = BP_ROT(jpp->cur->last->me, UT_NEG(cut)), pp2 = BP_ROT(jpp->oxy, UT_NEG(cut));
+    printf("p1: %lf,%lf p2: %lf,%lf pp1: %lf,%lf: pp2: %lf,%lf, c: %lf,%lf cut: %lf, alpha: %lf\n", jpp->cur->last->me.x, jpp->cur->last->me.y, jpp->oxy.x, jpp->oxy.y, pp1.x, pp1.y, pp2.x, pp2.y, c.x, c.y, atan2(cut.y, cut.x) * 180 / PI, alpha);
+    mu = -ut1.x/ut1.y;
+    nu = -ut2.x/ut2.y;
+    B = 1 + pow(mu + nu, 2)/2;
+    C = mu + nu;
+    E = alpha * (mu - nu);
+    B2AC = B*B-4*C;
+    tmp = 2 * (E*E - B2AC*alpha*alpha);
+    tmp2 = sqrt(pow(1-C,2) + B*B);
+    printf("mu: %lf, nu:%lf, B: %lf, C: %lf, E: %lf, B2AC: %lf, tmp: %lf, tmp2: %lf\n", mu, nu, B, C, E, B2AC, tmp, tmp2);
+    maj = sqrt(tmp * (1 + C + tmp2))/B2AC;
+    min = sqrt(tmp * (1 + C - tmp2))/B2AC;
+    printf("maj: %lf, min: %lf, angle: %lf\n", maj, min, atan2(cut.y, cut.x) * 180 / PI);
+    BevelJoin(jpp);
+} 
+
 static void MiterJoin(JoinParams *jpp) {
-    BasePoint ixy, refp, cow, coi, clip1, clip2, ut, oxy = jpp->oxy;
+    BasePoint ixy, refp, cow, coi, clip1, clip2, ut;
     int intersects;
     SplinePoint *sp;
     SplineSet *cur = jpp->cur;
-    bigreal fsw, jlen, jlim, refd;
+    bigreal fsw, jlen, jlim;
 
     cow = BP_ADD(cur->last->me, jpp->ut_endlast);
-    coi = BP_ADD(oxy, jpp->noi->utanvec);
-    intersects = IntersectLines(&ixy, &cur->last->me, &cow, &coi, &oxy);
-    assert(intersects);
+    coi = BP_ADD(jpp->oxy, jpp->noi->utanvec);
+    intersects = IntersectLines(&ixy, &cur->last->me, &cow, &coi, &jpp->oxy);
+    assert(intersects); // Shouldn't be called with parallel tangents
     fsw = FalseStrokeWidth(jpp->c, NormVec(BP_ADD(jpp->ut_endlast,
                                                   jpp->noi->utanvec)));
     jlim = CalcJoinLimit(jpp->c, fsw);
     jlen = CalcJoinLength(fsw, jpp->ut_endlast, jpp->noi->utanvec);
 
-    printf("%lf,%lf to %lf,%lf and %lf,%lf to %lf,%lf fsw=%lf, jlim=%lf, jl=%lf\n", cur->last->me.x, cur->last->me.y, cow.x, cow.y, coi.x, coi.y, oxy.x, oxy.y, fsw, jlim, jlen);
-
     if ( jlen<=jlim ) {
 	// Normal miter join
-	sp = SplinePointCreate(ixy.x, ixy.y);
-	SplineMake3(cur->last, sp);
-	cur->last = sp;
-	sp = SplinePointCreate(oxy.x, oxy.y);
-	SplineMake3(cur->last, sp);
+	SplineSetLineTo(cur, ixy);
+	SplineSetLineTo(cur, jpp->oxy);
     } else {
 	if ( jpp->c->join==lj_miter ) {
 	    BevelJoin(jpp);
 	    return;
 	}
-	refp = BP_AVG(cur->last->me, oxy);
-	refd = BP_DIST(refp, ixy);
-	if ( jlen-jlim >= refd ) {
+	refp = BP_ADD(jpp->sxy, jpp->c->pseudo_origin);
+	ut = NormVec(BP_ADD(cur->last->me, BP_REV(jpp->oxy)));
+	ut = jpp->bend_is_ccw ? UT_90CW(ut) : UT_90CCW(ut);
+	clip1 = BP_ADD(refp, BP_SCALE(ut, jlim/2));
+	clip2 = BP_ADD(clip1, UT_90CW(ut));
+	if ( !LineSameSide(clip1, clip2, jpp->oxy, refp) ) {
 	    // Don't trim past bevel
 	    BevelJoin(jpp);
 	    return;
 	}
+	if ( LineSameSide(clip1, clip2, ixy, refp) ) {
+	    // Backup normal miter join (rounding problems)
+	    SplineSetLineTo(cur, ixy);
+	    SplineSetLineTo(cur, jpp->oxy);
+	    return;
+	}
 	// Clipped miter join
-	ut = NormVec(BP_ADD(cur->last->me, BP_REV(oxy)));
-	ut = jpp->bend_is_ccw ? UT_90CW(ut) : UT_90CCW(ut);
-	printf("jlen-jlim: %lf, refd: %lf, bend_is_ccw: %d\n", jlen-jlim, refd, jpp->bend_is_ccw);
-	clip1 = BP_ADD(refp, BP_SCALE(ut, refd - (jlen-jlim)));
-	clip2 = BP_ADD(clip1, UT_90CW(ut));
 	intersects = IntersectLines(&ixy, &cur->last->me, &cow, &clip1, &clip2);
 	assert(intersects);
-	sp = SplinePointCreate(ixy.x, ixy.y);
-	SplineMake3(cur->last, sp);
-	cur->last = sp;
-	intersects = IntersectLines(&ixy, &oxy, &coi, &clip1, &clip2);
+	SplineSetLineTo(cur, ixy);
+	intersects = IntersectLines(&ixy, &jpp->oxy, &coi, &clip1, &clip2);
 	assert(intersects);
-	sp = SplinePointCreate(ixy.x, ixy.y);
-	SplineMake3(cur->last, sp);
-	cur->last = sp;
-	sp = SplinePointCreate(oxy.x, oxy.y);
-	SplineMake3(cur->last, sp);
-	cur->last = sp;
+	SplineSetLineTo(cur, ixy);
+	SplineSetLineTo(cur, jpp->oxy);
     }
 }
 
@@ -1077,6 +1203,11 @@ static int _HandleJoin(JoinParams *jpp) {
 	BevelJoin(jpp);
     } else if ( c->join==lj_bevel ) {
 	BevelJoin(jpp);
+    } else if ( c->join==lj_round ) {
+	if ( RealWithin(costheta, -1, COS_MARGIN) )
+	    BevelJoin(jpp);
+	else
+	    RoundJoin(jpp);
     } else if ( c->join==lj_miter || c->join==lj_miterclip ) {
 	if ( RealWithin(costheta, -1, COS_MARGIN) ) {
 	    if ( c->join==lj_miter )
@@ -1108,13 +1239,41 @@ static int HandleJoin(StrokeContext *c, SplineSet *cur,
 static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
                       BasePoint ut, int is_ccw, int is_right) {
     NibOffset nof, not;
+    BasePoint refp = BP_ADD(sxy, c->pseudo_origin), p1, p2, oxy;
     SplinePoint *sp;
+    bigreal cw, cel;
 
     CalcNibOffset(c, ut, false, &nof, -1);
     CalcNibOffset(c, ut, true, &not, -1);
-    sp = AddNibPortion(c, cur->last, &nof, is_ccw, &not, is_ccw, !is_right);
-    // SplineStrokeAppendFixup(sp, sxy, &not, is_ccw);
-    cur->last = sp;
+    oxy = BP_ADD(sxy, not.off[is_ccw]);
+
+    if ( c->cap==lc_bevel ) {
+	SplineSetLineTo(cur, oxy);
+	return;
+    }
+    cw = BP_DIST(nof.off[is_ccw], not.off[is_ccw]);
+    if ( c->cap==lc_butt || c->cap==lc_round ) {
+	cel = CalcCapExtend(c, cw);
+	CalcExtend(refp, BP_REV_IF(!is_right, ut),
+	           cur->last->me, oxy, cel, &p1, &p2);
+	if ( BPNEAR(cur->last->me, p1) )
+	    cur->last->me = p1;
+	else
+	    SplineSetLineTo(cur, p1);
+	// XXX handle round
+	if ( BPNEAR(oxy, p2) )
+	    SplineSetLineTo(cur, p2);
+	else {
+	    SplineSetLineTo(cur, p2);
+	    SplineSetLineTo(cur, oxy);
+	}
+    } else {
+	if ( c->cap!=lc_nib && c->cap!=lc_inherited )
+	    LogError( _("Warning: Unrecognized or unsupported cap type, defaulting to 'nib'.\n") );
+	sp = AddNibPortion(c, cur->last, &nof, is_ccw, &not, is_ccw, !is_right);
+	// SplineStrokeAppendFixup(sp, sxy, &not, is_ccw);
+	cur->last = sp;
+    }
 }
 
 /* The main loop of the stroking algorithm.
@@ -1184,10 +1343,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 	    // The path for this spline
 	    if ( linear ) {
 		sxy = SPLINEPVAL(s, 1.0);
-		sp = SplinePointCreate(sxy.x+no.off[is_ccw_start].x,
-		                       sxy.y+no.off[is_ccw_start].y);
-		SplineMake3(cur->last, sp);
-		cur->last = sp;
+		SplineSetLineTo(cur, BP_ADD(sxy, no.off[is_ccw_start]));
 	    } else {
 		t = 0.0;
 		ut_mid = ut_start;

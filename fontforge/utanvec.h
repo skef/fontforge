@@ -41,9 +41,11 @@
 #define BP_DOT(v1, v2) ( ((v1).x * (v2).x) + ((v1).y * (v2).y) )
 #define BP_UNINIT ((BasePoint) { -INFINITY, INFINITY })
 #define BP_IS_UNINIT(v) ((v).x==-INFINITY && (v).y==INFINITY)
+#define BP_ROT(v, ut) (BasePoint) { (ut).x * (v).x - (ut).y * (v).y, (ut).y * (v).x + (ut).x * (v).y }
 #define UTMIN ((BasePoint) { -1, -DBL_MIN })
 #define UT_90CCW(v) (BasePoint) { -(v).y, (v).x }
 #define UT_90CW(v) (BasePoint) { (v).y, -(v).x }
+#define UT_NEG(v) (BasePoint) { (v).x, -(v).y }
 
 extern BasePoint MakeUTanVec(bigreal x, bigreal y);
 extern BasePoint NormVec(BasePoint v);
