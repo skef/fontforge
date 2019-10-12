@@ -59,7 +59,8 @@ extern const int input_em_cnt;
 #define CID_JoinLimitVal 1013
 #define CID_JoinLimitLen 1014
 #define CID_JoinLimitRel 1015
-#define CID_MinorAxisTxt 1016
+#define CID_JoinLimitTxt 1016
+#define CID_MinorAxisTxt 1017
 	/* For Kanou (& me) */
 #define CID_RmInternal	1019
 #define CID_RmExternal	1020
@@ -79,8 +80,9 @@ extern const int input_em_cnt;
 #define CID_ExtendCapVal 1034
 #define CID_ExtendCapLen 1035
 #define CID_ExtendCapRel 1036
-#define CID_AccTar       1037
-#define CID_RoundJoin	1038
+#define CID_ExtendCapTxt 1036
+#define CID_AccTar       1038
+#define CID_RoundJoin	1039
 
 	/* For freehand */
 #define CID_CenterLine	1040
@@ -350,6 +352,8 @@ static void StrokeSetup(StrokeDlg *sd, enum si_type stroke_type) {
     GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_Width       ), stroke_type==si_round || stroke_type==si_caligraphic);
     GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_MinorAxisTxt), stroke_type==si_round || stroke_type==si_caligraphic);
     GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_MinorAxis   ), stroke_type==si_round || stroke_type==si_caligraphic);
+
+//    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_JoinLimitTxt), stroke_type==si_round || stroke_type==si_caligraphic);
 }
 
 static int Stroke_TextChanged(GGadget *g, GEvent *e) {
@@ -906,7 +910,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->join==lj_round?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_visible; // | gg_enabled | (def->join==lj_round?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_RoundJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[1][6] = &gcd[gcdoff-1]; joincaparray[1][7] = GCD_Glue;
@@ -915,7 +919,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_visible; // | (def->join==lj_arcs?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_visible; // | gg_enabled | (def->join==lj_arcs?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_ArcsJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[1][8] = &gcd[gcdoff-1]; joincaparray[1][9] = GCD_Glue;
@@ -961,6 +965,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
 	gcd[gcdoff].gd.flags = gg_enabled | gg_visible;
+	gcd[gcdoff].gd.cid = CID_JoinLimitTxt;
 	gcd[gcdoff++].creator = GLabelCreate;
 	jlexarray[0][0] = &gcd[gcdoff-1];
 
@@ -1000,6 +1005,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
 	gcd[gcdoff].gd.flags = gg_enabled | gg_visible;
+	gcd[gcdoff].gd.cid = CID_ExtendCapTxt;
 	gcd[gcdoff++].creator = GLabelCreate;
 	jlexarray[1][0] = &gcd[gcdoff-1];
 
