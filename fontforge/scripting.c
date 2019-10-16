@@ -5085,8 +5085,8 @@ static void bESFlags(Context *c, int fi, StrokeInfo *sip) {
     if ( c->a.vals[fi].type!=v_int )
 	ScriptError(c,"Bad argument type");
 
-    sip->removeinternal = (c->a.vals[fi].u.ival&1!=0);
-    sip->removeexternal = (c->a.vals[fi].u.ival&2!=0);
+    sip->removeinternal = ((c->a.vals[fi].u.ival&1)!=0);
+    sip->removeexternal = ((c->a.vals[fi].u.ival&2)!=0);
 
     if ( c->a.vals[fi].u.ival&4 )
 	sip->rmov = srmov_contour;
@@ -5095,10 +5095,10 @@ static void bESFlags(Context *c, int fi, StrokeInfo *sip) {
     else
 	sip->rmov = srmov_layer;
 
-    sip->simplify = !c->a.vals[fi].u.ival&16;
-    sip->extrema = !c->a.vals[fi].u.ival&32;
-    sip->jlrelative = !c->a.vals[fi].u.ival&64;
-    sip->ecrelative = !c->a.vals[fi].u.ival&128;
+    sip->simplify = !(c->a.vals[fi].u.ival&16);
+    sip->extrema = !(c->a.vals[fi].u.ival&32);
+    sip->jlrelative = !(c->a.vals[fi].u.ival&64);
+    sip->ecrelative = !(c->a.vals[fi].u.ival&128);
 }
 
 static void bExpandStroke(Context *c) {
@@ -5163,7 +5163,6 @@ static void bExpandStroke(Context *c) {
 	i = c->a.vals[1].u.ival;
 	if ( i >= 0 && i<=2 )
 	    si.stroke_type = nibmap[i];
-        si.stroke_type = si_round;
 	si.minorradius = args[3]/2.0;
 	si.penangle = 3.1415926535897932*args[4]/180;
 	bESJoinCap(c, 5, 6, &si);

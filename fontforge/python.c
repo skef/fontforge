@@ -4535,24 +4535,24 @@ struct flaglist strokeflags[] = {
 #define STROKE_OPTARGS &si->removeinternal, &si->removeexternal, &si->extrema, &si->simplify, &si->accuracy_target, &si->joinlimit, &si->extendcap, &si->jlrelative, &si->ecrelative, &rostring
 
 static char *strokekey_circ[] 
-    = { "type", "width", "cap", "join", "angle", STROKE_OPTKEYS };
+    = { "type", "width", "cap", "join", "angle", STROKE_OPTKEYS, NULL };
 static char *strokebkey_circ[]
-    = { "type", "width", "cap", "join", "flags" };
+    = { "type", "width", "cap", "join", "flags", NULL };
 static char *strokekey_ellip[] 
-    = { "type", "width", "minorwidth", "angle", "cap", "join", STROKE_OPTKEYS };
+    = { "type", "width", "minorwidth", "angle", "cap", "join", STROKE_OPTKEYS, NULL };
 static char *strokebkey_ellip[] 
-    = { "type", "width", "minorwidth", "angle", "cap", "join", "flags" };
+    = { "type", "width", "minorwidth", "angle", "cap", "join", "flags", NULL };
 static char *strokekey_rect[] 
-    = { "type", "width", "height", "angle", "cap", "join", STROKE_OPTKEYS };
+    = { "type", "width", "height", "angle", "cap", "join", STROKE_OPTKEYS, NULL };
 static char *strokebkey_rect[] 
-    = { "type", "width", "height", "angle", "flags" };
+    = { "type", "width", "height", "angle", "flags", NULL };
 static char *strokekey_conv[] 
-    = { "type", "contour", "angle", "cap", "join", STROKE_OPTKEYS };
+    = { "type", "contour", "angle", "cap", "join", STROKE_OPTKEYS, NULL };
 static char *strokebkey_conv[] 
-    = { "type", "contour", "flags" };
+    = { "type", "contour", "flags", NULL };
 
 static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
-    const char *str, *type, *cap="nib", *join="nib", *rostring="layer";
+    char *str, *type, *cap="nib", *join="nib", *rostring="layer";
     int c, j, f, r;
     PyObject *flagtuple=NULL;
     PyObject *nib=NULL;
@@ -4616,6 +4616,7 @@ static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
                 "sdd|dss" STROKE_OPTFORMAT, strokekey_rect, &type,
 	        &si->radius, &si->minorradius, &si->penangle, &cap, &join,
 	        STROKE_OPTARGS) ) {
+	    return( -1 );
 	    PyErr_Clear();
 	    if ( !PyArg_ParseTupleAndKeywords(args, keywds, "sddd|O", 
                 strokebkey_rect, &type, &si->radius, &si->minorradius,
@@ -4697,7 +4698,7 @@ static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
 	return( -1 );
     si->rmov = r;
 
-    if ( strokeflags!=NULL ) {
+    if ( flagtuple!=NULL ) {
 	f = FlagsFromTuple(flagtuple,strokeflags,"stroke flag");
 	if ( f==FLAG_UNKNOWN )
 	    return( -1 );
