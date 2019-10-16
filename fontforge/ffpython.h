@@ -102,7 +102,10 @@ extern FontViewBase *fv_active_in_ui;
 extern int layer_active_in_ui;
 
 extern void FfPy_Replace_MenuItemStub(PyObject *(*func)(PyObject *,PyObject *));
-extern void FfPy_Replace_SetConvexStub(PyObject *(*func)(PyObject *,PyObject *));
+extern int PyFF_ConvexNibID(char *);
+extern SplineSet *PyFF_ParseSetConvex(PyObject *args, int *tokp);
+extern void FfPy_Replace_Convex(PyObject *(*getf)(PyObject *,PyObject *),
+                                PyObject *(*setf)(PyObject *,PyObject *));
 extern PyObject *PySC_From_SC(SplineChar *sc);
 extern PyObject *PyFV_From_FV(FontViewBase *fv);
 extern int FlagsFromTuple(PyObject *tuple,struct flaglist *flags,const char *flagkind);
@@ -149,6 +152,8 @@ typedef struct ff_layer {
     int is_quadratic;		/* bit flags, but access to int is faster */
 } PyFF_Layer;
 extern PyTypeObject PyFF_LayerType;
+
+extern PyFF_Layer *LayerFromSS(SplineSet *ss, PyFF_Layer *l);
 
 typedef struct {
     PyObject_HEAD

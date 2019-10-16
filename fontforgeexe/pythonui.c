@@ -36,6 +36,8 @@
 #include "fontforgeui.h"
 #include "scriptfuncs.h"
 #include "scripting.h"
+#include "splinestroke.h"
+#include "splineutil.h"
 #include "ttf.h"
 #include "ustring.h"
 
@@ -339,41 +341,49 @@ return( NULL );
 Py_RETURN_NONE;
 }
 
-extern int NibCheck(SplineSet *nib);
-
-static PyObject *PyFF_setConvexNib(PyObject *UNUSED(self), PyObject *args) {
+static PyObject *PyFF_getConvexNibUI(PyObject *UNUSED(self), PyObject *args) {
+    char *tok;
+    int toknum;
     SplineSet *ss;
+    PyFF_Layer *l;
     PyObject *obj;
 
-    if ( no_windowing_ui ) {
-	PyErr_Format(PyExc_EnvironmentError, "No user interface");
-	return( NULL );
-    }
+#if PY_MAJOR_VERSION >= 3
+    obj = PyUnicode_AsUTF8String(args);
+    tok = PyBytes_AsString(obj);
+#else /* PY_MAJOR_VERSION >= 3 */
+    tok = PyBytes_AsString(args);
+#endif /* PY_MAJOR_VERSION >= 3 */
+    toknum = PyFF_ConvexNibID(tok);
+    if ( toknum==0 )
+	return NULL;
 
-    if ( !PyArg_ParseTuple(args,"O", &obj ) )
-	return( NULL );
+    if ( toknum>0 )
+	ss = StrokeGetConvexPlain(toknum);
+    else
+	ss = StrokeGetConvexUI(toknum);
+    l = LayerFromSS(ss, NULL);
+    SplinePointListFree(ss);
+    return l;
+}
 
-    if ( PyType_IsSubtype(&PyFF_LayerType, Py_TYPE(obj)) ) {
-	if ( ((PyFF_Layer *) obj)->is_quadratic ) {
-	    PyErr_Format(PyExc_TypeError, "Layer is quadratic, must be cubic");
-	    return( NULL );
-	}
-	ss = SSFromLayer( (PyFF_Layer *) obj);
-    } else if ( PyType_IsSubtype(&PyFF_ContourType, Py_TYPE(obj)) ) {
-	if ( ((PyFF_Contour *) obj)->is_quadratic ) {
-	    PyErr_Format(PyExc_TypeError, "Contour is quadratic, must be cubic");
-	    return( NULL );
-	}
-	ss = SSFromContour( (PyFF_Contour *) obj, NULL);
+static PyObject *PyFF_setConvexNibUI(PyObject *UNUSED(self), PyObject *args) {
+    SplineSet *ss;
+    int toknum;
+
+    ss = PyFF_ParseSetConvex(args, &toknum);
+    if ( ss==NULL )
+	return NULL;
+
+    if ( toknum < 0 ) {
+	if ( !StrokeSetConvexUI(ss, toknum) )
+	    return NULL;
     } else {
-	PyErr_Format(PyExc_TypeError, "Argument must be a layer or a contour" );
-	return( NULL );
+	assert( toknum > 0 );
+	if ( !StrokeSetConvexPlain(ss, toknum) )
+	    return NULL;
     }
 
-    if ( !NibCheck(ss) )
-	return ( NULL );
-
-    StrokeSetConvexNib(ss);
     Py_RETURN_NONE;
 }
 
@@ -410,7 +420,7 @@ copyUIMethodsToBaseTable( PyMethodDef* ui, PyMethodDef* md )
 void PythonUI_Init(void) {
     TRACE("PythonUI_Init()\n"); 
     FfPy_Replace_MenuItemStub(PyFF_registerMenuItem);
-    FfPy_Replace_SetConvexStub(PyFF_setConvexNib);
+    FfPy_Replace_Convex(PyFF_getConvexNibUI, PyFF_setConvexNibUI);
 
     copyUIMethodsToBaseTable( module_fontforge_ui_methods, module_fontforge_methods );
 }

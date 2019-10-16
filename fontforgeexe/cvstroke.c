@@ -38,6 +38,7 @@
 #include "ustring.h"
 #include "utype.h"
 
+#include <assert.h>
 #include <math.h>
 #define PI      3.1415926535897932
 
@@ -72,8 +73,8 @@ extern const int input_em_cnt;
 #define CID_CapExtend	1026
 #define CID_RmOvContour	1027
 #define CID_RmOvNone	1028
-#define CID_NoSimplify	1029
-#define CID_NoExtrema	1030
+#define CID_Simplify	1029
+#define CID_Extrema	1030
 #define CID_MiterClipJoin	1031
 #define CID_ArcsJoin	1032
 #define CID_BevelCap	1033
@@ -92,7 +93,7 @@ extern const int input_em_cnt;
 #define CID_LineJoinTxt 1043
 #define CID_LineCapTxt  1044
 
-static SplineSet *old_convex;
+static StrokeDlg main_sdlg;
 
 static void CVStrokeIt(void *_cv, StrokeInfo *si, int justapply) {
     CharView *cv = _cv;
@@ -165,30 +166,20 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
     else if ( si!= &strokeinfo &&
 	    GGadgetIsChecked( GWidgetGetControl(sw,CID_CenterLine)) )
 	si->stroke_type = si_centerline;
-    if ( si->stroke_type == si_nib ) {
+    if ( si->stroke_type==si_nib ) {
 	si->nib = sd->sc_stroke.layers[ly_fore].splines;
 	if ( sd->sc_stroke.layers[ly_fore].refs != NULL ) {
 	    ff_post_error(_("No References"),_("No references allowed in a pen."));
 	    err = true;
-	} else if ( si->nib == NULL ) {
+	} else if ( si->nib==NULL ) {
 	    ff_post_error(_("Nothing specified"),_("Please draw a convex polygon in the drawing area."));
 	    err = true;
 	} else {
 	    SplineSet *ss;
 	    SplinePoint *sp;
-	    int cnt, selectall;
-	    for ( ss=si->nib ; ss!=NULL && !err; ss=ss->next ) {
-		for ( sp=ss->first;;) {
-		    sp->selected = false;
-		    if ( sp->next==NULL )
-		break;
-		    sp = sp->next->to;
-		    if ( sp==ss->first )
-		break;
-		}
-	    }
+	    SplinePointListSelect(si->nib, false);
+	    int cnt, selectall = false;
 	    msg = NULL;
-	    selectall = false;
 	    for ( ss=si->nib ; ss!=NULL && !err; ss=ss->next ) {
 		if ( err )
 		    /* Already handled */;
@@ -259,13 +250,13 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
                srmov_layer;
     si->removeinternal = GGadgetIsChecked( GWidgetGetControl(sw,CID_RmInternal));
     si->removeexternal = GGadgetIsChecked( GWidgetGetControl(sw,CID_RmExternal));
-    si->nosimplify = GGadgetIsChecked( GWidgetGetControl(sw,CID_NoSimplify));
-    si->noextrema = GGadgetIsChecked( GWidgetGetControl(sw,CID_NoExtrema));
+    si->simplify = GGadgetIsChecked( GWidgetGetControl(sw,CID_Simplify));
+    si->extrema = GGadgetIsChecked( GWidgetGetControl(sw,CID_Extrema));
     si->joinlimit = GetReal8(sw,CID_JoinLimitVal,_("Join Limit:"),&err);
-    si->jl_is_length = GGadgetIsChecked( GWidgetGetControl(sw,CID_JoinLimitLen))
-                       ? true : false;
+    si->jlrelative = GGadgetIsChecked( GWidgetGetControl(sw,CID_JoinLimitLen))
+                       ? false : true;
     si->extendcap = GetReal8(sw,CID_ExtendCapVal,_("Extend Cap:"),&err);
-    si->ec_is_relative = GGadgetIsChecked( GWidgetGetControl(sw,CID_ExtendCapRel))
+    si->ecrelative = GGadgetIsChecked( GWidgetGetControl(sw,CID_ExtendCapRel))
                          ? true : false;
     si->accuracy_target = GetReal8(sw,CID_AccTar,_("Accuracy Target:"),&err);
     if ( si->removeinternal && si->removeexternal ) {
@@ -326,6 +317,7 @@ static void Stroke_ShowNib(StrokeDlg *sd) {
     }
     if ( GGadgetIsChecked(GWidgetGetControl(sd->gw,CID_Circle)) ||
 	    GGadgetIsChecked(GWidgetGetControl(sd->gw,CID_Caligraphic)) ) {
+	// UnitShape(1) presumably returns a square for this line's benefit.
 	ss = UnitShape( GGadgetIsChecked(GWidgetGetControl(sd->gw,CID_Caligraphic)) );
 	memset(transform,0,sizeof(transform));
 	width = GetCalmReal8(sd->gw,CID_Width,"",&err)/2;
@@ -458,7 +450,10 @@ static void Stroke_DoClose(struct cvcontainer *cvc) {
      {
 	SplineChar *msc = &sd->sc_stroke;
 	SplinePointListsFree(msc->layers[0].splines);
-	SplinePointListsFree(msc->layers[1].splines);
+	if (sd->old_convex==NULL)
+	    sd->old_convex = msc->layers[1].splines;
+	else
+	    SplinePointListsFree(msc->layers[1].splines);
 	free( msc->layers );
     }
 
@@ -510,7 +505,6 @@ struct cvcontainer_funcs stroke_funcs = {
 static void StrokeInit(StrokeDlg *sd) {
     real transform[6];
 
-    /*memset(sd,0,sizeof(*sd));*/
     sd->base.funcs = &stroke_funcs;
 
     {
@@ -566,13 +560,6 @@ static void StrokeInit(StrokeDlg *sd) {
     sd->dummy_map.enccount = sd->dummy_map.encmax = sd->dummy_map.backmax = 1;
     sd->dummy_map.enc = &custom;
 
-    /* Default poly to a 50x50 square */
-    if ( sd->old_convex==NULL ) {
-	sd->old_convex = UnitShape( true );
-	memset(transform,0,sizeof(transform));
-	transform[0] = transform[3] = 25;
-	SplinePointListTransform(sd->old_convex,transform,tpt_AllPoints);
-    }
 }
 
 static int stroke_e_h(GWindow gw, GEvent *event) {
@@ -600,9 +587,30 @@ return( true );
 #define SD_Height	400
 #define FH_Height	(SD_Height+75)
 
-static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),StrokeInfo *si) {
-    static StrokeDlg strokedlg;
-    StrokeDlg *sd, freehand_dlg;
+/* (Intended) convex nib lifecycle:
+ * This function and it's related functions are used by two facilities.
+ * One is the Expand Stroke... dialog, which reuses its StrokeDlg structure
+ * but does not maintain a StrokeInfo structure. The other is the FreeHand
+ * configuration dialog, which does not maintain a StrokeDlg structure but
+ * keeps a StrokeInfo structure. This is far from ideal but would take some
+ * effort to refactor out. 
+ *
+ * One problem with this system is how the customizable convex nib is stored
+ * in each case, especially given the new requirement that it be replaced and
+ * retrieved from scripts. So this is a note about how that is supposed to
+ * work:
+ *
+ * In the FreeHand case any convex nib is supposed to be stored in si->nib,
+ * regardless of whether the user chose stroke_type si_nib. 
+ *
+ * In the Expand Stroke case (which for this purpose corresponds to si==NULL)
+ * any convex nib is supposed to wind up in sd->old_convex between executions.
+ * That means it must be stored there at the end and retrieved at the start
+ * of the next execution.
+ */
+static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
+		           void (*strokeit)(void *,StrokeInfo *,int),
+                           StrokeInfo *si, int apply) {
     GRect pos;
     GWindow gw;
     GWindowAttrs wattrs;
@@ -610,46 +618,28 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	    *joincaparray[4][11], *overlaparray[10], *swarray[4][7],
 	    *pens[10], *checkarray[3][4], *jlexarray[3][6], *accarray[2][4];
     GTextInfo label[51];
-    int yoff=0, i;
-    int gcdoff, mi, swpos, tfpos[6];
+    int reusing = false, i, gcdoff, mi, swpos, tfpos[6];
     StrokeInfo *def;
+    SplineSet *tmp_ss;
     static StrokeInfo *defaults = NULL;
     char anglebuf[20], ecbuf[20], jlbuf[20], accbuf[20];
     char widthbuf[20], axisbuf[20];
 
-    if ( si!=NULL )
+    if ( si!=NULL ) {
 	def = si;
-    else {
+	if ( si->nib!=NULL ) {
+	    if ( sd->old_convex!=NULL )
+		SplinePointListFree(sd->old_convex);
+	    sd->old_convex = si->nib;
+	    si->nib = NULL;
+	}
+    } else {
 	if ( defaults==NULL ) {
 	    defaults = InitializeStrokeInfo(NULL);
 	    defaults->minorradius = defaults->radius;
 	    defaults->penangle = PI/4;
 	}
 	def = defaults;
-    }
-
-    if ( strokeit!=NULL ) {
-	sd = &strokedlg;
-	if ( old_convex!=NULL ) {
-	    if ( sd->sc_stroke.layers!=NULL &&
-	         sd->sc_stroke.layers[ly_fore].splines!=NULL ) {
-		SplinePointListsFree(sd->sc_stroke.layers[ly_fore].splines);
-		sd->sc_stroke.layers[ly_fore].splines = old_convex;
-		old_convex = NULL;
-	    } else {
-		sd->old_convex = old_convex;
-		old_convex = NULL;
-	    }
-	}
-    } else {
-	sd = &freehand_dlg;
-	memset(&freehand_dlg,0,sizeof(freehand_dlg));
-	sd->si = si;
-	yoff = 18;
-    }
-    if ( sd->old_convex==NULL && si!=NULL && si->nib!=NULL ) {
-	sd->old_convex = si->nib;
-	si->nib = NULL;
     }
 
     if ( sd->gw==NULL ) {
@@ -675,7 +665,6 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	memset(&label,0,sizeof(label));
 	memset(&gcd,0,sizeof(gcd));
 	memset(&boxes,0,sizeof(boxes));
-
 	gcdoff = mi = swpos = 0;
 
 	gcd[gcdoff].gd.flags = gg_visible|gg_enabled ;		/* This space is for the menubar */
@@ -825,7 +814,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 
 	boxes[3].gd.flags = gg_enabled|gg_visible;
 	boxes[3].gd.u.boxelements = swarray[0];
-	boxes[3].creator = GHVBoxCreate;
+	boxes[3].creator = GHVGroupCreate;
 	mainarray[mi][0] = &boxes[3]; mainarray[mi++][1] = NULL;
 
 	label[gcdoff].text = (unichar_t *) _("Line Cap:");
@@ -895,7 +884,6 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[1][2] = &gcd[gcdoff-1]; joincaparray[1][3] = GCD_Glue;
 
-	joincaparray[2][0] = joincaparray[2][1] = GCD_Glue;
 	label[gcdoff].text = (unichar_t *) _("Be_vel");
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
@@ -946,7 +934,8 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[2][4] = &gcd[gcdoff-1];
 	joincaparray[2][5] = joincaparray[2][6] = GCD_ColSpan;
-	joincaparray[2][7] = NULL;
+	joincaparray[2][7] = joincaparray[2][8] = joincaparray[2][8] = NULL;
+	joincaparray[2][10] = NULL;
 	joincaparray[3][0] = NULL;
 
 	boxes[4].gd.flags = gg_enabled|gg_visible;
@@ -985,7 +974,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->jl_is_length?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!def->jlrelative?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_JoinLimitLen;
 	gcd[gcdoff++].creator = GRadioCreate;
 	jlexarray[0][2] = &gcd[gcdoff-1];
@@ -994,7 +983,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!def->jl_is_length?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->jlrelative?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_JoinLimitRel;
 	gcd[gcdoff++].creator = GRadioCreate;
 	jlexarray[0][3] = &gcd[gcdoff-1];
@@ -1025,7 +1014,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!def->ec_is_relative?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!def->ecrelative?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_ExtendCapLen;
 	gcd[gcdoff++].creator = GRadioCreate;
 	jlexarray[1][2] = &gcd[gcdoff-1];
@@ -1034,7 +1023,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->ec_is_relative?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->ecrelative?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_ExtendCapRel;
 	gcd[gcdoff++].creator = GRadioCreate;
 	jlexarray[1][3] = &gcd[gcdoff-1];
@@ -1121,7 +1110,7 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 
 	boxes[7].gd.flags = gg_enabled|gg_visible;
 	boxes[7].gd.u.boxelements = overlaparray;
-	boxes[7].creator = GHVGroupCreate;
+	boxes[7].creator = GHVBoxCreate;
 	mainarray[mi][0] = &boxes[7]; mainarray[mi++][1] = NULL;
 
 	label[gcdoff].text = (unichar_t *) _("Remove Internal Contour");
@@ -1143,28 +1132,28 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	checkarray[0][1] = &gcd[gcdoff-1]; checkarray[0][2] = GCD_Glue;
 	checkarray[0][3] = NULL;
 
-	label[gcdoff].text = (unichar_t *) _("Don't Simplify");
+	label[gcdoff].text = (unichar_t *) _("Simplify");
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->nosimplify?gg_cb_on:0);
-	gcd[gcdoff].gd.cid = CID_NoSimplify;
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->simplify?gg_cb_on:0);
+	gcd[gcdoff].gd.cid = CID_Simplify;
 	gcd[gcdoff++].creator = GCheckBoxCreate;
 	checkarray[1][0] = &gcd[gcdoff-1];
 
-	label[gcdoff].text = (unichar_t *) _("Don't Add Extrema");
+	label[gcdoff].text = (unichar_t *) _("Add Extrema");
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->noextrema?gg_cb_on:0);
-	gcd[gcdoff].gd.cid = CID_NoExtrema;
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->extrema?gg_cb_on:0);
+	gcd[gcdoff].gd.cid = CID_Extrema;
 	gcd[gcdoff++].creator = GCheckBoxCreate;
 	checkarray[1][1] = &gcd[gcdoff-1]; checkarray[1][2] = GCD_Glue;
 	checkarray[1][3] = checkarray[2][0] = NULL;
 
 	boxes[8].gd.flags = gg_enabled|gg_visible;
 	boxes[8].gd.u.boxelements = checkarray[0];
-	boxes[8].creator = GHVBoxCreate;
+	boxes[8].creator = GHVGroupCreate;
 	mainarray[mi][0] = &boxes[8]; mainarray[mi++][1] = NULL;
 
 	gcd[gcdoff].gd.flags = gg_visible | gg_enabled | gg_but_default;
@@ -1211,17 +1200,19 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 
 	GGadgetsCreate(gw,boxes);
 	GHVBoxSetExpandableRow(boxes[0].ret,1);
-	for (i=2; i<=7; ++i)
+	for (i=2; i<=8; ++i)
 	    GHVBoxSetExpandableCol(boxes[i].ret,gb_expandglue);
-	GHVBoxSetExpandableCol(boxes[8].ret,gb_expandgluesame);
+	GHVBoxSetExpandableCol(boxes[9].ret,gb_expandgluesame);
 	for (i=0; i<6; ++i)
 	    GGadgetSetSkipUnQualifiedHotkeyProcessing(gcd[tfpos[i]].ret, 1);
 
 	StrokeCharViewInits(sd,CID_Nib);
 	sd->cv_stroke.showfore = true;
 	sd->cv_stroke.showgrids = true;
-    } else
+    } else {
+	reusing = true;
 	GDrawSetTransientFor(sd->gw,(GWindow) -1);
+    }
 
     Stroke_MakeActive(sd,&sd->cv_stroke);
     Stroke_ShowNib(sd);
@@ -1232,16 +1223,15 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
     sd->up[0] = sd->up[1] = true;
     GWidgetHidePalettes();
     GWidgetIndicateFocusGadget(GWidgetGetControl(sd->gw,CID_Width));
-    if ( si==NULL ) {
+    if ( reusing ) {
 	StrokeSetup(sd,GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Caligraphic))?si_caligraphic:
 		GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Circle))?si_round:
 		GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Convex))?si_nib:
 		si_centerline);
-	GGadgetSetVisible( GWidgetGetControl(sd->gw,CID_Apply),strokeit==CVStrokeIt );
     } else {
 	StrokeSetup(sd,def->stroke_type);
-	GGadgetSetVisible( GWidgetGetControl(sd->gw,CID_Apply),false );
     }
+    GGadgetSetVisible( GWidgetGetControl(sd->gw,CID_Apply), apply);
     GWidgetToDesiredSize(sd->gw);
 
     GDrawSetVisible(sd->gw,true);
@@ -1249,32 +1239,72 @@ static void MakeStrokeDlg(void *cv,void (*strokeit)(void *,StrokeInfo *,int),Str
 	GDrawProcessOneEvent(NULL);
 
     CVPalettesHideIfMine(&sd->cv_stroke);
-    if ( strokeit!=NULL )
-	GDrawSetVisible(sd->gw,false);
-    else
-	GDrawDestroyWindow(sd->gw);
+
+    if ( si!=NULL && si->stroke_type!=si_nib ) {
+	assert( si->nib==NULL );
+	// Pass the custom nib back in case the caller needs it
+	si->nib = sd->old_convex;
+	sd->old_convex = NULL;
+    } else if ( si==NULL && GWidgetGetControl(sd->gw,CID_Convex) ) {
+	// Don't replace old_convex if it's been changed in interim
+	if ( sd->old_convex==NULL ) {
+	    sd->old_convex = sd->sc_stroke.layers[ly_fore].splines;
+	    sd->sc_stroke.layers[ly_fore].splines = NULL;
+	}
+    }
+}
+
+static void _VStroke(void *cv, void (*strokeit)(void *,StrokeInfo *,int), 
+                     int apply) {
+    RaiseStrokeDlg(&main_sdlg, cv, strokeit,NULL, apply);
+    GDrawSetVisible(main_sdlg.gw, false);
 }
 
 void CVStroke(CharView *cv) {
-
     if ( cv->b.layerheads[cv->b.drawmode]->splines==NULL )
-return;
-
-    MakeStrokeDlg(cv,CVStrokeIt,NULL);
+	return;
+    _VStroke(cv, CVStrokeIt, true);
 }
 
 void FVStroke(FontView *fv) {
-    MakeStrokeDlg(fv,FVStrokeItScript,NULL);
+    _VStroke(fv, FVStrokeItScript, false);
+}
+
+int StrokeSetConvexUI(SplineSet *ss, int toknum) {
+    StrokeInfo *free_si;
+    if ( toknum==-1 ) {
+	if ( main_sdlg.old_convex!=NULL )
+	    SplinePointListFree(main_sdlg.old_convex);
+	main_sdlg.old_convex = ss;
+	return true;
+    } else if ( toknum==-2 ) {
+	free_si = CVFreeHandInfo();
+	if ( free_si->nib!=NULL )
+	    SplinePointListFree(free_si->nib);
+	free_si->nib = ss;
+	return true;
+    }
+
+    return false;
+}
+
+SplineSet *StrokeGetConvexUI(int toknum) {
+    StrokeInfo *free_si;
+    if ( toknum==-1 )
+	return main_sdlg.old_convex;
+    else if ( toknum==-2 ) {
+	free_si = CVFreeHandInfo();
+	return free_si->nib;
+    }
+    return NULL;
 }
 
 void FreeHandStrokeDlg(StrokeInfo *si) {
-    MakeStrokeDlg(NULL,NULL,si);
-}
-
-void StrokeSetConvexNib(SplineSet *ss) {
-    if ( old_convex!=NULL )
-	SplinePointListsFree(old_convex);
-    old_convex = ss;
+    StrokeDlg sdlg;
+    memset(&sdlg,0,sizeof(sdlg));
+    sdlg.si = si;
+    RaiseStrokeDlg(&sdlg,NULL,NULL,si,false);
+    GDrawDestroyWindow(sdlg.gw);
 }
 
 /* ************************************************************************** */

@@ -92,8 +92,8 @@ typedef struct strokecontext {
     int n;
     NibCorner *nibcorners;
     BasePoint pseudo_origin;
-    unsigned int jl_is_length: 1;
-    unsigned int ec_is_relative: 1;
+    unsigned int jlrelative: 1;
+    unsigned int ecrelative: 1;
     unsigned int remove_inner: 1;
     unsigned int remove_outer: 1;
     unsigned int leave_users_center: 1;	// Don't center the nib when stroking
@@ -128,11 +128,11 @@ StrokeInfo *InitializeStrokeInfo(StrokeInfo *sip) {
         srmov_layer,  // remove overlap style
         false,        // removeinternal
         false,        // removeexternal
-	false,        // nosimplify
-	false,        // noextrema
+	true,        // simplify
+	true,        // extrema
         false,        // leave users center
-        false,        // el_is_length
-        false,        // ec_is_relative
+        true,        // jlrelative
+        true,        // ecrelative
         0.0,          // pen angle
         0.0,          // minor radius (0: major)
 	0.0,          // extend cap
@@ -158,7 +158,7 @@ void SITranslatePSArgs(StrokeInfo *sip, enum linejoin lj, enum linecap lc) {
 	case lc_square:
 	    sip->cap = lc_butt;
 	    sip->extendcap = 1;
-	    sip->ec_is_relative = true;
+	    sip->ecrelative = true;
 	    break;
 	default:
 	    sip->cap = lc;
@@ -204,6 +204,40 @@ static SplineSet *SplineContourOuterCCWRemoveOverlap(SplineSet *ss) {
 	}
     assert(0);
     return ss;
+}
+
+int ConvexNibID(char *tok) {
+    if ( tok!=NULL ) {
+	if ( strcmp(tok, "default") )
+	    return 1;
+	else if ( strcmp(tok, "ui") )
+	    return -1;
+	else if ( strcmp(tok, "freehand") )
+	    return -2;
+	else {
+	    return 0;
+	}
+    } else
+	return 1;
+}
+
+static SplineSet *convex_nibs[2];
+
+int StrokeSetConvexPlain(SplineSet *ss, int toknum) {
+    if ( toknum==1 ) {
+	if ( convex_nibs[toknum]!=NULL )
+	    SplinePointListFree(convex_nibs[toknum]);
+	convex_nibs[toknum] = ss;
+	return true;
+    }
+
+    return false;
+}
+
+SplineSet *StrokeGetConvexPlain(int toknum) {
+    if ( toknum==1 )
+	return convex_nibs[toknum];
+    return NULL;
 }
 
 /* A contour is a valid convex polygon if:
@@ -1002,7 +1036,7 @@ static bigreal CalcJoinLimit(StrokeContext *c, bigreal fsw) {
     if (c->joinlimit <= 0)
 	return DBL_MAX;
 
-    if (c->jl_is_length)
+    if (!c->jlrelative)
 	return c->joinlimit;
 
     return c->joinlimit * fsw / 2;
@@ -1012,7 +1046,7 @@ static bigreal CalcCapExtend(StrokeContext *c, bigreal cw) {
     if (c->extendcap <= 0)
 	return 0;
 
-    if (!c->ec_is_relative)
+    if (!c->ecrelative)
 	return c->extendcap;
 
     return c->extendcap * cw / 2;
@@ -1672,10 +1706,10 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     c.remove_inner = si->removeinternal;
     c.remove_outer = si->removeexternal;
     c.leave_users_center = si->leave_users_center;
-    c.extrema = !si->noextrema;
-    c.simplify = !si->nosimplify;
-    c.ec_is_relative = si->ec_is_relative;
-    c.jl_is_length = si->jl_is_length;
+    c.extrema = si->extrema;
+    c.simplify = si->simplify;
+    c.ecrelative = si->ecrelative;
+    c.jlrelative = si->jlrelative;
     c.rmov = si->rmov;
     if ( si->minorradius!=0 )
 	mr = si->minorradius;

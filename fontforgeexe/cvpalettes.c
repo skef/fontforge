@@ -382,7 +382,7 @@ StrokeInfo *CVFreeHandInfo(void) {
     }
     return( expand );
 }
-    
+
 struct ask_info {
     GWindow gw;
     int done;

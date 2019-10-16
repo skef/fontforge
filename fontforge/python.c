@@ -284,7 +284,6 @@ static int SSSelectOnCurve(SplineSet *ss,int pos);
 static SplineSet *_SSFromContour(PyFF_Contour *, int *start, int flags);
 static PyFF_Contour *ContourFromSS(SplineSet *,PyFF_Contour *);
 static SplineSet *_SSFromLayer(PyFF_Layer *, int flags);
-static PyFF_Layer *LayerFromSS(SplineSet *,PyFF_Layer *);
 static PyFF_Layer *LayerFromLayer(Layer *,PyFF_Layer *);
 
 
@@ -1605,8 +1604,89 @@ Py_RETURN_NONE;
 return( reto );
 }
 
-static PyObject *PyFF_setConvexNibStub(PyObject *UNUSED(self), PyObject *args) {
+int NibCheck(SplineSet *ss);
+
+int PyFF_ConvexNibID(char *tok) {
+   int r = ConvexNibID(tok);
+   if ( r==0 )
+	PyErr_Format(PyExc_TypeError, "Unrecognized convex nib context name" );
+   return r;
+}
+
+SplineSet *PyFF_ParseSetConvex(PyObject *args, int *tokp) {
+    PyObject *obj;
+    SplineSet *ss, *ss2;
+    char *tok;
+
+    if ( !PyArg_ParseTuple(args,"O|s", &obj, &tok ) ) {
+	return NULL;
+    }
+    *tokp = PyFF_ConvexNibID(tok);
+    if ( *tokp==0 )
+	return NULL;
+
+    if ( PyType_IsSubtype(&PyFF_LayerType, Py_TYPE(obj)) ) {
+	ss = SSFromLayer( (PyFF_Layer *) obj);
+	if ( ((PyFF_Layer *) obj)->is_quadratic ) {
+	    ss2 = SplineSetsPSApprox(ss);
+	    SplinePointListFree(ss);
+	    ss = ss2;
+	}
+    } else if ( PyType_IsSubtype(&PyFF_ContourType, Py_TYPE(obj)) ) {
+	ss = SSFromContour( (PyFF_Contour *) obj, NULL);
+	if ( ((PyFF_Contour *) obj)->is_quadratic ) {
+	    ss2 = SplineSetsPSApprox(ss);
+	    SplinePointListFree(ss);
+	    ss = ss2;
+	}
+    } else {
+	PyErr_Format(PyExc_TypeError, "Argument must be a layer or a contour" );
+	return( NULL );
+    }
+
+    if ( !NibCheck(ss) ) {
+	SplinePointListFree(ss);
+	return ( NULL );
+    }
+
+    return ss;
+}
+
+static PyObject *PyFF_setConvexNibPlain(PyObject *UNUSED(self), PyObject *args) {
+    SplineSet *ss;
+    int toknum;
+
+    ss = PyFF_ParseSetConvex(args, &toknum);
+    if ( ss==NULL )
+	return NULL;
+
+    if ( toknum < 0 ) {
+	PyErr_Format(PyExc_TypeError, "No user interface" );
+	return NULL;
+    }
+    assert( toknum > 0 );
+    if ( !StrokeSetConvexPlain(ss, toknum) )
+	return NULL;
+
     Py_RETURN_NONE;
+}
+
+static PyObject *PyFF_getConvexNibPlain(PyObject *UNUSED(self), PyObject *args) {
+    char *tok;
+    int toknum;
+    SplineSet *ss;
+    PyFF_Layer *l;
+
+    PYGETSTR(args, tok, NULL);
+    toknum = PyFF_ConvexNibID(tok);
+    ENDPYGETSTR();
+    if ( toknum==0 )
+	return NULL;
+
+    ss = StrokeGetConvexPlain(toknum);
+    l = LayerFromSS(ss, NULL);
+    SplinePointListFree(ss);
+    return (PyObject *) l;
 }
 
 static PyObject *PyFF_ask(PyObject *UNUSED(self), PyObject *args) {
@@ -4429,89 +4509,141 @@ struct flaglist linecap[] = {
 struct flaglist linejoin[] = {
     { "nib", lj_nib },
     { "miter", lj_miter },
+    { "miterclip", lj_miterclip },
     { "round", lj_round },
     { "bevel", lj_bevel },
+    { "arcs", lj_arcs },
+    FLAGLIST_EMPTY /* Sentinel */
+};
+
+struct flaglist rmov[] = {
+    { "layer", srmov_layer },
+    { "contour", srmov_contour },
+    { "none", srmov_none },
     FLAGLIST_EMPTY /* Sentinel */
 };
 
 struct flaglist strokeflags[] = {
     { "removeinternal", 1 },
     { "removeexternal", 2 },
-    { "do_not_simplify", 4 },
-    { "no_extrema", 8 },
-    { "rmov_layer", 16 },
-    { "rmov_contour", 32 },
-    { "rmov_none", 64 },
+    { "cleanup", 4 },
     FLAGLIST_EMPTY /* Sentinel */
 };
 
-static int Stroke_Parse(StrokeInfo *si, PyObject *args) {
-    const char *str, *cap="nib", *join="nib";
-    double width=0, minor=1, angle=0;
-    int c, j, f;
+#define STROKE_OPTKEYS "removeinternal", "removeexternal", "extrema", "simplify", "accuracy", "joinlimit", "extendcap", "jlrelative", "ecrelative", "removeoverlap"
+#define STROKE_OPTFORMAT "$ppppdddpps"
+#define STROKE_OPTARGS &si->removeinternal, &si->removeexternal, &si->extrema, &si->simplify, &si->accuracy_target, &si->joinlimit, &si->extendcap, &si->jlrelative, &si->ecrelative, &rostring
+
+static char *strokekey_circ[] 
+    = { "type", "width", "cap", "join", "angle", STROKE_OPTKEYS };
+static char *strokebkey_circ[]
+    = { "type", "width", "cap", "join", "flags" };
+static char *strokekey_ellip[] 
+    = { "type", "width", "minorwidth", "angle", "cap", "join", STROKE_OPTKEYS };
+static char *strokebkey_ellip[] 
+    = { "type", "width", "minorwidth", "angle", "cap", "join", "flags" };
+static char *strokekey_rect[] 
+    = { "type", "width", "height", "angle", "cap", "join", STROKE_OPTKEYS };
+static char *strokebkey_rect[] 
+    = { "type", "width", "height", "angle", "flags" };
+static char *strokekey_conv[] 
+    = { "type", "contour", "angle", "cap", "join", STROKE_OPTKEYS };
+static char *strokebkey_conv[] 
+    = { "type", "contour", "flags" };
+
+static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
+    const char *str, *type, *cap="nib", *join="nib", *rostring="layer";
+    int c, j, f, r;
     PyObject *flagtuple=NULL;
     PyObject *nib=NULL;
-    int argcnt;
 
     if ( !PySequence_Check(args) ) {
 	PyErr_Format(PyExc_TypeError, "Expected a sequence");
-return( -1 );
+	return( -1 );
     }
-    argcnt = PySequence_Size(args);
-    if ( argcnt==0 ) {
+    if ( PySequence_Size(args)==0 ) {
 	PyErr_Format(PyExc_TypeError, "Expected a name of a pen type");
-return( -1 );
+	return( -1 );
     }
-    PYGETSTR(PySequence_GetItem(args,0), str, -1);
+
     InitializeStrokeInfo(si);
+    si->radius *= 2;
+    si->minorradius *= 2;
+    // Verify expected defaults
+    assert( si->rmov==srmov_layer && si->cap==lc_nib && si->join==lj_nib );
+
+    PYGETSTR(PySequence_GetItem(args,0), str, -1);
     if ( str==NULL ) {
 	ENDPYGETSTR();
-return( -1 );
+	return( -1 );
     }
-    if ( strcmp(str,"circular")==0 ) {
-	if ( !PyArg_ParseTuple(args,"sd|ssO", &str, &width, &cap, &join, &flagtuple ) ) {
-	    ENDPYGETSTR();
-return( -1 );
-	}
+    if ( strcmp(str, "circular")==0 ) {
 	si->stroke_type = si_round;
-	minor = width;
-	angle = 0;
-    } else if ( strcmp(str,"eliptical")==0 ) {
-	if ( !PyArg_ParseTuple(args,"sddd|ssO", &str, &width, &minor, &angle, &cap, &join, &flagtuple ) ) {
-	    ENDPYGETSTR();
-	    return( -1 );
-	}
-	si->stroke_type = si_round;
-    } else if ( strcmp(str,"caligraphic")==0 || strcmp(str,"square")==0 ) {
-	if ( !PyArg_ParseTuple(args,"sdddss|O", &str, &width, &minor, &angle, &cap, &join, &flagtuple ) ) {
+	if ( !PyArg_ParseTupleAndKeywords(args, keywds,
+                "sd|ssd" STROKE_OPTFORMAT, strokekey_circ, &type, &si->radius, 
+		&cap, &join, &si->penangle, STROKE_OPTARGS) ) {
 	    PyErr_Clear();
-	    if ( !PyArg_ParseTuple(args,"sdddss|O", &str, &width, &minor, &angle, &cap, &join, &flagtuple ) ) {
-		PyErr_Clear();
-		if ( !PyArg_ParseTuple(args,"sddd|O", &str, &width, &minor, &angle, &flagtuple ) ) {
-		    ENDPYGETSTR();
-		    return( -1 );
-		}
-	    }
-	}
-	si->stroke_type = si_caligraphic;
-    } else if ( strcmp(str,"polygonal")==0 || strcmp(str,"poly")==0 || 
-                strcmp(str,"convex")==0 ) {
-	if ( !PyArg_ParseTuple(args,"sOd|ssO", &str, &nib, &angle, &cap, &join, &flagtuple ) ) {
-	    PyErr_Clear();
-	    if ( !PyArg_ParseTuple(args,"sO|O", &str, &nib, &flagtuple ) ) {
+	    if ( !PyArg_ParseTupleAndKeywords(args, keywds, "sd|ssO", 
+                strokebkey_circ, &type, &si->radius, 
+		&cap, &join, &flagtuple) ) {
 		ENDPYGETSTR();
+		PyErr_Format(PyExc_TypeError, "Wrong parameter set for "
+		                              "'circular' nib type" );
 		return( -1 );
 	    }
 	}
+    } else if (    strcmp(str, "eliptical")==0 
+                || strcmp(str, "elliptical")==0 ) {
+	si->stroke_type = si_round;
+	if ( !PyArg_ParseTupleAndKeywords(args, keywds,
+                "sdd|dss" STROKE_OPTFORMAT, strokekey_ellip, &type,
+	        &si->radius, &si->minorradius, &si->penangle, &cap, &join,
+	        STROKE_OPTARGS) ) {
+	    PyErr_Clear();
+	    if ( !PyArg_ParseTupleAndKeywords(args, keywds, "sddd|ssO", 
+                strokebkey_ellip, &type, &si->radius, &si->minorradius,
+		&si->penangle, &cap, &join, &flagtuple) ) {
+		ENDPYGETSTR();
+		PyErr_Format(PyExc_TypeError, "Wrong parameter set for "
+		                              "'elliptical' nib type" );
+		return( -1 );
+	    }
+	}
+    } else if (    strcmp(str, "caligraphic")==0 
+                || strcmp(str, "rectangular")==0 ) {
+	si->stroke_type = si_caligraphic;
+	if ( !PyArg_ParseTupleAndKeywords(args, keywds,
+                "sdd|dss" STROKE_OPTFORMAT, strokekey_rect, &type,
+	        &si->radius, &si->minorradius, &si->penangle, &cap, &join,
+	        STROKE_OPTARGS) ) {
+	    PyErr_Clear();
+	    if ( !PyArg_ParseTupleAndKeywords(args, keywds, "sddd|O", 
+                strokebkey_rect, &type, &si->radius, &si->minorradius,
+		&si->penangle, &flagtuple) ) {
+		ENDPYGETSTR();
+		PyErr_Format(PyExc_TypeError, "Wrong parameter set for "
+		                              "'caligraphic' nib type" );
+		return( -1 );
+	    }
+	}
+    } else if (    strcmp(str, "convex")==0 
+                || strcmp(str, "polygonal")==0 ) {
 	si->stroke_type = si_nib;
-    } else {
-	ENDPYGETSTR();
-        PyErr_Format(PyExc_ValueError, "Unknown stroke type %s", str );
-	return( -1 );
+	if ( !PyArg_ParseTupleAndKeywords(args, keywds,
+                "sO|dss" STROKE_OPTFORMAT, strokekey_conv, &type,
+	        &nib, &si->penangle, &cap, &join, STROKE_OPTARGS) ) {
+	    PyErr_Clear();
+	    if ( !PyArg_ParseTupleAndKeywords(args, keywds, "sO|O", 
+                strokebkey_conv, &type, &nib, &flagtuple) ) {
+		ENDPYGETSTR();
+		PyErr_Format(PyExc_TypeError, "Wrong parameter set for "
+		                              "'convex' nib type" );
+		return( -1 );
+	    }
+	}
     }
-    ENDPYGETSTR();
-
-    if ( nib!=NULL ) {
+	                                  
+    if ( si->stroke_type==si_nib ) {
 	SplineSet *ss=NULL;
 	int start=0, order2=0;
 
@@ -4532,52 +4664,48 @@ return( -1 );
                 return( -1 );
             }
 	} else {
-	    PyErr_Format(PyExc_TypeError, "Second argument must be a (FontForge) Contour or Layer");
-return( -1 );
+	    PyErr_Format(PyExc_TypeError, "Second argument must be a (fontforge) Contour or Layer");
+	    return( -1 );
 	}
 	if ( order2 ) {
 	    SplineSet *temp = SSPSApprox(ss);
 	    SplinePointListsFree(ss);
 	    ss = temp;
 	}
-	if ( !NibCheck(ss))
-return( -1 );
+	if ( !NibCheck(ss) )
+	    return( -1 );
 	si->nib = ss;
-    } else if ( width<=0 || minor<=0 ) {
-        PyErr_Format(PyExc_ValueError, "Stroke width must be positive" );
-return( -1 );
+    } else if ( si->radius<=0 || si->minorradius<0 ) {
+        PyErr_Format(PyExc_ValueError, "Stroke dimensions must be positive" );
+	return( -1 );
     }
+    ENDPYGETSTR();
+
+    si->radius = si->radius/2;
+    si->minorradius = si->minorradius/2;
+
     c = FlagsFromString(cap,linecap,"linecap type");
     if ( c==FLAG_UNKNOWN )
-return( -1 );
+	return( -1 );
+    si->cap = c;
     j = FlagsFromString(join,linejoin,"linejoin type");
     if ( j==FLAG_UNKNOWN )
-return( -1 );
-    f = FlagsFromTuple(flagtuple,strokeflags,"stroke flag");
-    if ( f==FLAG_UNKNOWN )
-return( -1 );
-
-    si->radius = width/2;
+	return( -1 );
     si->join = j;
-    si->cap = c;
-    if ( f&1 )
-	si->removeinternal = true;
-    if ( f&2 )
-	si->removeexternal = true;
-    if ( f&4 )
-	si->nosimplify = true;
-    if ( f&8 )
-	si->noextrema = true;
-    if ( f&16 )
-	si->rmov = srmov_layer;
-    if ( f&32 )
-	si->rmov = srmov_contour;
-    if ( f&64 )
-	si->rmov = srmov_none;
-    si->penangle = angle;
-    si->minorradius = minor/2;
+    r = FlagsFromString(rostring,rmov,"removeoverlap type");
+    if ( r==FLAG_UNKNOWN )
+	return( -1 );
+    si->rmov = r;
 
-return( 0 );
+    if ( strokeflags!=NULL ) {
+	f = FlagsFromTuple(flagtuple,strokeflags,"stroke flag");
+	if ( f==FLAG_UNKNOWN )
+	    return( -1 );
+	si->removeinternal = ( f&1!=0 );
+	si->removeexternal = ( f&2!=0 );
+	si->simplify = ( f&4!=0 );
+    }
+    return( 0 );
 }
 
 static PyObject *PyFFLayer_export(PyFF_Layer *self, PyObject *args) {
@@ -4640,12 +4768,12 @@ return( NULL );
 Py_RETURN( self );
 }
 
-static PyObject *PyFFLayer_Stroke(PyFF_Layer *self, PyObject *args) {
+static PyObject *PyFFLayer_Stroke(PyFF_Layer *self, PyObject *args, PyObject *keywds) {
     SplineSet *ss, *newss;
     StrokeInfo si;
 
-    if ( Stroke_Parse(&si,args)==-1 )
-return( NULL );
+    if ( Stroke_Parse(&si, args, keywds)==-1 )
+	return( NULL );
 
     ss = SSFromLayer(self);
     if ( ss==NULL ) {
@@ -4916,7 +5044,7 @@ static PyMethodDef PyFFLayer_methods[] = {
 	     "Reverse the orientation of each contour in the layer." },
     {"export", (PyCFunction)PyFFLayer_export, METH_VARARGS,
 	     "Exports the layer to a file" },
-    {"stroke", (PyCFunction)PyFFLayer_Stroke, METH_VARARGS,
+    {"stroke", (PyCFunction)PyFFLayer_Stroke, METH_VARARGS | METH_KEYWORDS,
 	     "Strokes the contours in a layer" },
     {"removeOverlap", (PyCFunction)PyFFLayer_RemoveOverlap, METH_NOARGS,
 	     "Remove overlapping areas from a layer." },
@@ -5368,7 +5496,7 @@ SplineSet *SSFromLayer(PyFF_Layer *layer) {
 	return _SSFromLayer(layer, pconvert_flag_none);
 }
 
-static PyFF_Layer *LayerFromSS(SplineSet *ss,PyFF_Layer *layer) {
+PyFF_Layer *LayerFromSS(SplineSet *ss,PyFF_Layer *layer) {
     SplineSet *cur;
     int cnt, i;
 
@@ -9232,12 +9360,12 @@ return( NULL );
 Py_RETURN( self );
 }
 
-static PyObject *PyFFGlyph_Stroke(PyFF_Glyph *self, PyObject *args) {
+static PyObject *PyFFGlyph_Stroke(PyFF_Glyph *self, PyObject *args, PyObject *keywds) {
     StrokeInfo si;
     SplineSet *newss;
 
-    if ( Stroke_Parse(&si,args)==-1 )
-return( NULL );
+    if ( Stroke_Parse(&si, args, keywds)==-1 )
+	return( NULL );
 
     newss = SplineSetStroke(self->sc->layers[self->layer].splines,&si,
 	    self->sc->layers[self->layer].order2);
@@ -9417,7 +9545,7 @@ static PyMethodDef PyFF_Glyph_methods[] = {
     { "setLayer", (PyCFunction)PyFFGlyph_setLayer, METH_VARARGS, "Replaces the content of the specified layer" },
     { "validate", (PyCFunction)PyFFGlyph_validate, METH_VARARGS, "Returns whether this glyph is valid for output (if not check validation_state" },
     { "simplify", (PyCFunction)PyFFGlyph_Simplify, METH_VARARGS, "Simplifies a glyph" },
-    { "stroke", (PyCFunction)PyFFGlyph_Stroke, METH_VARARGS, "Strokes the contours in a glyph"},
+    { "stroke", (PyCFunction)PyFFGlyph_Stroke, METH_VARARGS | METH_KEYWORDS, "Strokes the contours in a glyph"},
     { "transform", (PyCFunction)PyFFGlyph_Transform, METH_VARARGS, "Transform a glyph by a 6 element matrix." },
     { "nltransform", (PyCFunction)PyFFGlyph_NLTransform, METH_VARARGS, "Transform a glyph by two non-linear expressions (one for x, one for y)." },
     { "unlinkRef", PyFFGlyph_unlinkRef, METH_VARARGS, "Unlink a reference and turn it into outlines"},
@@ -17665,13 +17793,13 @@ return (NULL);
 Py_RETURN( self );
 }
 
-static PyObject *PyFFFont_Stroke(PyFF_Font *self, PyObject *args) {
+static PyObject *PyFFFont_Stroke(PyFF_Font *self, PyObject *args, PyObject *keywds) {
     StrokeInfo si;
 
     if ( CheckIfFontClosed(self) )
-return (NULL);
-    if ( Stroke_Parse(&si,args)==-1 )
-return( NULL );
+	return (NULL);
+    if ( Stroke_Parse(&si, args, keywds)==-1 )
+	return( NULL );
 
     FVStrokeItScript(self->fv, &si,false);
     SplinePointListsFree(si.nib); si.nib = NULL;
@@ -17880,7 +18008,7 @@ PyMethodDef PyFF_Font_methods[] = {
     { "removeOverlap", (PyCFunction) PyFFFont_RemoveOverlap, METH_NOARGS, "Remove overlapping areas from a glyph"},
     { "round", (PyCFunction)PyFFFont_Round, METH_VARARGS, "Rounds point coordinates (and reference translations) to integers"},
     { "simplify", (PyCFunction)PyFFFont_Simplify, METH_VARARGS, "Simplifies a glyph" },
-    { "stroke", (PyCFunction)PyFFFont_Stroke, METH_VARARGS, "Strokes the contours in a glyph"},
+    { "stroke", (PyCFunction)PyFFFont_Stroke, METH_VARARGS | METH_KEYWORDS, "Strokes the contours in a glyph"},
     { "transform", (PyCFunction)PyFFFont_Transform, METH_VARARGS, "Transform a font by a 6 element matrix." },
     { "nltransform", (PyCFunction)PyFFFont_NLTransform, METH_VARARGS, "Transform a font by non-linear expressions for x and y." },
     { "validate", (PyCFunction)PyFFFont_validate, METH_VARARGS, "Check whether a font is valid and return True if it is." },
@@ -18588,7 +18716,8 @@ PyMethodDef module_fontforge_methods[] = {
     { "hasUserInterface", PyFF_hasUserInterface, METH_NOARGS, "Returns whether this fontforge session has a user interface (True if it has opened windows) or is just running a script (False)"},
     { "registerImportExport", PyFF_registerImportExport, METH_VARARGS, "Adds an import/export spline conversion module"},
     { "registerMenuItem", PyFF_registerMenuItemStub, METH_VARARGS, "Adds a menu item (which runs a python script) to the font or glyph (or both) windows -- in the Tools menu"},
-    { "setConvexNib", PyFF_setConvexNibStub, METH_VARARGS, "Sets the 'Convex' nib in the stroke dialog to the layer argument."},
+    { "getConvexNib", PyFF_getConvexNibPlain, METH_VARARGS, "Sets the specified 'Convex' to the layer/contour argument."},
+    { "setConvexNib", PyFF_setConvexNibPlain, METH_VARARGS, "Returns the specified 'Convex' nib as a layer."},
     { "logWarning", PyFF_logError, METH_VARARGS, "Adds a non-fatal message to the Warnings window"},
     { "postError", PyFF_postError, METH_VARARGS, "Pops up an error dialog box with the given title and message" },
     { "postNotice", PyFF_postNotice, METH_VARARGS, "Pops up an notice window with the given title and message" },
@@ -18685,14 +18814,21 @@ return;
 	}
 }
 
-void FfPy_Replace_SetConvexStub(PyObject *(*func)(PyObject *,PyObject *)) {
-    int i;
+void FfPy_Replace_Convex(PyObject *(*getf)(PyObject *,PyObject *),
+                         PyObject *(*setf)(PyObject *,PyObject *)) {
+    int i, c=0;
     PyMethodDef *methods = module_fontforge_methods;
-    for ( i=0; methods[i].ml_name!=NULL; ++i )
+    for ( i=0; methods[i].ml_name!=NULL; ++i ) {
 	if ( strcmp(methods[i].ml_name,"setConvexNib")==0 ) {
-	    methods[i].ml_meth = func;
-return;
+	    methods[i].ml_meth = setf;
+	    ++c;
+	} else if ( strcmp(methods[i].ml_name,"getConvexNib")==0 ) {
+	    methods[i].ml_meth = getf;
+	    ++c;
 	}
+	if ( c==2 )
+	    return;
+    }
 }
 
 static PyObject *PyPS_Identity(PyObject *UNUSED(noself), PyObject *UNUSED(args)) {
