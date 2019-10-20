@@ -772,10 +772,10 @@ static void MakeStrokeDlg(void *cv, void (*strokeit)(void *,StrokeInfo *,int),
 	label[gcdoff].text_is_1byte = true;
 	gcd[gcdoff].gd.pos.width = 50;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_visible | gg_enabled | gg_utf8_popup;
+	gcd[gcdoff].gd.flags = gg_visible | gg_enabled;
 	gcd[gcdoff].gd.cid = CID_PenAngle;
 	gcd[gcdoff].gd.handle_controlevent = Stroke_TextChanged;
-	gcd[gcdoff].gd.popup_msg = (unichar_t *) _(
+	gcd[gcdoff].gd.popup_msg = _(
 	    "A Convex nib will also be rotated by this amount\n"
 	    "although this is not displayed in the dialog.");
 	tfpos[2] = gcdoff;
@@ -1027,10 +1027,10 @@ static void MakeStrokeDlg(void *cv, void (*strokeit)(void *,StrokeInfo *,int),
 	label[gcdoff].text_is_1byte = true;
 	gcd[gcdoff].gd.pos.width = 50;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_visible | gg_enabled | gg_utf8_popup;
+	gcd[gcdoff].gd.flags = gg_visible | gg_enabled;
 	gcd[gcdoff].gd.cid = CID_AccTar;
 	gcd[gcdoff].gd.handle_controlevent = Stroke_TextChanged;
-	gcd[gcdoff].gd.popup_msg = (unichar_t *) _(
+	gcd[gcdoff].gd.popup_msg = _(
 	    "The stroke algorithm will attempt to be (at least)\n"
 	    "this accurate, but there may be exceptions.");
 	tfpos[5] = gcdoff;
