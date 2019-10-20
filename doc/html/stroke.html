@@ -1,0 +1,229 @@
+<HTML>
+<HEAD>
+  <TITLE>Expand Stroke Facility</TITLE>
+  <LINK REL="icon" href="fftype16.png">
+  <LINK REL="stylesheet" TYPE="text/css" HREF="FontForge.css">
+</HEAD>
+<BODY>
+<DIV id="in">
+  <H1 ALIGN=Center>
+    Expand Stroke Facility
+  </H1>
+  <H2>Nib Tracing</H2>
+  The Expand Stroke facility traces a closed, convex contour (referred to 
+  as the "nib") along a "source" contour, producing a new contour or contours 
+  that enclose the area the nib "passed over". When the source contour is 
+  open the result is usually a single closed contour, and when the source
+  contour is closed the result is usually two closed contours:
+  <P>
+  However, there are exceptions when the geometry of the nib and the source
+  contour interact:
+  <P>
+  This guide to the facility is arranged into these sections: It first 
+  describes the common case of tracing a circular nib, which is called 
+  "Offsetting", including the "cap" and "join" options for offset curves. 
+  Next it discusses other types of nibs, including the rectangular 
+  "caligraphic" nibs associated with some types of calligraphy and general
+  convex nibs supplied by the user. These nibs support the same cap and 
+  join options, although the way some of these options work is somewhat 
+  different. The last section additional options for special cases, that
+  affect the accuracy of the output, or that aid in debugging problems
+  with the facility. 
+
+  <H2>Offsetting</H2>
+  Tracing a stroke with a circular nib of radius <em>r</em> is equivalent
+  to "offsetting"—creating a contour parallel to the source contour on each
+  side at distance <em>r</em> for a total line thickness of <em>2r</em>:
+  <P>
+  In FontForge you specify a circular nib by choosing the "Circular/Elliptical"
+  nib type and making the Major and Minor axis lengths equal. The angle can
+  have any value but zero is recommended:
+  <P>
+  Offsetting is a longstanding way of describing a line of a given thickness
+  as a contour—that is, a sequence of connecting splines—together with an 
+  offset radius. This model was common in PostScript and is used in the SVG 
+  graphics markup language.  Most font formats do not support offset curves
+  directly, however, so a line modeled that way must be translated into
+  (roughly) equivalent closed contours. This is the most common use of the 
+  Expand Stroke facility.
+  <P>
+  The parallel lines specified by the contour and offset radius do not 
+  necessarily connect. They do all connect in the case of a source contour
+  that is closed and has only smooth points:
+  <P>
+  They do not connect when the source contour is open or has "corner"
+  points where the angle changes:
+  <P> 
+  <H3>Caps</H3>
+  The line that closes the ends corresponding to the first and last points
+  of an open source contour is called a "cap". PostScript and SVG specify 
+  three cap styles that are really two styles: "Round" and "Butt"/Square". 
+  A Round cap connects the ends with a semi-circle, while a Butt cap connects
+  them with a line. When tracing with a circular nib the FontForge cap options
+  "Nib" and "Round" are equivalent to PS/SVG "Round", and the options "Butt"
+  and "Bevel" are equivalent to PS/SVG "Butt". (These options differ with
+  other nib shapes.) 
+  <P>
+  A PS/SVG "Square" cap is a Butt cap extended by the length of the offset
+  radius and therefore half the width of the traced line. The FontForge
+  "Extend Cap" parameter generalizes this feature by allowing the user to
+  specify the distance between the end of the source contour and the cap 
+  line either as an absolute length or in units of half-stroke-width. The
+  parameter works with the "Round" and "Butt" cap styles but not the "Nib"
+  and "Bevel" styles. A PS/SVG square cap is therefore equivalent to a Butt
+  cap with "Extend Cap" set to 1 in half-stroke-width units. 
+  <H3>Joins</H3>
+  A corner point on the source contour where the angle changes will have one
+  angle of less than 180 degrees and one greater than 180 degrees. In the case
+  of the former the offset lines will intersect and the easy choice is to 
+  just trim off the parts of the line beyond the intersection:
+  <P>
+  The offset lines at the larger "reflex" angle do not meet and must be 
+  closed with a line called a "join". PostScript specified three join styles:
+  "Round", "Bevel" and "Miter". SVG 2.0 adds styles "Miter Clip" and "Arcs". 
+  FontForge currently supports the four styles "Nib", "Bevel", "Miter", and 
+  "Miter Clip". There are future plans to support the two additional styles
+  "Round" and "Arcs". 
+   <P>
+   A PS/SVG "Bevel" join connects the two offset curves with a straight line,
+   and this is also what FontForge's "Bevel" option does:
+   <P>
+   A PS/SVG "Miter" or SVG "Miter Clip" join normally extends each offset 
+   curve with a straight line tangent to the curve at the endpoint to where 
+   each intersects, as do FontForge's equivalent "Miter" and "Miter Clip"
+   options:
+   <P>
+   The difference between the two is in how "long" joins are handled. The
+   "Join Limit" parameter specifies the maximum "length" of a miter join.
+   This limit can be specified either in em-units or (given a circular nib)
+   in offset radii. The term "join length" is a bit misleading because the
+   limit is actually calculated based on the angle of the join, and the 
+   "length" is how long the join <em>would</em> be if the offset curves were
+   straight lines. (There is a more complete explanation of the "miter limit" 
+   in the SVG specification).
+   <P>
+   With the "Miter" style any join that exceeds the join limit falls
+   back to a Bevel join. With a "Miter Clip" style a join is clipped at the
+   join limit by a line parallel to the Bevel line:
+   <P>
+   Note, however, that the term "limit" is also somewhat misleading, in that 
+   a Miter join is <em>never</em> shortened past the Bevel line, which therefore
+   restricts the minimum length of a given join:
+   <P>
+   A FontForge "Nib" join connects the offset curves with an edge 
+   corresponding to the shape of the nib. Given that offsetting uses a 
+   round nib this is equivalent to the PS/SVG Round join option, which 
+   connects the offset lines with an arc of the offset radius. (The Nib cap 
+   option does the same, and when offsetting is equivalent to an PS/SVG Round 
+   cap for the same reason. The FontForge "Round" join option is not yet 
+   enabled because round joins have not yet been generalized to other nib 
+   shapes.)
+   <P>
+   The "Arcs" join style will be documented when it is implemented.
+  <H2>Calligraphic and Other Convex Nibs</H2>
+   <P>
+   (Just rough notes from here on.) A calligraphic nib is retangular and
+   usually at an angle. You can also specify an elliptical nib or design
+   your own nib as long as it is <em>convex</em> by this defintion:
+   <PRE>
+ A contour is a valid convex polygon if:
+  1. It contains something (not a line or a single point
+     but a closed piecewise spline containing area) 
+  2. All edges/splines are lines
+  3. It is convex
+  4. There are no extranious points on the edges
+
+ A contour is a valid nib shape if:
+  5. It's on-curve points would form a valid convex
+     polygon if there were no control points.
+  6. Every edge/spline is either:
+     6a. A line, or
+     6b. A spline where each control point is
+         outside of the polygon but inside the 
+         triangle (or possibly rectangle) formed by 
+	 the spline edge and extending the lines of 
+         the adjacent edges.
+   </PRE>
+   <P>
+   Older versions of FontForge did not have cap and join options for 
+   non-elliptical nibs. It just filled in the cap and join shapes with the 
+   nib edges, which is equivalent to Nib cap and Nib join styles. These
+   correspond to the shape that would be created by inking and tracing the
+   nib on paper and a good first choice for non-circular nibs. 
+   <P>
+   The other cap and join options work somewhat differently for other nibs:
+   <UL>
+	   <LI> With a circular nib the ends of the offset curves at a reflex
+		   angle are always equidistant from the source contour point.
+		   This is not true for most nibs. This changes the appearance
+		   of Bevel and clipped Miter Clip joins but not how they
+		   are constructed. 
+	   <LI> With a circular nib the ends of the offset curves at a cap
+		   are colinear with the end of the source contour. This is
+		   also not true for most nibs. As a result a Butt or Round 
+		   cap often requires extending one of the lines to match,
+		   affecting the length of the shape. The Extend Cap option is
+		   useful in these cases because the extension length is 
+		   calculated from the source contour endpoint, and can
+		   therefore be chosen to provide consistent join lengths.
+	   <LI> The Bevel cap option just connects the two offset curves with
+		   a line. For non-circular nibs this line will generally not
+		   be perpendicular to the tangent line at the endpoint of the
+		   source contour like a Butt cap is. 
+	   <LI> Because a circular nib traces a line of a constant width, the
+		   em-unit and radius-unit means of specifying a Join Limit
+		   or Extend Cap length are basically equivalent: For a given
+		   value expressed one way there will always be a value 
+		   expressed the other way that yields the same result. 
+		   With other nibs the width of the curve varies with its
+		   angle, making these values not equivalent. Accordingly, in 
+		   either case the "radius" is calculated as the "span" of the
+		   nib at the cap tangent angle, or in the case of a join at 
+		   the average of the join tangent angles, divided by two. 
+		   This means that when specifying an Extend Cap or Join 
+		   Limit value by em-unit 
+		   the length will not vary, while specifying either relative
+		   to this "pseudo-radius" it will be (roughly, in the case
+		   of a join) proportional to the line width at the cap or 
+		   join.
+   </UL>
+  <H2>Other Parameters</H2>
+  <UL>
+	  <LI> The "Accuracy Target" is in em-units and specifies how accurate
+		  the output geometry should be. The algorithm generally tries
+		  to be at least as accurate as the target but there can be
+		  exceptions. The default of 0.25 is a reasonable choice even 
+		  you plan to round later, although a value of 1 or even higher
+		  may also work fine depending on your needs. 
+	   <LI> The Expand Stroke algorithm just traces and connects the 
+		   offsets including "cusps" and other artifacts, which are
+		   removed by running Remove Overlap. Therefore some form of
+		   that algorthm is generally needed. By default it is run 
+		   on the output layer as a whole, but you can also choose 
+		   to run it contour-by-contour. In rare cases the Remove 
+		   Overlap algorithm may fail or produce incorrect results, 
+		   FontForge also provides the option of not running the
+		   algorithm at all. This can be useful for debugging 
+		   purposes and also provides the option, in a pinch, of
+		   cleaning up some or all of the "interior" lines yourself. 
+	   <LI> You can also choose, when expanding a closed source contour, 
+		   that the algorithm only return the "Internal" (smaller) 
+		   or "External" (larger) contour—sort of. These terms are 
+		   only accurate relative to a <em>clockwise</em> source 
+		   contour. When tracing a <em>counterclockwise</em> contour 
+		   "Internal" returns the larger contour and "External" the 
+		   smaller contour. This means that when tracing a typical 
+		   "o" (for example) specifying "External" makes the whole 
+		   character thicker while specifying "Internal" makes it
+		   thinner. This is actually how FontForge's 
+		   "Change Weight ..." function works. 
+	   <LI> Finally there are the "Simplify" and "Add Extrema" options,
+		   which are both selected by default. "Add Extrema" does
+		   just that, and "Simplify" runs a version of FontForge's
+		   simplify algorithm with sensible parameters and using
+		   the Accuracy Target. "Unsimpified" expanded contours can
+		   have many redundant points, but you might not care or might
+		   prefer to run simplify with your own choice of arguments.
+  </UL>
+</DIV>
+</BODY></HTML>
