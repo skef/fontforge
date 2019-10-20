@@ -1015,7 +1015,7 @@ SplinePoint *_ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
 	    maxerri = i;
 	}
     }
-    printf("   Error sum %lf, max error %lf at depth %d\n", errsum, maxerr, depth);
+    // printf("   Error sum %lf, max error %lf at depth %d\n", errsum, maxerr, depth);
 
     if ( (toler_is_sumsq ? errsum : maxerr) > toler && depth < 6 ) {
 	mid_t = fp[maxerri].t * (end_t-start_t) + start_t;
@@ -1048,6 +1048,7 @@ SplinePoint *_ApproximateSplineSetFromGen(SplinePoint *from, SplinePoint *to,
 	    return NULL;
 	}
     } else if ( (toler_is_sumsq ? errsum : maxerr) > toler ) {
+	// XXX turn into warning
 	printf("%s %lf exceeds %lf at maximum depth %d\n",
 	       toler_is_sumsq ? "Sum of squared errors" : "Maximum error length",
 	       toler_is_sumsq ? errsum : maxerr, toler, depth);

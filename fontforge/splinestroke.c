@@ -49,7 +49,7 @@
 // Rounding makes even slope-continuous splines only approximately so. 
 #define INTERSPLINE_MARGIN (1e-1)
 #define INTRASPLINE_MARGIN (1e-8)
-#define FIXUP_MARGIN (1e-2)
+#define FIXUP_MARGIN (1e-1)
 #define CUSPD_MARGIN (1e-5)
 // About .25 degrees
 #define COS_MARGIN (1e-5)
@@ -370,7 +370,7 @@ enum ShapeType NibIsValid(SplineSet *ss) {
 	    d = NORMANGLE(d);
 	    if ( d > 0.0 )
 		return Shape_BadNextCP;
-	    printf("nextcp angle: %lf, dout: %lf, din:%lf\n", ncp_angle, d, NORMANGLE(angle-ncp_angle));
+	    // printf("nextcp angle: %lf, dout: %lf, din:%lf\n", ncp_angle, d, NORMANGLE(angle-ncp_angle));
 	    s->from->selected = false;
 	    s->to->selected = true;
 	    if ( s->to->noprevcp || BPNEAR(s->to->prevcp, s->to->me) ) 
@@ -381,7 +381,7 @@ enum ShapeType NibIsValid(SplineSet *ss) {
 	    d = NORMANGLE(d);
 	    if ( d > 0.0 )
 		return Shape_BadPrevCP;
-	    printf("prevcp angle: %lf, dout: %lf\n", pcp_angle, d);
+	    // printf("prevcp angle: %lf, dout: %lf\n", pcp_angle, d);
 	    s->from->selected = false;
 	} else
 	    pcp_angle = angle;
@@ -722,7 +722,7 @@ static void SplineStrokeAppendFixup(SplinePoint *endp, BasePoint sxy,
     dxy = BP_ADD(oxy, BP_REV(endp->me));
     mg = fmax(fabs(dxy.x), fabs(dxy.y));
 
-    assert( mg < 1 );
+    // assert( mg < 1 );
     if ( mg > FIXUP_MARGIN ) {
 	LogError(_("Warning: Coordinate diff %lf greater than margin %lf\n"),
 	         mg, FIXUP_MARGIN);
@@ -825,7 +825,7 @@ int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end,
 		                                      nib_ccw, CUSPD_MARGIN,
 						      stip->starts_on_cusp);
 		free(fp);
-		printf("Found %s cusp transition at %lf\n", stip->starts_on_cusp ? "1 to 0" : "0 to 1", stip->cusp_trans);
+		// printf("Found %s cusp transition at %lf\n", stip->starts_on_cusp ? "1 to 0" : "0 to 1", stip->cusp_trans);
 		return 0;
 	    }
 	} else {
@@ -1240,7 +1240,7 @@ static void RoundJoin(JoinParams *jpp) {
     ut1 = BP_ROT(BP_REV(jpp->ut_endlast), UT_NEG(cut));
     ut2 = BP_ROT(jpp->noi->utanvec, UT_NEG(cut));
     BasePoint pp1 = BP_ROT(jpp->cur->last->me, UT_NEG(cut)), pp2 = BP_ROT(jpp->oxy, UT_NEG(cut));
-    printf("p1: %lf,%lf p2: %lf,%lf pp1: %lf,%lf: pp2: %lf,%lf, c: %lf,%lf cut: %lf, alpha: %lf\n", jpp->cur->last->me.x, jpp->cur->last->me.y, jpp->oxy.x, jpp->oxy.y, pp1.x, pp1.y, pp2.x, pp2.y, c.x, c.y, atan2(cut.y, cut.x) * 180 / PI, alpha);
+    // printf("p1: %lf,%lf p2: %lf,%lf pp1: %lf,%lf: pp2: %lf,%lf, c: %lf,%lf cut: %lf, alpha: %lf\n", jpp->cur->last->me.x, jpp->cur->last->me.y, jpp->oxy.x, jpp->oxy.y, pp1.x, pp1.y, pp2.x, pp2.y, c.x, c.y, atan2(cut.y, cut.x) * 180 / PI, alpha);
     mu = -ut1.x/ut1.y;
     nu = -ut2.x/ut2.y;
     B = 1 + pow(mu + nu, 2)/2;
@@ -1249,10 +1249,10 @@ static void RoundJoin(JoinParams *jpp) {
     B2AC = B*B-4*C;
     tmp = 2 * (E*E - B2AC*alpha*alpha);
     tmp2 = sqrt(pow(1-C,2) + B*B);
-    printf("mu: %lf, nu:%lf, B: %lf, C: %lf, E: %lf, B2AC: %lf, tmp: %lf, tmp2: %lf\n", mu, nu, B, C, E, B2AC, tmp, tmp2);
+    // printf("mu: %lf, nu:%lf, B: %lf, C: %lf, E: %lf, B2AC: %lf, tmp: %lf, tmp2: %lf\n", mu, nu, B, C, E, B2AC, tmp, tmp2);
     maj = sqrt(tmp * (1 + C + tmp2))/B2AC;
     min = sqrt(tmp * (1 + C - tmp2))/B2AC;
-    printf("maj: %lf, min: %lf, angle: %lf\n", maj, min, atan2(cut.y, cut.x) * 180 / PI);
+    // printf("maj: %lf, min: %lf, angle: %lf\n", maj, min, atan2(cut.y, cut.x) * 180 / PI);
     BevelJoin(jpp);
 } 
 
@@ -1467,7 +1467,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 		;
 	    on_cusp = OffsetOnCuspAt(c, s, 0.0, &no, is_right, is_ccw_start);
 
-	    printf("is_right=%d nci=%d is_ccw:%d nc.x=%lf nc.y=%lf, ut_start=%lf,%lf\n", is_right, no.nci[is_ccw_start], is_ccw_start, c->nibcorners[no.nci[is_ccw_start]].on_nib->me.x, c->nibcorners[no.nci[is_ccw_start]].on_nib->me.y, ut_start.x, ut_start.y);
+	    // printf("is_right=%d nci=%d is_ccw:%d nc.x=%lf nc.y=%lf, ut_start=%lf,%lf\n", is_right, no.nci[is_ccw_start], is_ccw_start, c->nibcorners[no.nci[is_ccw_start]].on_nib->me.x, c->nibcorners[no.nci[is_ccw_start]].on_nib->me.y, ut_start.x, ut_start.y);
 
 	    // The path for this spline
 	    if ( linear ) {
@@ -1483,7 +1483,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 		                          is_right, no.nci[is_ccw_mid]);
 		    assert( t > last_t && t <= 1.0 );
 
-		    printf("nci: %d, ut_mid=%lf,%lf, t=%.15lf, curved=%d\n", no.nci[is_ccw_mid], ut_mid.x, ut_mid.y, t, curved);
+		    // printf("nci: %d, ut_mid=%lf,%lf, t=%.15lf, curved=%d\n", no.nci[is_ccw_mid], ut_mid.x, ut_mid.y, t, curved);
 
 		    if ( curved )
 			sp = TraceAndFitSpline(c, s, last_t, t, cur->last,
