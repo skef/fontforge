@@ -55,7 +55,7 @@ extern const int input_em_cnt;
 #define CID_MinorAxis	1008
 #define CID_PenAngle	1009
 #define CID_Circle	1010
-#define CID_Caligraphic	1011
+#define CID_Calligraphic 1011
 #define CID_Convex	1012
 #define CID_JoinLimitVal 1013
 #define CID_JoinLimitLen 1014
@@ -92,8 +92,6 @@ extern const int input_em_cnt;
 #define CID_SquareCap	1041
 #define CID_LineJoinTxt 1043
 #define CID_LineCapTxt  1044
-
-static StrokeDlg main_sdlg;
 
 static void CVStrokeIt(void *_cv, StrokeInfo *si, int justapply) {
     CharView *cv = _cv;
@@ -148,23 +146,27 @@ static void CVStrokeIt(void *_cv, StrokeInfo *si, int justapply) {
 }
 
 static int _Stroke_OK(StrokeDlg *sd,int isapply) {
-    StrokeInfo *si, strokeinfo;
+    StrokeInfo *si, apply_si;
     int err;
     GWindow sw = sd->gw;
+    GGadget *clg;
     char *msg;
 
+    assert( sd->si!=NULL );
+    if ( isapply ) {
+	memset(&apply_si, 0, sizeof(apply_si));
+	si = &apply_si;
+    } else
+	si = sd->si;
     err = false;
-    if ( (si = sd->si)==NULL ) {
-	memset(&strokeinfo,'\0',sizeof(strokeinfo));
-	si = &strokeinfo;
-    }
+
     si->stroke_type = si_round;
-    if ( GGadgetIsChecked( GWidgetGetControl(sw,CID_Caligraphic)) )
-	si->stroke_type = si_caligraphic;
+    if ( GGadgetIsChecked( GWidgetGetControl(sw,CID_Calligraphic)) )
+	si->stroke_type = si_calligraphic;
     else if ( GGadgetIsChecked( GWidgetGetControl(sw,CID_Convex)) )
 	si->stroke_type = si_nib;
-    else if ( si!= &strokeinfo &&
-	    GGadgetIsChecked( GWidgetGetControl(sw,CID_CenterLine)) )
+    else if (   (clg=GWidgetGetControl(sw,CID_CenterLine))!=NULL
+	     && GGadgetIsChecked(clg) )
 	si->stroke_type = si_centerline;
     if ( si->stroke_type==si_nib ) {
 	si->nib = sd->sc_stroke.layers[ly_fore].splines;
@@ -216,15 +218,18 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
 	    }
 	}
 	GDrawRequestExpose(sd->cv_stroke.v,NULL,false);
-    } else if ( si->stroke_type==si_round || si->stroke_type==si_caligraphic ) {
+    } else { 
 	si->radius = GetReal8(sw,CID_Width,_("Stroke _Width:"),&err)/2;
-	if (si->radius == 0) {
+	if ( si->radius==0 && (   si->stroke_type==si_round 
+	                       || si->stroke_type==si_calligraphic )) {
 	    ff_post_error(_("Bad Value"), _("Stroke width cannot be zero"));
 	    err = true;
 	}
 	if ( si->radius<0 )
 	    si->radius = -si->radius;
 	si->minorradius = GetReal8(sw,CID_MinorAxis,_("Minor A_xis:"),&err)/2;
+	if ( si->minorradius<0 )
+	    si->minorradius = -si->minorradius;
     }
     si->penangle = GetReal8(sw,CID_PenAngle,_("Pen _Angle:"),&err);
     if ( si->penangle>180 || si->penangle < -180 ) {
@@ -264,11 +269,11 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
 	err = true;
     }
     if ( err )
-return( true );
+	return( true );
     if ( sd->strokeit!=NULL )
 	(sd->strokeit)(sd->cv,si,isapply);
     sd->done = !isapply;
-return( true );
+    return( true );
 }
 
 static int Stroke_OK(GGadget *g, GEvent *e) {
@@ -316,9 +321,9 @@ static void Stroke_ShowNib(StrokeDlg *sd) {
 	}
     }
     if ( GGadgetIsChecked(GWidgetGetControl(sd->gw,CID_Circle)) ||
-	    GGadgetIsChecked(GWidgetGetControl(sd->gw,CID_Caligraphic)) ) {
+	    GGadgetIsChecked(GWidgetGetControl(sd->gw,CID_Calligraphic)) ) {
 	// UnitShape(1) presumably returns a square for this line's benefit.
-	ss = UnitShape( GGadgetIsChecked(GWidgetGetControl(sd->gw,CID_Caligraphic)) );
+	ss = UnitShape( GGadgetIsChecked(GWidgetGetControl(sd->gw,CID_Calligraphic)) );
 	memset(transform,0,sizeof(transform));
 	width = GetCalmReal8(sd->gw,CID_Width,"",&err)/2;
 	height = GetCalmReal8(sd->gw,CID_MinorAxis,"",&err)/2;
@@ -340,12 +345,12 @@ static void StrokeSetup(StrokeDlg *sd, enum si_type stroke_type) {
 
     sd->dontexpand = ( stroke_type==si_centerline );
 
-    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_WidthTxt    ), stroke_type==si_round || stroke_type==si_caligraphic);
-    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_Width       ), stroke_type==si_round || stroke_type==si_caligraphic);
-    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_MinorAxisTxt), stroke_type==si_round || stroke_type==si_caligraphic);
-    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_MinorAxis   ), stroke_type==si_round || stroke_type==si_caligraphic);
+    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_WidthTxt    ), stroke_type==si_round || stroke_type==si_calligraphic);
+    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_Width       ), stroke_type==si_round || stroke_type==si_calligraphic);
+    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_MinorAxisTxt), stroke_type==si_round || stroke_type==si_calligraphic);
+    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_MinorAxis   ), stroke_type==si_round || stroke_type==si_calligraphic);
 
-//    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_JoinLimitTxt), stroke_type==si_round || stroke_type==si_caligraphic);
+//    GGadgetSetEnabled(GWidgetGetControl(sd->gw,CID_JoinLimitTxt), stroke_type==si_round || stroke_type==si_calligraphic);
 }
 
 static int Stroke_TextChanged(GGadget *g, GEvent *e) {
@@ -365,10 +370,10 @@ static int Stroke_CenterLine(GGadget *g, GEvent *e) {
 return( true );
 }
 
-static int Stroke_Caligraphic(GGadget *g, GEvent *e) {
+static int Stroke_Calligraphic(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_radiochanged ) {
 	StrokeDlg *sd = (StrokeDlg *) ((CharViewBase *) GDrawGetUserData(GGadgetGetWindow(g)))->container;
-	StrokeSetup(sd,si_caligraphic);
+	StrokeSetup(sd,si_calligraphic);
 	Stroke_ShowNib(sd);
     }
 return( true );
@@ -587,30 +592,9 @@ return( true );
 #define SD_Height	400
 #define FH_Height	(SD_Height+75)
 
-/* (Intended) convex nib lifecycle:
- * This function and it's related functions are used by two facilities.
- * One is the Expand Stroke... dialog, which reuses its StrokeDlg structure
- * but does not maintain a StrokeInfo structure. The other is the FreeHand
- * configuration dialog, which does not maintain a StrokeDlg structure but
- * keeps a StrokeInfo structure. This is far from ideal but would take some
- * effort to refactor out. 
- *
- * One problem with this system is how the customizable convex nib is stored
- * in each case, especially given the new requirement that it be replaced and
- * retrieved from scripts. So this is a note about how that is supposed to
- * work:
- *
- * In the FreeHand case any convex nib is supposed to be stored in si->nib,
- * regardless of whether the user chose stroke_type si_nib. 
- *
- * In the Expand Stroke case (which for this purpose corresponds to si==NULL)
- * any convex nib is supposed to wind up in sd->old_convex between executions.
- * That means it must be stored there at the end and retrieved at the start
- * of the next execution.
- */
-static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
-		           void (*strokeit)(void *,StrokeInfo *,int),
+static void MakeStrokeDlg(void *cv, void (*strokeit)(void *,StrokeInfo *,int),
                            StrokeInfo *si, int apply) {
+    StrokeDlg sd;
     GRect pos;
     GWindow gw;
     GWindowAttrs wattrs;
@@ -618,32 +602,21 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	    *joincaparray[4][11], *overlaparray[10], *swarray[4][7],
 	    *pens[10], *checkarray[3][4], *jlexarray[3][6], *accarray[2][4];
     GTextInfo label[51];
-    int reusing = false, i, gcdoff, mi, swpos, tfpos[6];
-    StrokeInfo *def;
-    SplineSet *tmp_ss;
-    static StrokeInfo *defaults = NULL;
+    int i, gcdoff, mi, swpos, tfpos[6];
     char anglebuf[20], ecbuf[20], jlbuf[20], accbuf[20];
     char widthbuf[20], axisbuf[20];
 
-    if ( si!=NULL ) {
-	def = si;
-	if ( si->nib!=NULL ) {
-	    if ( sd->old_convex!=NULL )
-		SplinePointListFree(sd->old_convex);
-	    sd->old_convex = si->nib;
-	    si->nib = NULL;
-	}
-    } else {
-	if ( defaults==NULL ) {
-	    defaults = InitializeStrokeInfo(NULL);
-	    defaults->minorradius = defaults->radius;
-	    defaults->penangle = PI/4;
-	}
-	def = defaults;
+    assert( si!=NULL );
+
+    memset(&sd, 0, sizeof(sd));
+    sd.si = si;
+    if ( si->nib!=NULL ) {
+	sd.old_convex = si->nib;
+	si->nib = NULL;
     }
 
-    if ( sd->gw==NULL ) {
-	StrokeInit(sd);
+    {
+	StrokeInit(&sd);
 	memset(&wattrs,0,sizeof(wattrs));
 	wattrs.mask = wam_events|wam_cursor|wam_utf8_wtitle|wam_undercursor|wam_isdlg|wam_restrict;
 	wattrs.event_masks = ~(1<<et_charup);
@@ -657,7 +630,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	pos.x = pos.y = 0;
 	pos.width = GGadgetScale(GDrawPointsToPixels(NULL,SD_Width));
 	pos.height = GDrawPointsToPixels(NULL,strokeit!=NULL ? SD_Height : FH_Height);
-	sd->gw = gw = GDrawCreateTopWindow(NULL,&pos,stroke_e_h,&sd->cv_stroke,&wattrs);
+	sd.gw = gw = GDrawCreateTopWindow(NULL,&pos,stroke_e_h,&sd.cv_stroke,&wattrs);
 	GDrawSetWindowTypeName(gw, "CharView"); // For hotkeys
 	if ( si!=NULL )
 	    GDrawRequestDeviceEvents(gw,input_em_cnt,input_em);
@@ -691,7 +664,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->stroke_type==si_round? gg_cb_on : 0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->stroke_type==si_round? gg_cb_on : 0);
 	gcd[gcdoff].gd.u.radiogroup = 1;
 	gcd[gcdoff].gd.cid = CID_Circle;
 	gcd[gcdoff].gd.handle_controlevent = Stroke_Stroke;
@@ -702,10 +675,10 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->stroke_type == si_caligraphic ? gg_cb_on : 0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->stroke_type == si_calligraphic ? gg_cb_on : 0);
 	gcd[gcdoff].gd.u.radiogroup = 1;
-	gcd[gcdoff].gd.cid = CID_Caligraphic;
-	gcd[gcdoff].gd.handle_controlevent = Stroke_Caligraphic;
+	gcd[gcdoff].gd.cid = CID_Calligraphic;
+	gcd[gcdoff].gd.handle_controlevent = Stroke_Calligraphic;
 	gcd[gcdoff++].creator = GRadioCreate;
 	pens[2] = &gcd[gcdoff-1];
 
@@ -713,7 +686,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->stroke_type == si_nib ? gg_cb_on : 0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->stroke_type == si_nib ? gg_cb_on : 0);
 	gcd[gcdoff].gd.u.radiogroup = 1;
 	gcd[gcdoff].gd.cid = CID_Convex;
 	gcd[gcdoff].gd.handle_controlevent = Stroke_Convex;
@@ -725,7 +698,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	    label[gcdoff].text_is_1byte = true;
 	    label[gcdoff].text_in_resource = true;
 	    gcd[gcdoff].gd.label = &label[gcdoff];
-	    gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->stroke_type==si_centerline ? gg_cb_on : 0 );
+	    gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->stroke_type==si_centerline ? gg_cb_on : 0 );
 	    gcd[gcdoff].gd.u.radiogroup = 1;
 	    gcd[gcdoff].gd.cid = CID_CenterLine;
 	    gcd[gcdoff].gd.handle_controlevent = Stroke_CenterLine;
@@ -748,7 +721,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	gcd[gcdoff++].creator = GLabelCreate;
 	swarray[swpos][0] = &gcd[gcdoff-1];
 
-	sprintf( widthbuf, "%g", (double) (2*def->radius) );
+	sprintf( widthbuf, "%g", (double) (2*si->radius) );
 	label[gcdoff].text = (unichar_t *) widthbuf;
 	label[gcdoff].text_is_1byte = true;
 	gcd[gcdoff].gd.pos.width = 50;
@@ -769,7 +742,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	gcd[gcdoff++].creator = GLabelCreate;
 	swarray[swpos][3] = &gcd[gcdoff-1];
 
-	sprintf( axisbuf, "%g", (double) (2*def->minorradius) );
+	sprintf( axisbuf, "%g", (double) (2*si->minorradius) );
 	label[gcdoff].text = (unichar_t *) axisbuf;
 	label[gcdoff].text_is_1byte = true;
 	gcd[gcdoff].gd.pos.width = 50;
@@ -794,7 +767,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	gcd[gcdoff++].creator = GLabelCreate;
 	swarray[swpos][0] = &gcd[gcdoff-1];
 
-	sprintf( anglebuf, "%g", (double) (def->penangle*180/3.1415926535897932) );
+	sprintf( anglebuf, "%g", (double) (si->penangle*180/3.1415926535897932) );
 	label[gcdoff].text = (unichar_t *) anglebuf;
 	label[gcdoff].text_is_1byte = true;
 	gcd[gcdoff].gd.pos.width = 50;
@@ -828,7 +801,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->cap==lc_nib?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->cap==lc_nib?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_NibCap;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[0][2] = &gcd[gcdoff-1]; joincaparray[0][3] = GCD_Glue;
@@ -840,7 +813,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].image = &GIcon_buttcap;
 	gcd[gcdoff].gd.mnemonic = 'q';
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->cap==lc_butt?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->cap==lc_butt?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_ButtCap;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[0][4] = &gcd[gcdoff-1]; joincaparray[0][5] = GCD_Glue;
@@ -851,7 +824,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].image = &GIcon_roundcap;
 	gcd[gcdoff].gd.mnemonic = 'R';
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->cap==lc_round?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->cap==lc_round?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_RoundCap;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[0][6] = &gcd[gcdoff-1]; joincaparray[0][7] = GCD_Glue;
@@ -861,7 +834,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_in_resource = true;
 //	label[gcdoff].image = &GIcon_roundcap;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->cap==lc_round?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->cap==lc_round?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_BevelCap;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[0][8] = &gcd[gcdoff-1]; joincaparray[0][9] = GCD_Glue;
@@ -879,7 +852,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->join==lj_nib?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->join==lj_nib?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_NibJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[1][2] = &gcd[gcdoff-1]; joincaparray[1][3] = GCD_Glue;
@@ -889,7 +862,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_in_resource = true;
 	label[gcdoff].image = &GIcon_beveljoin;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->join==lj_bevel?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->join==lj_bevel?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_BevelJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[1][4] = &gcd[gcdoff-1]; joincaparray[1][5] = GCD_Glue;
@@ -898,7 +871,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_visible; // | gg_enabled | (def->join==lj_round?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_visible; // | gg_enabled | (si->join==lj_round?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_RoundJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[1][6] = &gcd[gcdoff-1]; joincaparray[1][7] = GCD_Glue;
@@ -907,7 +880,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_visible; // | gg_enabled | (def->join==lj_arcs?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_visible; // | gg_enabled | (si->join==lj_arcs?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_ArcsJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[1][8] = &gcd[gcdoff-1]; joincaparray[1][9] = GCD_Glue;
@@ -920,7 +893,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_in_resource = true;
 	label[gcdoff].image = &GIcon_miterjoin;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->join==lj_miter?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->join==lj_miter?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_MiterJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[2][2] = &gcd[gcdoff-1]; joincaparray[2][3] = GCD_Glue;
@@ -929,7 +902,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->join==lj_miterclip?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->join==lj_miterclip?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_MiterClipJoin;
 	gcd[gcdoff++].creator = GRadioCreate;
 	joincaparray[2][4] = &gcd[gcdoff-1];
@@ -958,7 +931,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	gcd[gcdoff++].creator = GLabelCreate;
 	jlexarray[0][0] = &gcd[gcdoff-1];
 
-	sprintf( jlbuf, "%g", (double) (def->joinlimit) );
+	sprintf( jlbuf, "%g", (double) (si->joinlimit) );
 	label[gcdoff].text = (unichar_t *) jlbuf;
 	label[gcdoff].text_is_1byte = true;
 	gcd[gcdoff].gd.pos.width = 50;
@@ -974,7 +947,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!def->jlrelative?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!si->jlrelative?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_JoinLimitLen;
 	gcd[gcdoff++].creator = GRadioCreate;
 	jlexarray[0][2] = &gcd[gcdoff-1];
@@ -983,7 +956,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->jlrelative?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->jlrelative?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_JoinLimitRel;
 	gcd[gcdoff++].creator = GRadioCreate;
 	jlexarray[0][3] = &gcd[gcdoff-1];
@@ -998,7 +971,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	gcd[gcdoff++].creator = GLabelCreate;
 	jlexarray[1][0] = &gcd[gcdoff-1];
 
-	sprintf( ecbuf, "%g", (double) (def->extendcap) );
+	sprintf( ecbuf, "%g", (double) (si->extendcap) );
 	label[gcdoff].text = (unichar_t *) ecbuf;
 	label[gcdoff].text_is_1byte = true;
 	gcd[gcdoff].gd.pos.width = 50;
@@ -1014,7 +987,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!def->ecrelative?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (!si->ecrelative?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_ExtendCapLen;
 	gcd[gcdoff++].creator = GRadioCreate;
 	jlexarray[1][2] = &gcd[gcdoff-1];
@@ -1023,7 +996,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->ecrelative?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->ecrelative?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_ExtendCapRel;
 	gcd[gcdoff++].creator = GRadioCreate;
 	jlexarray[1][3] = &gcd[gcdoff-1];
@@ -1049,7 +1022,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	gcd[gcdoff++].creator = GLabelCreate;
 	accarray[0][0] = &gcd[gcdoff-1];
 
-	sprintf( accbuf, "%g", (double) (def->accuracy_target) );
+	sprintf( accbuf, "%g", (double) (si->accuracy_target) );
 	label[gcdoff].text = (unichar_t *) accbuf;
 	label[gcdoff].text_is_1byte = true;
 	gcd[gcdoff].gd.pos.width = 50;
@@ -1084,7 +1057,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->rmov==srmov_layer?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->rmov==srmov_layer?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_RmOvLayer;
 	gcd[gcdoff++].creator = GRadioCreate;
 	overlaparray[2] = &gcd[gcdoff-1]; overlaparray[3] = GCD_Glue;
@@ -1093,7 +1066,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->rmov==srmov_contour?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->rmov==srmov_contour?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_RmOvContour;
 	gcd[gcdoff++].creator = GRadioCreate;
 	overlaparray[4] = &gcd[gcdoff-1]; overlaparray[5] = GCD_Glue;
@@ -1102,7 +1075,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->rmov==srmov_none?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->rmov==srmov_none?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_RmOvNone;
 	gcd[gcdoff++].creator = GRadioCreate;
 	overlaparray[6] = &gcd[gcdoff-1]; overlaparray[8] = GCD_Glue;
@@ -1117,7 +1090,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->removeinternal?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->removeinternal?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_RmInternal;
 	gcd[gcdoff++].creator = GCheckBoxCreate;
 	checkarray[0][0] = &gcd[gcdoff-1]; 
@@ -1126,7 +1099,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->removeexternal?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->removeexternal?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_RmExternal;
 	gcd[gcdoff++].creator = GCheckBoxCreate;
 	checkarray[0][1] = &gcd[gcdoff-1]; checkarray[0][2] = GCD_Glue;
@@ -1136,7 +1109,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->simplify?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->simplify?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_Simplify;
 	gcd[gcdoff++].creator = GCheckBoxCreate;
 	checkarray[1][0] = &gcd[gcdoff-1];
@@ -1145,7 +1118,7 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	label[gcdoff].text_is_1byte = true;
 	label[gcdoff].text_in_resource = true;
 	gcd[gcdoff].gd.label = &label[gcdoff];
-	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (def->extrema?gg_cb_on:0);
+	gcd[gcdoff].gd.flags = gg_enabled | gg_visible | (si->extrema?gg_cb_on:0);
 	gcd[gcdoff].gd.cid = CID_Extrema;
 	gcd[gcdoff++].creator = GCheckBoxCreate;
 	checkarray[1][1] = &gcd[gcdoff-1]; checkarray[1][2] = GCD_Glue;
@@ -1206,105 +1179,54 @@ static void RaiseStrokeDlg(StrokeDlg *sd, void *cv,
 	for (i=0; i<6; ++i)
 	    GGadgetSetSkipUnQualifiedHotkeyProcessing(gcd[tfpos[i]].ret, 1);
 
-	StrokeCharViewInits(sd,CID_Nib);
-	sd->cv_stroke.showfore = true;
-	sd->cv_stroke.showgrids = true;
-    } else {
-	reusing = true;
-	GDrawSetTransientFor(sd->gw,(GWindow) -1);
+	StrokeCharViewInits(&sd,CID_Nib);
+	sd.cv_stroke.showfore = true;
+	sd.cv_stroke.showgrids = true;
     }
 
-    Stroke_MakeActive(sd,&sd->cv_stroke);
-    Stroke_ShowNib(sd);
+    Stroke_MakeActive(&sd,&sd.cv_stroke);
+    Stroke_ShowNib(&sd);
 
-    sd->cv = cv;
-    sd->strokeit = strokeit;
-    sd->done = false;
-    sd->up[0] = sd->up[1] = true;
+    sd.cv = cv;
+    sd.strokeit = strokeit;
+    sd.done = false;
+    sd.up[0] = sd.up[1] = true;
+
     GWidgetHidePalettes();
-    GWidgetIndicateFocusGadget(GWidgetGetControl(sd->gw,CID_Width));
-    if ( reusing ) {
-	StrokeSetup(sd,GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Caligraphic))?si_caligraphic:
-		GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Circle))?si_round:
-		GGadgetIsChecked( GWidgetGetControl(sd->gw,CID_Convex))?si_nib:
-		si_centerline);
-    } else {
-	StrokeSetup(sd,def->stroke_type);
-    }
-    GGadgetSetVisible( GWidgetGetControl(sd->gw,CID_Apply), apply);
-    GWidgetToDesiredSize(sd->gw);
+    GWidgetIndicateFocusGadget(GWidgetGetControl(sd.gw,CID_Width));
 
-    GDrawSetVisible(sd->gw,true);
-    while ( !sd->done )
+    StrokeSetup(&sd,si->stroke_type);
+
+    GGadgetSetVisible(GWidgetGetControl(sd.gw,CID_Apply), apply);
+    GWidgetToDesiredSize(sd.gw);
+
+    GDrawSetVisible(sd.gw,true);
+    while ( !sd.done )
 	GDrawProcessOneEvent(NULL);
 
-    CVPalettesHideIfMine(&sd->cv_stroke);
+    CVPalettesHideIfMine(&sd.cv_stroke);
+    GDrawDestroyWindow(sd.gw);
 
-    if ( si!=NULL && si->stroke_type!=si_nib ) {
+    if ( si->stroke_type!=si_nib ) {
 	assert( si->nib==NULL );
-	// Pass the custom nib back in case the caller needs it
-	si->nib = sd->old_convex;
-	sd->old_convex = NULL;
-    } else if ( si==NULL && GWidgetGetControl(sd->gw,CID_Convex) ) {
-	// Don't replace old_convex if it's been changed in interim
-	if ( sd->old_convex==NULL ) {
-	    sd->old_convex = sd->sc_stroke.layers[ly_fore].splines;
-	    sd->sc_stroke.layers[ly_fore].splines = NULL;
-	}
+	// Store any unused custom nib for the next invocation
+	si->nib = sd.old_convex;
+	sd.old_convex = NULL;
     }
-}
-
-static void _VStroke(void *cv, void (*strokeit)(void *,StrokeInfo *,int), 
-                     int apply) {
-    RaiseStrokeDlg(&main_sdlg, cv, strokeit,NULL, apply);
-    GDrawSetVisible(main_sdlg.gw, false);
 }
 
 void CVStroke(CharView *cv) {
     if ( cv->b.layerheads[cv->b.drawmode]->splines==NULL )
 	return;
-    _VStroke(cv, CVStrokeIt, true);
+    MakeStrokeDlg(cv, CVStrokeIt, CVStrokeInfo(), true);
 }
 
 void FVStroke(FontView *fv) {
-    _VStroke(fv, FVStrokeItScript, false);
-}
-
-int StrokeSetConvexUI(SplineSet *ss, int toknum) {
-    StrokeInfo *free_si;
-    if ( toknum==-1 ) {
-	if ( main_sdlg.old_convex!=NULL )
-	    SplinePointListFree(main_sdlg.old_convex);
-	main_sdlg.old_convex = ss;
-	return true;
-    } else if ( toknum==-2 ) {
-	free_si = CVFreeHandInfo();
-	if ( free_si->nib!=NULL )
-	    SplinePointListFree(free_si->nib);
-	free_si->nib = ss;
-	return true;
-    }
-
-    return false;
-}
-
-SplineSet *StrokeGetConvexUI(int toknum) {
-    StrokeInfo *free_si;
-    if ( toknum==-1 )
-	return main_sdlg.old_convex;
-    else if ( toknum==-2 ) {
-	free_si = CVFreeHandInfo();
-	return free_si->nib;
-    }
-    return NULL;
+    MakeStrokeDlg(fv, FVStrokeItScript, CVStrokeInfo(), false);
 }
 
 void FreeHandStrokeDlg(StrokeInfo *si) {
-    StrokeDlg sdlg;
-    memset(&sdlg,0,sizeof(sdlg));
-    sdlg.si = si;
-    RaiseStrokeDlg(&sdlg,NULL,NULL,si,false);
-    GDrawDestroyWindow(sdlg.gw);
+    MakeStrokeDlg(NULL,NULL,si,false);
 }
 
 /* ************************************************************************** */

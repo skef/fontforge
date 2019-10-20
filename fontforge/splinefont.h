@@ -224,7 +224,7 @@ struct pen {
 };
 
 struct spline;
-enum si_type { si_round, si_caligraphic, si_nib, si_centerline };
+enum si_type { si_round, si_calligraphic, si_nib, si_centerline };
 /* If you change this structure you may need to update MakeStrokeDlg */
 /*  and cvpalettes.c -- both contain statically initialized StrokeInfos */
 typedef struct strokeinfo {

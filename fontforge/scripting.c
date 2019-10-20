@@ -5062,7 +5062,7 @@ static void bNonLinearTransform(Context *c) {
 	ScriptError(c,"Bad expression");
 }
 
-static const int nibmap[] = { si_round, si_caligraphic, si_nib };
+static const int nibmap[] = { si_round, si_calligraphic, si_nib };
 static const int joinmap[] = { lj_miter, lj_round, lj_bevel, lj_nib, 
                                lj_miterclip, lj_arcs, lj_inherited };
 static const int capmap[] = { lc_butt, lc_round, lc_square, lc_nib,
@@ -5110,8 +5110,8 @@ static void bExpandStroke(Context *c) {
 	4 => stroke width, line cap, line join
 	5 => stroke width, nib angle, thickness-numerator, thickness-denom
 	6 => stroke width, line cap, line join, 0, flags
-	7 => stroke width, caligraphic angle, thickness-numerator, thickness-denom, 0, flags
-	11 => nib type, width, height, caligraphic angle, line cap, line join, join limit, extend cap, accuracy target, flags
+	7 => stroke width, calligraphic angle, thickness-numerator, thickness-denom, 0, flags
+	11 => nib type, width, height, calligraphic angle, line cap, line join, join limit, extend cap, accuracy target, flags
     */ 
 
     if ( c->a.argc<2 || (c->a.argc>7 && c->a.argc!=11) ) {
@@ -5144,11 +5144,11 @@ static void bExpandStroke(Context *c) {
 	else
 	    bESFlags(c, 5, &si);
     } else if ( c->a.argc==5 ) {
-	si.stroke_type = si_caligraphic;
+	si.stroke_type = si_calligraphic;
 	si.penangle = 3.1415926535897932*args[2]/180;
 	si.minorradius = si.radius * args[3] / (double) args[4];
     } else if ( c->a.argc==7 ) {
-        si.stroke_type = si_caligraphic;
+        si.stroke_type = si_calligraphic;
 	si.penangle = 3.1415926535897932*args[2]/180;
 	si.minorradius = si.radius * args[3] / (double) args[4];
 	if ( c->a.vals[5].type!=v_int || c->a.vals[5].u.ival!=0 )
@@ -5163,7 +5163,16 @@ static void bExpandStroke(Context *c) {
 	i = c->a.vals[1].u.ival;
 	if ( i >= 0 && i<=2 )
 	    si.stroke_type = nibmap[i];
-	si.minorradius = args[3]/2.0;
+	else 
+	    ScriptError(c,"Unrecognized stroke type");
+	if ( si.stroke_type == si_nib ) {
+	    if ( c->a.vals[2].type!=v_int )
+		ScriptError(c,"Bad argument type");
+	    si.nib = StrokeGetConvex(c->a.vals[2].u.ival, false);
+	    if ( si.nib==NULL ) 
+		ScriptError(c,"Convex nib unknown or not defined");
+	} else
+	    si.minorradius = args[3]/2.0;
 	si.penangle = 3.1415926535897932*args[4]/180;
 	bESJoinCap(c, 5, 6, &si);
 	if ( args[7]>0 )

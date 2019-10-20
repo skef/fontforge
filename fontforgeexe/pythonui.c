@@ -341,52 +341,6 @@ return( NULL );
 Py_RETURN_NONE;
 }
 
-static PyObject *PyFF_getConvexNibUI(PyObject *UNUSED(self), PyObject *args) {
-    char *tok;
-    int toknum;
-    SplineSet *ss;
-    PyFF_Layer *l;
-    PyObject *obj;
-
-#if PY_MAJOR_VERSION >= 3
-    obj = PyUnicode_AsUTF8String(args);
-    tok = PyBytes_AsString(obj);
-#else /* PY_MAJOR_VERSION >= 3 */
-    tok = PyBytes_AsString(args);
-#endif /* PY_MAJOR_VERSION >= 3 */
-    toknum = PyFF_ConvexNibID(tok);
-    if ( toknum==0 )
-	return NULL;
-
-    if ( toknum>0 )
-	ss = StrokeGetConvexPlain(toknum);
-    else
-	ss = StrokeGetConvexUI(toknum);
-    l = LayerFromSS(ss, NULL);
-    SplinePointListFree(ss);
-    return l;
-}
-
-static PyObject *PyFF_setConvexNibUI(PyObject *UNUSED(self), PyObject *args) {
-    SplineSet *ss;
-    int toknum;
-
-    ss = PyFF_ParseSetConvex(args, &toknum);
-    if ( ss==NULL )
-	return NULL;
-
-    if ( toknum < 0 ) {
-	if ( !StrokeSetConvexUI(ss, toknum) )
-	    return NULL;
-    } else {
-	assert( toknum > 0 );
-	if ( !StrokeSetConvexPlain(ss, toknum) )
-	    return NULL;
-    }
-
-    Py_RETURN_NONE;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
@@ -420,7 +374,6 @@ copyUIMethodsToBaseTable( PyMethodDef* ui, PyMethodDef* md )
 void PythonUI_Init(void) {
     TRACE("PythonUI_Init()\n"); 
     FfPy_Replace_MenuItemStub(PyFF_registerMenuItem);
-    FfPy_Replace_Convex(PyFF_getConvexNibUI, PyFF_setConvexNibUI);
 
     copyUIMethodsToBaseTable( module_fontforge_ui_methods, module_fontforge_methods );
 }

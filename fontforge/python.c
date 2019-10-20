@@ -1608,37 +1608,27 @@ int NibCheck(SplineSet *ss);
 
 int PyFF_ConvexNibID(char *tok) {
    int r = ConvexNibID(tok);
-   if ( r==0 )
+   if ( r==-1 )
 	PyErr_Format(PyExc_TypeError, "Unrecognized convex nib context name" );
    return r;
 }
 
-SplineSet *PyFF_ParseSetConvex(PyObject *args, int *tokp) {
+static SplineSet *PyFF_ParseSetConvex(PyObject *args, int *tokp) {
     PyObject *obj;
-    SplineSet *ss, *ss2;
+    SplineSet *ss;
     char *tok;
 
     if ( !PyArg_ParseTuple(args,"O|s", &obj, &tok ) ) {
 	return NULL;
     }
     *tokp = PyFF_ConvexNibID(tok);
-    if ( *tokp==0 )
+    if ( *tokp==-1 )
 	return NULL;
 
     if ( PyType_IsSubtype(&PyFF_LayerType, Py_TYPE(obj)) ) {
 	ss = SSFromLayer( (PyFF_Layer *) obj);
-	if ( ((PyFF_Layer *) obj)->is_quadratic ) {
-	    ss2 = SplineSetsPSApprox(ss);
-	    SplinePointListFree(ss);
-	    ss = ss2;
-	}
     } else if ( PyType_IsSubtype(&PyFF_ContourType, Py_TYPE(obj)) ) {
 	ss = SSFromContour( (PyFF_Contour *) obj, NULL);
-	if ( ((PyFF_Contour *) obj)->is_quadratic ) {
-	    ss2 = SplineSetsPSApprox(ss);
-	    SplinePointListFree(ss);
-	    ss = ss2;
-	}
     } else {
 	PyErr_Format(PyExc_TypeError, "Argument must be a layer or a contour" );
 	return( NULL );
@@ -1652,7 +1642,7 @@ SplineSet *PyFF_ParseSetConvex(PyObject *args, int *tokp) {
     return ss;
 }
 
-static PyObject *PyFF_setConvexNibPlain(PyObject *UNUSED(self), PyObject *args) {
+static PyObject *PyFF_setConvexNib(PyObject *UNUSED(self), PyObject *args) {
     SplineSet *ss;
     int toknum;
 
@@ -1660,18 +1650,17 @@ static PyObject *PyFF_setConvexNibPlain(PyObject *UNUSED(self), PyObject *args) 
     if ( ss==NULL )
 	return NULL;
 
-    if ( toknum < 0 ) {
+    if ( toknum < 0 && no_windowing_ui ) {
 	PyErr_Format(PyExc_TypeError, "No user interface" );
 	return NULL;
     }
-    assert( toknum > 0 );
-    if ( !StrokeSetConvexPlain(ss, toknum) )
+    if ( !StrokeSetConvex(ss, toknum) )
 	return NULL;
 
     Py_RETURN_NONE;
 }
 
-static PyObject *PyFF_getConvexNibPlain(PyObject *UNUSED(self), PyObject *args) {
+static PyObject *PyFF_getConvexNib(PyObject *UNUSED(self), PyObject *args) {
     char *tok;
     int toknum;
     SplineSet *ss;
@@ -1680,10 +1669,12 @@ static PyObject *PyFF_getConvexNibPlain(PyObject *UNUSED(self), PyObject *args) 
     PYGETSTR(args, tok, NULL);
     toknum = PyFF_ConvexNibID(tok);
     ENDPYGETSTR();
-    if ( toknum==0 )
+    if ( toknum==-1 )
 	return NULL;
 
-    ss = StrokeGetConvexPlain(toknum);
+    ss = StrokeGetConvex(toknum, false);
+    if ( ss==NULL )
+	Py_RETURN_NONE;
     l = LayerFromSS(ss, NULL);
     SplinePointListFree(ss);
     return (PyObject *) l;
@@ -4553,7 +4544,7 @@ static char *strokebkey_conv[]
 
 static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
     char *str, *type, *cap="nib", *join="nib", *rostring="layer";
-    int c, j, f, r;
+    int c, j, f, r, toknum;
     PyObject *flagtuple=NULL;
     PyObject *nib=NULL;
 
@@ -4609,9 +4600,10 @@ static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
 		return( -1 );
 	    }
 	}
-    } else if (    strcmp(str, "caligraphic")==0 
+    } else if (    strcmp(str, "calligraphic")==0 
+                || strcmp(str, "caligraphic")==0 
                 || strcmp(str, "rectangular")==0 ) {
-	si->stroke_type = si_caligraphic;
+	si->stroke_type = si_calligraphic;
 	if ( !PyArg_ParseTupleAndKeywords(args, keywds,
                 "sdd|dss" STROKE_OPTFORMAT, strokekey_rect, &type,
 	        &si->radius, &si->minorradius, &si->penangle, &cap, &join,
@@ -4623,7 +4615,7 @@ static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
 		&si->penangle, &flagtuple) ) {
 		ENDPYGETSTR();
 		PyErr_Format(PyExc_TypeError, "Wrong parameter set for "
-		                              "'caligraphic' nib type" );
+		                              "'calligraphic' nib type" );
 		return( -1 );
 	    }
 	}
@@ -4642,7 +4634,12 @@ static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
 		return( -1 );
 	    }
 	}
+    } else {
+	PyErr_Format(PyExc_TypeError, "Unrecognized stroke type");
+	ENDPYGETSTR();
+	return -1;
     }
+    ENDPYGETSTR();
 	                                  
     if ( si->stroke_type==si_nib ) {
 	SplineSet *ss=NULL;
@@ -4664,8 +4661,19 @@ static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
                     PyErr_SetString(PyExc_AttributeError, "Empty Layer");
                 return( -1 );
             }
+	} else if ( STRING_CHECK(nib) ) {
+	    PYGETSTR(nib, str, -1);
+	    toknum = PyFF_ConvexNibID(str);
+	    ENDPYGETSTR();
+	    if ( toknum==-1 )
+		return -1;
+	    ss = StrokeGetConvex(toknum, true);
+	    if ( ss==NULL ) {
+		PyErr_Format(PyExc_TypeError, "Nib context empty (never initialized?)");
+		return -1;
+	    }
 	} else {
-	    PyErr_Format(PyExc_TypeError, "Second argument must be a (fontforge) Contour or Layer");
+	    PyErr_Format(PyExc_TypeError, "Second argument must be a (fontforge) Contour or Layer or a nib context identifier string");
 	    return( -1 );
 	}
 	if ( order2 ) {
@@ -4680,7 +4688,6 @@ static int Stroke_Parse(StrokeInfo *si, PyObject *args, PyObject *keywds) {
         PyErr_Format(PyExc_ValueError, "Stroke dimensions must be positive" );
 	return( -1 );
     }
-    ENDPYGETSTR();
 
     si->radius = si->radius/2;
     si->minorradius = si->minorradius/2;
@@ -18717,8 +18724,8 @@ PyMethodDef module_fontforge_methods[] = {
     { "hasUserInterface", PyFF_hasUserInterface, METH_NOARGS, "Returns whether this fontforge session has a user interface (True if it has opened windows) or is just running a script (False)"},
     { "registerImportExport", PyFF_registerImportExport, METH_VARARGS, "Adds an import/export spline conversion module"},
     { "registerMenuItem", PyFF_registerMenuItemStub, METH_VARARGS, "Adds a menu item (which runs a python script) to the font or glyph (or both) windows -- in the Tools menu"},
-    { "getConvexNib", PyFF_getConvexNibPlain, METH_VARARGS, "Sets the specified 'Convex' to the layer/contour argument."},
-    { "setConvexNib", PyFF_setConvexNibPlain, METH_VARARGS, "Returns the specified 'Convex' nib as a layer."},
+    { "getConvexNib", PyFF_getConvexNib, METH_VARARGS, "Sets the specified 'Convex' to the layer/contour argument."},
+    { "setConvexNib", PyFF_setConvexNib, METH_VARARGS, "Returns the specified 'Convex' nib as a layer."},
     { "logWarning", PyFF_logError, METH_VARARGS, "Adds a non-fatal message to the Warnings window"},
     { "postError", PyFF_postError, METH_VARARGS, "Pops up an error dialog box with the given title and message" },
     { "postNotice", PyFF_postNotice, METH_VARARGS, "Pops up an notice window with the given title and message" },
@@ -18813,23 +18820,6 @@ void FfPy_Replace_MenuItemStub(PyObject *(*func)(PyObject *,PyObject *)) {
 	    methods[i].ml_meth = func;
 return;
 	}
-}
-
-void FfPy_Replace_Convex(PyObject *(*getf)(PyObject *,PyObject *),
-                         PyObject *(*setf)(PyObject *,PyObject *)) {
-    int i, c=0;
-    PyMethodDef *methods = module_fontforge_methods;
-    for ( i=0; methods[i].ml_name!=NULL; ++i ) {
-	if ( strcmp(methods[i].ml_name,"setConvexNib")==0 ) {
-	    methods[i].ml_meth = setf;
-	    ++c;
-	} else if ( strcmp(methods[i].ml_name,"getConvexNib")==0 ) {
-	    methods[i].ml_meth = getf;
-	    ++c;
-	}
-	if ( c==2 )
-	    return;
-    }
 }
 
 static PyObject *PyPS_Identity(PyObject *UNUSED(noself), PyObject *UNUSED(args)) {

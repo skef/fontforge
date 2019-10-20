@@ -930,8 +930,7 @@ a[4][0] = "Nested array";
 		Type
 	      <DD>
 		When using the last form the type must be one of: 0=&gt;circular/elliptical,
-		1=&gt;caligraphic/rectangular, 2=&gt;convex/polygonal. Convex nibs are not yet
-		supported via the FontForge scripting language. 
+		1=&gt;caligraphic/rectangular, 2=&gt;convex/polygonal.
 	      <DT>
 		Width
 	      <DD>
@@ -940,8 +939,17 @@ a[4][0] = "Nested array";
 		a point will be added to each of the new curves at width/2 units as measured
 		on a vector normal to the direction of the original curve at that point.
 		This is equivalent to the value being the diameter of a circular nib.<BR>
-		In a caligraphic pen, the width is the width of the pen used to draw the
-		curve.
+		With a caligraphic pen the width is the width of the pen used to draw the
+		curve.<BR>
+		With a convex pen (and therefore the last, longest parameter set) this
+		second argument is not interpreted as a width, but as the identifier of a
+		convex nib context: 0=&gt; the default context, -10=&gt; the "FreeHand"
+		nib, -11=&gt; the Expand Stroke nib. (The negative contexts are only 
+		available when the UI is enabled.) <!-- These can be set with
+		<A HREF="#PasteConvexNib">PasteConvexNib()</A>.--> The nibs cannot currently
+		be altered with native scripting functions, but when executing scripts in
+		interactive FontForge the Expand Stroke and FreeHand nibs can be changed
+		using their respective dialogs. 
 	      <DT>
 		Line cap
 	      <DD>
@@ -2203,8 +2211,18 @@ SetLBearing(lbearing)
     <TR VALIGN=TOP>
       <TD BGCOLOR=yellow><A NAME="P">P</A></TD>
       <TD><DL>
+	  <!-- <DT>
+	   <A NAME="PasteConvexNib">P</A>asteConvexNib(context_id)
+	  <DD>
+	    Assuming what was most recently copied was a single glyph, this sets
+	    the specified convex nib to be a copy of the foreground layer of that glyph. 
+	    the identifiers are: 0=&gt; the default context, -10=&gt; the "FreeHand"
+	    nib, -11=&gt; the Expand Stroke nib. The negative contexts are only available
+	    when the UI is enabled. If the foreground layer is empty, the identifier is
+	    unrecognized, or the foreground layer of the glyph is not a valid nib the
+	    function returns an error.
 	  <DT>
-	    <A NAME="Paste" HREF="editmenu.html#PasteInto">Paste Into</A>
+	  <A NAME="PasteInto" HREF="editmenu.html#PasteInto">Paste Into</A> -->
 	  <DD>
 	    Copies the clipboard into the current font (merging with what was there before)
 	  <DT>

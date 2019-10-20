@@ -59,6 +59,10 @@
 #define BPNEAR(bp1, bp2) BPWITHIN(bp1, bp2, INTRASPLINE_MARGIN)
 #define BP_DIST(bp1, bp2) sqrt(pow((bp1).x-(bp2).x,2)+pow((bp1).y-(bp2).y,2))
 
+#define CONVEX_SLOTS 1
+#define FREEHAND_TOKNUM -10
+#define CVSTROKE_TOKNUM -11
+
 enum pentype { pt_circle, pt_square, pt_convex };
 
 /* c->nibcorners is a structure that models the "corners" of the current nib
@@ -208,36 +212,89 @@ static SplineSet *SplineContourOuterCCWRemoveOverlap(SplineSet *ss) {
 
 int ConvexNibID(char *tok) {
     if ( tok!=NULL ) {
-	if ( strcmp(tok, "default") )
-	    return 1;
-	else if ( strcmp(tok, "ui") )
-	    return -1;
-	else if ( strcmp(tok, "freehand") )
-	    return -2;
-	else {
+	if ( strcmp(tok, "default")==0 )
 	    return 0;
+	else if ( strcmp(tok, "freehand")==0 )
+	    return FREEHAND_TOKNUM;
+	else if ( strcmp(tok, "ui")==0 )
+	    return CVSTROKE_TOKNUM;
+	else {
+	    return -1;
 	}
     } else
-	return 1;
+	return -1;
 }
 
-static SplineSet *convex_nibs[2];
+static SplineSet *convex_nibs[CONVEX_SLOTS];
 
-int StrokeSetConvexPlain(SplineSet *ss, int toknum) {
-    if ( toknum==1 ) {
+int StrokeSetConvex(SplineSet *ss, int toknum) {
+    StrokeInfo *si = NULL;
+
+    if ( toknum>=0 && toknum<CONVEX_SLOTS ) {
 	if ( convex_nibs[toknum]!=NULL )
 	    SplinePointListFree(convex_nibs[toknum]);
 	convex_nibs[toknum] = ss;
 	return true;
-    }
+    } else if ( no_windowing_ui ) 
+	return false;
+    else if ( toknum==CVSTROKE_TOKNUM )
+	si = CVStrokeInfo();
+    else if ( toknum==FREEHAND_TOKNUM ) 
+	si = CVFreeHandInfo();
+    else
+	return false;
 
-    return false;
+    if ( si->nib!=NULL )
+	SplinePointListFree(si->nib);
+    si->nib = ss;
+
+    return true;
 }
 
-SplineSet *StrokeGetConvexPlain(int toknum) {
-    if ( toknum==1 )
-	return convex_nibs[toknum];
-    return NULL;
+SplineSet *StrokeGetConvex(int toknum, int cpy) {
+    SplineSet *ss = NULL;
+
+    if ( toknum>=0 && toknum<CONVEX_SLOTS )
+	ss = convex_nibs[toknum];
+    else if ( no_windowing_ui ) 
+	return NULL;
+    else if ( toknum==CVSTROKE_TOKNUM ) 
+	ss = CVStrokeInfo()->nib;
+    else if ( toknum==FREEHAND_TOKNUM )
+	ss = CVFreeHandInfo()->nib;
+    else
+	return NULL;
+
+    if ( ss==NULL )
+	return NULL;
+
+    if ( cpy )
+	return SplinePointListCopy(ss);
+    else
+	return ss;
+}
+
+StrokeInfo *CVStrokeInfo() {
+    static StrokeInfo *cv_si;
+    if ( cv_si==NULL ) {
+	cv_si = InitializeStrokeInfo(NULL);
+	cv_si->minorradius = cv_si->radius;
+	cv_si->penangle = PI/4;
+    }
+    return cv_si;
+}
+
+StrokeInfo *CVFreeHandInfo() {
+    static StrokeInfo *fv_si = NULL;
+
+    if ( fv_si==NULL ) {
+	fv_si = InitializeStrokeInfo(NULL);
+	fv_si->cap = lc_butt;
+	fv_si->stroke_type = si_centerline;
+	fv_si->minorradius = fv_si->radius;
+	fv_si->penangle = PI/4;
+    }
+    return fv_si;
 }
 
 /* A contour is a valid convex polygon if:
@@ -1042,14 +1099,14 @@ static bigreal CalcJoinLimit(StrokeContext *c, bigreal fsw) {
     return c->joinlimit * fsw / 2;
 }
 
-static bigreal CalcCapExtend(StrokeContext *c, bigreal cw) {
+static bigreal CalcCapExtend(StrokeContext *c, bigreal fsw) {
     if (c->extendcap <= 0)
 	return 0;
 
     if (!c->ecrelative)
 	return c->extendcap;
 
-    return c->extendcap * cw / 2;
+    return c->extendcap * fsw / 2;
 }
 
 static int LineSameSide(BasePoint l1, BasePoint l2, BasePoint p, BasePoint r) {
@@ -1267,7 +1324,7 @@ static int _HandleJoin(JoinParams *jpp) {
 	SplineStrokeAppendFixup(cur->last, jpp->sxy, jpp->noi, jpp->is_ccw);
 	is_flat = true;
     } else if ( RealWithin(costheta, 1, COS_MARGIN) ) {
-        HandleFlat(jpp->cur, jpp->sxy, jpp->noi, jpp->is_ccw);
+	SplineSetLineTo(cur, oxy);
 	is_flat = true;
     } else if ( !jpp->bend_is_ccw == !jpp->is_right ) {
 	// Join is under nib, just connect for later removal
@@ -1312,7 +1369,7 @@ static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
     NibOffset nof, not;
     BasePoint refp = BP_ADD(sxy, c->pseudo_origin), p1, p2, oxy;
     SplinePoint *sp;
-    bigreal cw, cel;
+    bigreal fsw, cel;
 
     CalcNibOffset(c, ut, false, &nof, -1);
     CalcNibOffset(c, ut, true, &not, -1);
@@ -1322,9 +1379,9 @@ static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
 	SplineSetLineTo(cur, oxy);
 	return;
     }
-    cw = BP_DIST(nof.off[is_ccw], not.off[is_ccw]);
+    fsw = FalseStrokeWidth(c, UT_NEG(ut));
     if ( c->cap==lc_butt || c->cap==lc_round ) {
-	cel = CalcCapExtend(c, cw);
+	cel = CalcCapExtend(c, fsw);
 	CalcExtend(refp, BP_REV_IF(!is_right, ut),
 	           cur->last->me, oxy, cel, &p1, &p2);
 	if ( BPNEAR(cur->last->me, p1) )
@@ -1357,7 +1414,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
     Spline *s, *first=NULL;
     SplineSet *left=NULL, *right=NULL, *cur;
     SplinePoint *sp;
-    BasePoint ut_ini = BP_UNINIT, ut_start, ut_mid, ut_end, ut_endlast;
+    BasePoint ut_ini = BP_UNINIT, ut_start, ut_mid, ut_endlast;
     BasePoint sxy;
     bigreal last_t, t;
     int is_right, linear, curved, on_cusp;
@@ -1379,10 +1436,8 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 	ut_start = SplineUTanVecAt(s, 0.0);
 	linear = SplineIsLinearish(s);
 	if ( linear ) {
-	    ut_end = ut_start;
 	    is_ccw_start = 0;
 	} else {
-	    ut_end = SplineUTanVecAt(s, 1.0);
 	    is_ccw_start = SplineTurningCCWAt(s, 0.0);
 	}
 	if ( BP_IS_UNINIT(ut_ini) ) {
@@ -1408,7 +1463,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 
 	    if ( !HandleJoin(c, cur, sxy, &no, is_ccw_start, ut_endlast,
 	                     was_ccw, is_right) )
-		// Handle cusp value change here
+		// XXX Handle cusp value change here
 		;
 	    on_cusp = OffsetOnCuspAt(c, s, 0.0, &no, is_right, is_ccw_start);
 
@@ -1445,12 +1500,13 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 		    SplineStrokeAppendFixup(cur->last, sxy, &no,
 		                            on_cusp ? is_ccw_mid : !is_ccw_mid);
 
-		    HandleFlat(cur, sxy, &no, is_ccw_mid);
+		    if ( t < 1.0 )
+			HandleFlat(cur, sxy, &no, is_ccw_mid);
 		    on_cusp = OffsetOnCuspAt(c, s, t, &no, is_right, is_ccw_mid);
 		}
 	    }
 	}
-	ut_endlast = ut_end;
+	ut_endlast = SplineUTanVecAt(s, 1.0);
         was_ccw = SplineTurningCCWAt(s, 1.0);
     }
     if (    (left!=NULL && left->first==NULL) 
@@ -1733,7 +1789,7 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     trans[3] = co;
     trans[4] = trans[5] = 0;
 
-    if ( si->stroke_type==si_round || si->stroke_type==si_caligraphic ) {
+    if ( si->stroke_type==si_round || si->stroke_type==si_calligraphic ) {
 	c.pentype = si->stroke_type==si_round ? pt_circle : pt_square;
 	max_pc = 4;
 	nibs = UnitShape(si->stroke_type==si_round ? 0 : -4);

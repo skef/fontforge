@@ -17,10 +17,12 @@ enum ShapeType {
 	Shape_SelfIntersects
 };
 
-extern enum ShapeType NibIsValid(SplineSet *);
+extern StrokeInfo *CVFreeHandInfo();
+extern StrokeInfo *CVStrokeInfo();
 extern int ConvexNibID(char *tok);
-extern int StrokeSetConvexPlain(SplineSet *ss, int toknum);
-extern SplineSet *StrokeGetConvexPlain(int toknum);
+extern int StrokeSetConvex(SplineSet *ss, int toknum);
+extern SplineSet *StrokeGetConvex(int toknum, int cpy);
+extern enum ShapeType NibIsValid(SplineSet *);
 extern SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_start,
                                              bigreal t_end, SplinePoint *start);
 extern SplinePoint *AppendCubicSplineSetPortion(Spline *s, bigreal t_start,
