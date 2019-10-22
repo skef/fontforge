@@ -709,20 +709,49 @@ static void SSAppendSemiCircle(SplineSet *cur, bigreal radius, BasePoint ut,
     free(nc);
 }
 
+static BasePoint SplineStrokeVerifyCorner(BasePoint sxy, BasePoint txy, 
+                                          NibOffset *noe, int is_ccw,
+				          BasePoint *dxyp, bigreal *mgp) {
+    BasePoint oxy;
+
+    oxy = BP_ADD(sxy, noe->off[is_ccw]);
+    *dxyp = BP_ADD(oxy, BP_REV(txy));
+    *mgp = fmax(fabs(dxyp->x), fabs(dxyp->y));
+    return oxy;
+}
+
+static int SplineStrokeFindCorner(BasePoint sxy, BasePoint txy, 
+                                  NibOffset *noe) {
+    bigreal mg, mg2;
+    BasePoint tmp;
+
+    SplineStrokeVerifyCorner(sxy, txy, noe, 0, &tmp, &mg);
+    SplineStrokeVerifyCorner(sxy, txy, noe, 1, &tmp, &mg2);
+    return mg > mg2 ? 1 : 0;
+}
+
 /* Put the new endpoint exactly where the NibOffset calculation says it
  * should be to avoid cumulative append errors.
  */
-static void SplineStrokeAppendFixup(SplinePoint *endp, BasePoint sxy,
-                                    NibOffset *noe, int is_ccw) {
-    int i = 0;
-    bigreal mg;
-    BasePoint oxy, dxy;
+static int SplineStrokeAppendFixup(SplinePoint *endp, BasePoint sxy,
+                                   NibOffset *noe, int is_ccw) {
+    bigreal mg, mg2;
+    BasePoint oxy, oxy2, dxy, dxy2;
 
-    oxy = BP_ADD(sxy, noe->off[is_ccw]);
-    dxy = BP_ADD(oxy, BP_REV(endp->me));
-    mg = fmax(fabs(dxy.x), fabs(dxy.y));
+    if ( is_ccw==-1 ) {
+	oxy = SplineStrokeVerifyCorner(sxy, endp->me, noe, 0, &dxy, &mg);
+	oxy2 = SplineStrokeVerifyCorner(sxy, endp->me, noe, 1, &dxy2, &mg2);
+	if ( mg2<mg ) {
+	    mg = mg2;
+	    oxy = oxy2;
+	    dxy = dxy2;
+	    is_ccw = 1;
+	} else
+	    is_ccw = 0;
+    } else
+	oxy = SplineStrokeVerifyCorner(sxy, endp->me, noe, is_ccw, &dxy, &mg);
 
-    // assert( mg < 1 );
+    assert( mg < 1 );
     if ( mg > FIXUP_MARGIN ) {
 	LogError(_("Warning: Coordinate diff %lf greater than margin %lf\n"),
 	         mg, FIXUP_MARGIN);
@@ -730,6 +759,7 @@ static void SplineStrokeAppendFixup(SplinePoint *endp, BasePoint sxy,
 
     endp->nextcp = BP_ADD(endp->nextcp, dxy);
     endp->me = oxy;
+    return is_ccw;
 }
 
 /* Note that is_ccw relates to the relevant NibOffset entries, and not
@@ -1203,9 +1233,11 @@ static void BevelJoin(JoinParams *jpp) {
 static void NibJoin(JoinParams *jpp) {
     NibOffset now;
     SplinePoint *sp;
+    int was_ccw;
 
     CalcNibOffset(jpp->c, jpp->ut_endlast, jpp->is_right, &now, -1);
-    sp = AddNibPortion(jpp->c->nibcorners, jpp->cur->last, &now, jpp->was_ccw,
+    was_ccw = SplineStrokeAppendFixup(jpp->cur->last, jpp->sxy, &now, -1);
+    sp = AddNibPortion(jpp->c->nibcorners, jpp->cur->last, &now, was_ccw,
                        jpp->noi, jpp->is_ccw, !jpp->bend_is_ccw);
     SplineStrokeAppendFixup(sp, jpp->sxy, jpp->noi, jpp->is_ccw);
     jpp->cur->last = sp;
@@ -1219,8 +1251,7 @@ static void DoubleBackJoin(JoinParams *jpp) {
     assert( RealWithin( BP_DOT(jpp->ut_endlast, jpp->noi->utanvec),
                         -1, COS_MARGIN) );
     refp = BP_ADD(jpp->sxy, jpp->c->pseudo_origin);
-    fsw = FalseStrokeWidth(jpp->c, NormVec(BP_ADD(jpp->ut_endlast,
-                                                  jpp->noi->utanvec)));
+    fsw = FalseStrokeWidth(jpp->c, jpp->ut_endlast);
     jlim = CalcJoinLimit(jpp->c, fsw);
     CalcExtend(refp, jpp->ut_endlast, jpp->cur->last->me, jpp->oxy, jlim/2,
                &p1, &p2);
@@ -1365,15 +1396,12 @@ static int HandleJoin(StrokeContext *c, SplineSet *cur,
 
    
 static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
-                      BasePoint ut, int is_ccw, int is_right) {
+                      BasePoint ut, BasePoint oxy, int is_right) {
     NibOffset nof, not;
-    BasePoint refp = BP_ADD(sxy, c->pseudo_origin), p1, p2, oxy;
+    BasePoint refp = BP_ADD(sxy, c->pseudo_origin), p1, p2;
     SplinePoint *sp;
     bigreal fsw, cel;
-
-    CalcNibOffset(c, ut, false, &nof, -1);
-    CalcNibOffset(c, ut, true, &not, -1);
-    oxy = BP_ADD(sxy, not.off[is_ccw]);
+    int was_corner, is_corner;
 
     if ( c->cap==lc_bevel ) {
 	SplineSetLineTo(cur, oxy);
@@ -1400,9 +1428,14 @@ static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
     } else {
 	if ( c->cap!=lc_nib && c->cap!=lc_inherited )
 	    LogError( _("Warning: Unrecognized or unsupported cap type, defaulting to 'nib'.\n") );
-	sp = AddNibPortion(c->nibcorners, cur->last, &nof, is_ccw, &not,
-	                   is_ccw, !is_right);
-	// SplineStrokeAppendFixup(sp, sxy, &not, is_ccw);
+
+	CalcNibOffset(c, ut, false, &nof, -1);
+	was_corner = SplineStrokeFindCorner(sxy, cur->last->me, &nof);
+	CalcNibOffset(c, ut, true, &not, -1);
+	is_corner = SplineStrokeFindCorner(sxy, oxy, &not);
+	sp = AddNibPortion(c->nibcorners, cur->last, &nof, was_corner, &not,
+	                   is_corner, !is_right);
+	SplineStrokeAppendFixup(sp, sxy, &not, is_corner);
 	cur->last = sp;
     }
 }
@@ -1497,8 +1530,8 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 		    sxy = SPLINEPVAL(s, t);
 		    CalcNibOffset(c, ut_mid, is_right, &no, no.nci[is_ccw_mid]);
 		    is_ccw_mid = SplineTurningCCWAt(s, t);
-		    SplineStrokeAppendFixup(cur->last, sxy, &no,
-		                            on_cusp ? is_ccw_mid : !is_ccw_mid);
+		    SplineStrokeAppendFixup(cur->last, sxy, &no, -1);
+		    //                        on_cusp ? is_ccw_mid : !is_ccw_mid);
 
 		    if ( t < 1.0 )
 			HandleFlat(cur, sxy, &no, is_ccw_mid);
@@ -1521,7 +1554,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
     }
     cur = NULL;
     if ( !closed ) {
-	HandleCap(c, left, ss->last->me, ut_endlast, was_ccw, true);
+	HandleCap(c, left, ss->last->me, ut_endlast, right->last->me, true);
 	SplineSetReverse(right);
 	left->next = right;
 	right = NULL;
@@ -1529,7 +1562,7 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 	if ( !closed )
 	     LogError( _("Warning: Contour end did not close\n") );
 	else {
-	    HandleCap(c, left, ss->first->me, ut_ini, is_ccw_ini, false);
+	    HandleCap(c, left, ss->first->me, ut_ini, left->first->me, false);
 	    SplineSetJoin(left, true, FIXUP_MARGIN, &closed);
 	    if ( !closed )
 		LogError( _("Warning: Contour start did not close\n") );
