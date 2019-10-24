@@ -4380,24 +4380,13 @@ Py_RETURN( self );
 }
 
 int NibCheck(SplineSet *nib) {
+    enum ShapeType pt;
     SplineSet *ss;
-    SplinePoint *sp;
-    int cnt;
 
     for ( ss=nib ; ss!=NULL; ss=ss->next ) {
-	enum ShapeType pt;
 	pt = NibIsValid(ss);
-	if ( pt==Shape_NotClosed ) {
-	    PyErr_Format(PyExc_ValueError, "The nib must be a closed, convex shape. This one is not closed." );
-	    return false;
-	} else if ( pt==Shape_TooFewPoints ) {
-	    PyErr_Format(PyExc_ValueError, "The brush must be a closed, convex shape. This one has too few points." );
-	    return false;
-	} else if ( pt==Shape_PointOnEdge ) {
-	    PyErr_Format(PyExc_ValueError, "There are at least 3 colinear vertices in the brush.");
-	    return false;
-	} else if ( pt!=Shape_Convex ) {
-	    PyErr_Format(PyExc_ValueError, "The nib must be a closed, convex shape. This one is not." );
+	if ( pt!=Shape_Convex ) {
+	    PyErr_Format(PyExc_ValueError, NibShapeTypeMsg(pt));
 	    return false;
 	}
     }

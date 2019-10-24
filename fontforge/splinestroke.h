@@ -12,8 +12,7 @@ enum ShapeType {
 	Shape_NotClosed,
 	Shape_TinySpline,
 	Shape_HalfLinear,
-	Shape_BadNextCP,
-	Shape_BadPrevCP,
+	Shape_BadCP,
 	Shape_SelfIntersects
 };
 
@@ -23,6 +22,7 @@ extern int ConvexNibID(char *tok);
 extern int StrokeSetConvex(SplineSet *ss, int toknum);
 extern SplineSet *StrokeGetConvex(int toknum, int cpy);
 extern enum ShapeType NibIsValid(SplineSet *);
+extern const char *NibShapeTypeMsg(enum ShapeType st);
 extern SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_start,
                                              bigreal t_end, SplinePoint *start);
 extern SplinePoint *AppendCubicSplineSetPortion(Spline *s, bigreal t_start,

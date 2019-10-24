@@ -150,7 +150,7 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
     int err;
     GWindow sw = sd->gw;
     GGadget *clg;
-    char *msg;
+    const char *msg;
 
     assert( sd->si!=NULL );
     if ( isapply ) {
@@ -183,21 +183,11 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
 	    int cnt, selectall = false;
 	    msg = NULL;
 	    for ( ss=si->nib ; ss!=NULL && !err; ss=ss->next ) {
-		if ( err )
-		    /* Already handled */;
-		else {
-		    enum ShapeType pt;
-		    pt = NibIsValid(ss);
-		    if ( pt==Shape_NotClosed ) {
-			msg = _("The selected contour is open, but it must be a closed convex shape.");
-			err = selectall = true;
-		     } else if ( pt==Shape_TooFewPoints ) {
-			msg = _("There aren't enough vertices to be a convex shape.");
-			err = selectall = true;
-		    } else if ( pt!=Shape_Convex ) {
-			printf("Nib not valid: %d\n", (int)pt);
+		if ( !err ) {
+		    enum ShapeType pt = NibIsValid(ss);
+		    if ( pt!=Shape_Convex ) {
+			msg = NibShapeTypeMsg(pt);
 			err = true;
-			msg = _("The selected vertex makes this a concave shape. Please remove (Edit->Merge) it.");
 		    }
 		}
 		if ( selectall ) {
@@ -212,7 +202,7 @@ static int _Stroke_OK(StrokeDlg *sd,int isapply) {
 		}
 		if ( err ) {
 		    GDrawRequestExpose(sd->cv_stroke.v,NULL,false);
-		    ff_post_error(_("Not a convex polygon"),msg);
+		    ff_post_error(_("Nib contour not convex"),msg);
 	    break;
 		}
 	    }

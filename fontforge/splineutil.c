@@ -2232,6 +2232,21 @@ SplinePointList *SPLCopyTransformedHintMasks(RefChar *r,
 return( _SPLCopyTransformedHintMasks(r->sc,layer,transform,basesc));
 }
 
+void SplinePointListClearCPSel(SplinePointList *spl) {
+    Spline *spline, *first;
+
+    for ( ; spl!=NULL; spl = spl->next ) {
+	first = NULL;
+	spl->first->nextcpselected = false;
+	spl->first->prevcpselected = false;
+	for ( spline = spl->first->next; spline!=NULL && spline!=first; spline=spline->to->next ) {
+	     spl->first->nextcpselected = false;
+	     spl->first->prevcpselected = false;
+	    if ( first==NULL ) first = spline;
+	}
+    }
+}
+
 void SplinePointListSelect(SplinePointList *spl,int sel) {
     Spline *spline, *first;
 

@@ -56,12 +56,9 @@
 #define MIN_ACCURACY (1e-5)
 
 #define NORMANGLE(a) ((a)>PI?(a)-2*PI:(a)<-PI?(a)+2*PI:(a))
+#define SIGNOF(a) ((0 < (a)) - ((a) < 0))
 #define BPNEAR(bp1, bp2) BPWITHIN(bp1, bp2, INTRASPLINE_MARGIN)
 #define BP_DIST(bp1, bp2) sqrt(pow((bp1).x-(bp2).x,2)+pow((bp1).y-(bp2).y,2))
-
-#define CONVEX_SLOTS 1
-#define FREEHAND_TOKNUM -10
-#define CVSTROKE_TOKNUM -11
 
 enum pentype { pt_circle, pt_square, pt_convex };
 
@@ -176,6 +173,18 @@ void SITranslatePSArgs(StrokeInfo *sip, enum linejoin lj, enum linecap lc) {
     }
 }
 
+static int LineSameSide(BasePoint l1, BasePoint l2, BasePoint p, BasePoint r,
+                        int on_line_ok) {
+    bigreal tp, tr;
+
+    tp = (l2.x-l1.x)*(p.y-l1.y) - (p.x-l1.x)*(l2.y-l1.y);
+    tr = (l2.x-l1.x)*(r.y-l1.y) - (r.x-l1.x)*(l2.y-l1.y);
+
+    if ( RealWithin(tp, 0, 1e-5) )
+	return on_line_ok;
+    return SIGNOF(tr)==SIGNOF(tp);
+}
+
 static SplineSet *SplineContourOuterCCWRemoveOverlap(SplineSet *ss) {
     DBounds b;
     SplinePoint *sp;
@@ -210,6 +219,12 @@ static SplineSet *SplineContourOuterCCWRemoveOverlap(SplineSet *ss) {
     return ss;
 }
 
+#define CONVEX_SLOTS 1
+#define FREEHAND_TOKNUM -10
+#define CVSTROKE_TOKNUM -11
+
+static SplineSet *convex_nibs[CONVEX_SLOTS];
+
 int ConvexNibID(char *tok) {
     if ( tok!=NULL ) {
 	if ( strcmp(tok, "default")==0 )
@@ -224,8 +239,6 @@ int ConvexNibID(char *tok) {
     } else
 	return -1;
 }
-
-static SplineSet *convex_nibs[CONVEX_SLOTS];
 
 int StrokeSetConvex(SplineSet *ss, int toknum) {
     StrokeInfo *si = NULL;
@@ -314,12 +327,11 @@ StrokeInfo *CVFreeHandInfo() {
  *         triangle formed by the spline edge and
  *         extending the lines of the adjacent edges.
  */
-// XXX Add outer CP check against next angle
 enum ShapeType NibIsValid(SplineSet *ss) {
     Spline *s;
-    int n = 1;
+    BasePoint lref_cp;
     bigreal d, anglesum = 0, angle, last_angle;
-    bigreal pcp_angle, ncp_angle, last_pcp_angle;
+    int n = 1;
 
     if ( ss->first==NULL )
 	return Shape_TooFewPoints;
@@ -331,14 +343,14 @@ enum ShapeType NibIsValid(SplineSet *ss) {
     s = ss->first->prev;
     last_angle = atan2(s->to->me.y - s->from->me.y,
                        s->to->me.x - s->from->me.x);
-    if ( ! SplineIsLinear(s) )
-	last_pcp_angle = atan2(s->to->me.y - s->to->prevcp.y,
-	                       s->to->me.x - s->to->prevcp.x);
+    if ( SplineIsLinear(s) )
+	lref_cp = s->from->me;
     else
-	last_pcp_angle = last_angle;
+	lref_cp = s->to->prevcp;
 
     s = ss->first->next;
     SplinePointListSelect(ss, false);
+    SplinePointListClearCPSel(ss);
     while ( true ) {
 	s->from->selected = true;
 	if ( BPWITHIN(s->from->me, s->to->me,1e-2) )
@@ -351,44 +363,9 @@ enum ShapeType NibIsValid(SplineSet *ss) {
 	if ( d<0 )
 	    return Shape_CCWTurn;
 	anglesum += d;
-	if ( last_pcp_angle != last_angle ) {
-	    d = last_pcp_angle-angle;
-	    d = NORMANGLE(d);
-	    if ( d<0 )
-		return Shape_BadPrevCP;
-	}
-	if ( !SplineIsLinear(s) ) {
-	    if ( s->from->nonextcp || BPNEAR(s->from->nextcp, s->from->me) )
-		return Shape_HalfLinear;
-	    ncp_angle = atan2(s->from->nextcp.y - s->from->me.y,
-	                      s->from->nextcp.x - s->from->me.x);
-	    d = ncp_angle-last_pcp_angle; // Outer limit
-	    d = NORMANGLE(d);
-	    if ( d > 0.0 )
-		return Shape_BadNextCP;
-	    d = angle-ncp_angle; // Inner limit
-	    d = NORMANGLE(d);
-	    if ( d > 0.0 )
-		return Shape_BadNextCP;
-	    // printf("nextcp angle: %lf, dout: %lf, din:%lf\n", ncp_angle, d, NORMANGLE(angle-ncp_angle));
-	    s->from->selected = false;
-	    s->to->selected = true;
-	    if ( s->to->noprevcp || BPNEAR(s->to->prevcp, s->to->me) ) 
-		return Shape_HalfLinear;
-	    pcp_angle = atan2(s->to->me.y - s->to->prevcp.y,
-	                      s->to->me.x - s->to->prevcp.x);
-	    d = pcp_angle-angle; // Inner limit
-	    d = NORMANGLE(d);
-	    if ( d > 0.0 )
-		return Shape_BadPrevCP;
-	    // printf("prevcp angle: %lf, dout: %lf\n", pcp_angle, d);
-	    s->from->selected = false;
-	} else
-	    pcp_angle = angle;
-	s->from->selected = s->to->selected = false;
-	s=s->to->next;
+	s->from->selected = false;
 	last_angle = angle;
-	last_pcp_angle = pcp_angle;
+	s=s->to->next;
 	if ( s==ss->first->next )
 	    break;
 	++n;
@@ -397,7 +374,76 @@ enum ShapeType NibIsValid(SplineSet *ss) {
 	return Shape_TooFewPoints;
     if ( !RealWithin(anglesum, 2*PI, 1e-1) )
 	return Shape_SelfIntersects;
+
+    assert( s==ss->first->next );
+    while ( true ) {
+	if ( SplineIsLinear(s) )
+	    lref_cp = s->from->me;
+	else {
+	    if ( s->from->nonextcp || BPNEAR(s->from->nextcp, s->from->me) ||
+	         s->to->noprevcp || BPNEAR(s->to->prevcp, s->to->me) ) 
+		return Shape_HalfLinear;
+	    s->from->nextcpselected = true;
+	    if ( LineSameSide(s->from->me, s->to->me, s->from->nextcp,
+	                      s->from->prev->from->me, true) )
+		return Shape_BadCP;
+	    if ( !LineSameSide(lref_cp, s->from->me,
+	                       s->from->nextcp, s->to->me, true) )
+		return Shape_BadCP;
+	    if ( !LineSameSide(s->to->me, s->to->prevcp,
+	                       s->from->nextcp, s->from->me, true) )
+		return Shape_BadCP;
+	    s->from->nextcpselected = false;
+	    s->from->selected = false;
+	    s->to->selected = true;
+	    s->to->prevcpselected = true;
+	    if ( LineSameSide(s->from->me, s->to->me, s->to->prevcp, 
+	                      s->to->next->to->me, false) )
+		return Shape_BadCP;
+	    if ( !LineSameSide(s->to->me, s->to->next->to->me,
+	                       s->to->prevcp, s->from->me, true) )
+		return Shape_BadCP;
+	    if ( !LineSameSide(s->from->me, s->from->nextcp,
+	                       s->to->prevcp, s->to->me, true) )
+		return Shape_BadCP;
+	    s->to->prevcpselected = false;
+	    s->to->selected = false;
+	    lref_cp = s->to->prevcp;
+	}
+	s=s->to->next;
+	if ( s==ss->first->next )
+	    break;
+    }
     return Shape_Convex;
+}
+
+const char *NibShapeTypeMsg(enum ShapeType st) {
+    if ( st==Shape_CCW )
+	return _("The contour winds counter-clockwise; "
+	         "a nib must wind clockwise.");
+    else if ( st==Shape_CCWTurn )
+	return _("The contour bends or curves counter-clockwise "
+	         "at the selected point; "
+	         "all on-curve points must bend or curve clockwise.");
+    else if ( st==Shape_PointOnEdge )
+	return _("The selected point is on a line; "
+	         "all on-curve points must bend or curve clockwise.");
+    else if ( st==Shape_TooFewPoints )
+	return _("A nib must have at least three on-curve points.");
+    else if ( st==Shape_NotClosed )
+	return _("The contour is open; a nib must be closed.");
+    else if ( st==Shape_TinySpline )
+	return _("The selected point is the start of a 'tiny' spline; "
+	         "splines that small may cause inaccurate calculations.");
+    else if ( st==Shape_HalfLinear )
+	return _("The selected point starts a spline with one control point; "
+	         "nib splines need a defined slope at both points.");
+    else if ( st==Shape_BadCP )
+	return _("The selected control point is out of bounds.");
+    else if ( st==Shape_SelfIntersects )
+	return _("The contour intersects itself; a nib must non-intersecting.");
+
+    return NULL;
 }
 
 static void BuildNibCorners(NibCorner **ncp, SplineSet *nib, int *maxp,
@@ -1139,16 +1185,6 @@ static bigreal CalcCapExtend(StrokeContext *c, bigreal fsw) {
     return c->extendcap * fsw / 2;
 }
 
-static int LineSameSide(BasePoint l1, BasePoint l2, BasePoint p, BasePoint r) {
-    bigreal t1, t2;
-
-    t1 = (l2.x-l1.x)*(r.y-l1.y) - (r.x-l1.x)*(l2.y-l1.y);
-    t2 = (l2.x-l1.x)*(p.y-l1.y) - (p.x-l1.x)*(l2.y-l1.y);
-
-    return    !RealWithin(t1, 0, 1e-4) && !RealWithin(t2, 0, 1e-4)
-           && (t1>0)==(t2>0);
-}
-
 static bigreal LineDist(BasePoint l1, BasePoint l2, BasePoint p) {
     assert (l1.x!=l2.x || l1.y!=l2.y);
     return   abs((l2.y-l1.y)*p.x - (l2.x-l1.x)*p.y + l2.x*l1.y -l2.y*l1.x)
@@ -1201,9 +1237,9 @@ static void CalcExtend(BasePoint refp, BasePoint ut, BasePoint op1,
     BasePoint clip1 = BP_ADD(refp, BP_SCALE(ut, min));
     BasePoint clip2 = BP_ADD(clip1, UT_90CW(ut));
 
-    if ( !LineSameSide(clip1, clip2, op1, refp) )
+    if ( !LineSameSide(clip1, clip2, op1, refp, false) )
 	extra = LineDist(clip1, clip2, op1);
-    if ( !LineSameSide(clip1, clip2, op2, refp) ) {
+    if ( !LineSameSide(clip1, clip2, op2, refp, false) ) {
 	tmp = LineDist(clip1, clip2, op2);
 	if (tmp > extra)
 	    extra = tmp;
@@ -1317,12 +1353,12 @@ static void MiterJoin(JoinParams *jpp) {
 	ut = jpp->bend_is_ccw ? UT_90CW(ut) : UT_90CCW(ut);
 	clip1 = BP_ADD(refp, BP_SCALE(ut, jlim/2));
 	clip2 = BP_ADD(clip1, UT_90CW(ut));
-	if ( !LineSameSide(clip1, clip2, jpp->oxy, refp) ) {
+	if ( !LineSameSide(clip1, clip2, jpp->oxy, refp, false) ) {
 	    // Don't trim past bevel
 	    BevelJoin(jpp);
 	    return;
 	}
-	if ( LineSameSide(clip1, clip2, ixy, refp) ) {
+	if ( LineSameSide(clip1, clip2, ixy, refp, false) ) {
 	    // Backup normal miter join (rounding problems)
 	    SplineSetLineTo(cur, ixy);
 	    SplineSetLineTo(cur, jpp->oxy);

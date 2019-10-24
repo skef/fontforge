@@ -195,6 +195,7 @@ extern void SplinePointCategorize(SplinePoint *sp);
 extern void SplinePointFree(SplinePoint *sp);
 extern void SplinePointListFree(SplinePointList *spl);
 extern void SplinePointListMDFree(SplineChar *sc, SplinePointList *spl);
+extern void SplinePointListClearCPSel(SplinePointList *spl);
 extern void SplinePointListSelect(SplinePointList *spl, int sel);
 extern void SplinePointListsFree(SplinePointList *spl);
 extern void SplinePointListsMDFree(SplineChar *sc, SplinePointList *spl);
