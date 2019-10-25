@@ -371,18 +371,6 @@ return( sin(3.1415926535897932/ps_pointcnt)*tan(2*3.1415926535897932/ps_pointcnt
 return( star_percent );
 }
 
-StrokeInfo *CVFreeHandInfo(void) {
-    static StrokeInfo *expand = NULL;
-
-    if ( expand==NULL ) {
-	expand = InitializeStrokeInfo(NULL);
-	expand->cap = lc_butt;
-	expand->stroke_type = si_centerline;
-	expand->penangle = 3.1415926535897932/4;
-    }
-    return( expand );
-}
-
 struct ask_info {
     GWindow gw;
     int done;

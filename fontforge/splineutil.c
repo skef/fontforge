@@ -114,19 +114,6 @@ void chunktest(void) {
 }
 #endif
 
-static void SplineCompare(Spline *s1, Spline *s2) {
-    for (int i = 0; i < 2; ++i) {
-        if (! RealNear(s1->splines[i].a, s2->splines[i].a) )
-	    printf("Bad Spline Compare splines[%d].a %lf %lf\n", i, s1->splines[i].a, s2->splines[i].a);
-        if (! RealNear(s1->splines[i].b, s2->splines[i].b) )
-	    printf("Bad Spline Compare splines[%d].b %lf %lf\n", i, s1->splines[i].b, s2->splines[i].b);
-        if (! RealNear(s1->splines[i].c, s2->splines[i].c) )
-	    printf("Bad Spline Compare splines[%d].c %lf %lf\n", i, s1->splines[i].c, s2->splines[i].c);
-        if (! RealNear(s1->splines[i].d, s2->splines[i].d) )
-	    printf("Bad Spline Compare splines[%d].d %lf %lf\n", i, s1->splines[i].d, s2->splines[i].d);
-    }
-}
-
 char *strconcat(const char *str1,const char *str2) {
     char *ret;
     int len1 = strlen(str1);
@@ -1764,14 +1751,6 @@ static void _BpTransform(BasePoint *to, BasePoint *from, real transform[6], enum
 
 void BpTransform(BasePoint *to, BasePoint *from, real transform[6]) {
     _BpTransform(to, from, transform, 0);
-}
-
-static void BpTransformDouble(BasePoint *to, BasePoint *from, bigreal transform[6]) {
-    BasePoint p;
-    p.x = transform[0]*from->x + transform[2]*from->y + transform[4];
-    p.y = transform[1]*from->x + transform[3]*from->y + transform[5];
-    to->x = p.x;
-    to->y = p.y;
 }
 
 void ApTransform(AnchorPoint *ap, real transform[6]) {

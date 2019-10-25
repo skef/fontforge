@@ -40,8 +40,8 @@
 #include "splineutil2.h"
 #include "utanvec.h"
 
-#include <math.h>
 #include <assert.h>
+#include <math.h>
 
 #define CIRCOFF 0.551915
 #define PI      3.1415926535897932
@@ -60,11 +60,10 @@
 #define BPNEAR(bp1, bp2) BPWITHIN(bp1, bp2, INTRASPLINE_MARGIN)
 #define BP_DIST(bp1, bp2) sqrt(pow((bp1).x-(bp2).x,2)+pow((bp1).y-(bp2).y,2))
 
-enum pentype { pt_circle, pt_square, pt_convex };
+enum nibtype { nib_ellip, nib_rect, nib_convex };
 
-/* c->nibcorners is a structure that models the "corners" of the current nib
- * treated as if all splines were linear, and therefore as a convex polygon.
- */
+// c->nibcorners is a structure that models the "corners" of the current nib
+// treated as if all splines were linear, and therefore as a convex polygon.
 
 #define NC_IN_IDX 0
 #define NC_OUT_IDX 1
@@ -80,9 +79,8 @@ typedef struct nibcorner {
     unsigned int linear: 1;
 } NibCorner;
 
-// XXX Add optional error info char *
 typedef struct strokecontext {
-    enum pentype pentype;
+    enum nibtype nibtype;
     enum linejoin join;
     enum linecap cap;
     enum stroke_rmov rmov;
@@ -117,6 +115,10 @@ typedef struct niboffset {
                               // tracing the right side
 } NibOffset;
 
+/******************************************************************************/
+/* ****************************** Configuration ***************************** */
+/******************************************************************************/
+
 StrokeInfo *InitializeStrokeInfo(StrokeInfo *sip) {
     if ( sip==NULL )
 	sip = malloc(sizeof(StrokeInfo));
@@ -129,11 +131,11 @@ StrokeInfo *InitializeStrokeInfo(StrokeInfo *sip) {
         srmov_layer,  // remove overlap style
         false,        // removeinternal
         false,        // removeexternal
-	true,        // simplify
-	true,        // extrema
+	true,         // simplify
+	true,         // extrema
         false,        // leave users center
-        true,        // jlrelative
-        true,        // ecrelative
+        true,         // jlrelative
+        true,         // ecrelative
         0.0,          // pen angle
         0.0,          // minor radius (0: major)
 	0.0,          // extend cap
@@ -171,52 +173,6 @@ void SITranslatePSArgs(StrokeInfo *sip, enum linejoin lj, enum linecap lc) {
 	default:
 	    sip->join = lj;
     }
-}
-
-static int LineSameSide(BasePoint l1, BasePoint l2, BasePoint p, BasePoint r,
-                        int on_line_ok) {
-    bigreal tp, tr;
-
-    tp = (l2.x-l1.x)*(p.y-l1.y) - (p.x-l1.x)*(l2.y-l1.y);
-    tr = (l2.x-l1.x)*(r.y-l1.y) - (r.x-l1.x)*(l2.y-l1.y);
-
-    if ( RealWithin(tp, 0, 1e-5) )
-	return on_line_ok;
-    return SIGNOF(tr)==SIGNOF(tp);
-}
-
-static SplineSet *SplineContourOuterCCWRemoveOverlap(SplineSet *ss) {
-    DBounds b;
-    SplinePoint *sp;
-    SplineSet *ss_tmp, *ss_last = NULL;
-
-    SplineSetQuickBounds(ss,&b);
-    ss_tmp = chunkalloc(sizeof(SplineSet));
-    ss_tmp->first = SplinePointCreate(b.minx-100,b.miny-100);
-    ss_tmp->last = SplinePointCreate(b.minx-100,b.maxy+100);
-    SplineMake3(ss_tmp->first, ss_tmp->last);
-    sp = SplinePointCreate(b.maxx+100,b.maxy+100);
-    SplineMake3(ss_tmp->last, sp);
-    ss_tmp->last = sp;
-    sp = SplinePointCreate(b.maxx+100,b.miny-100);
-    SplineMake3(ss_tmp->last, sp);
-    SplineMake3(sp, ss_tmp->first);
-    ss_tmp->last = ss_tmp->first;
-    ss->next = ss_tmp;
-    ss=SplineSetRemoveOverlap(NULL,ss,over_remove);
-    for ( ss_tmp=ss; ss_tmp!=NULL; ss_last=ss_tmp, ss_tmp=ss_tmp->next )
-	if (   ss_tmp->first->me.x==(b.minx-100)
-	    || ss_tmp->first->me.x==(b.maxx+100) ) {
-	    if ( ss_last==NULL )
-		ss = ss->next;
-    	    else
-		ss_last->next = ss_tmp->next;
-	    ss_tmp->next = NULL;
-	    SplinePointListFree(ss_tmp);
-	    return ss;
-	}
-    assert(0);
-    return ss;
 }
 
 #define CONVEX_SLOTS 1
@@ -310,6 +266,64 @@ StrokeInfo *CVFreeHandInfo() {
     return fv_si;
 }
 
+/******************************************************************************/
+/* ********************************* Utility ******************************** */
+/******************************************************************************/
+
+static int LineSameSide(BasePoint l1, BasePoint l2, BasePoint p, BasePoint r,
+                        int on_line_ok) {
+    bigreal tp, tr;
+
+    tp = (l2.x-l1.x)*(p.y-l1.y) - (p.x-l1.x)*(l2.y-l1.y);
+    tr = (l2.x-l1.x)*(r.y-l1.y) - (r.x-l1.x)*(l2.y-l1.y);
+
+    if ( RealWithin(tp, 0, 1e-5) )
+	return on_line_ok;
+    return SIGNOF(tr)==SIGNOF(tp);
+}
+
+/* A hack for cleaning up cusps and intersections on isolated 
+ * counter-clockwise contours -- builds an enclosing clockwise
+ * rectangle, runs remove-overlap, and removes the rectangle.
+ */
+static SplineSet *SplineContourOuterCCWRemoveOverlap(SplineSet *ss) {
+    DBounds b;
+    SplinePoint *sp;
+    SplineSet *ss_tmp, *ss_last = NULL;
+
+    SplineSetQuickBounds(ss,&b);
+    ss_tmp = chunkalloc(sizeof(SplineSet));
+    ss_tmp->first = SplinePointCreate(b.minx-100,b.miny-100);
+    ss_tmp->last = SplinePointCreate(b.minx-100,b.maxy+100);
+    SplineMake3(ss_tmp->first, ss_tmp->last);
+    sp = SplinePointCreate(b.maxx+100,b.maxy+100);
+    SplineMake3(ss_tmp->last, sp);
+    ss_tmp->last = sp;
+    sp = SplinePointCreate(b.maxx+100,b.miny-100);
+    SplineMake3(ss_tmp->last, sp);
+    SplineMake3(sp, ss_tmp->first);
+    ss_tmp->last = ss_tmp->first;
+    ss->next = ss_tmp;
+    ss=SplineSetRemoveOverlap(NULL,ss,over_remove);
+    for ( ss_tmp=ss; ss_tmp!=NULL; ss_last=ss_tmp, ss_tmp=ss_tmp->next )
+	if (   ss_tmp->first->me.x==(b.minx-100)
+	    || ss_tmp->first->me.x==(b.maxx+100) ) {
+	    if ( ss_last==NULL )
+		ss = ss->next;
+    	    else
+		ss_last->next = ss_tmp->next;
+	    ss_tmp->next = NULL;
+	    SplinePointListFree(ss_tmp);
+	    return ss;
+	}
+    assert(0);
+    return ss;
+}
+
+/******************************************************************************/
+/* ****************************** Nib Geometry ****************************** */
+/******************************************************************************/
+
 /* A contour is a valid convex polygon if:
  *  1. It contains something (not a line or a single point
  *     but a closed piecewise spline containing area) 
@@ -322,10 +336,12 @@ StrokeInfo *CVFreeHandInfo() {
  *     polygon if there were no control points.
  *  6. Every edge/spline is either:
  *     6a. A line, or
- *     6b. A spline where *both* control points are
- *         outside of the polygon but inside the 
- *         triangle formed by the spline edge and
- *         extending the lines of the adjacent edges.
+ *     6b. A spline where *both* control points are:
+ *         6bi.  Inside the triangle formed by the spline's from/to edge
+ *               and extending the lines of the adjacent edges**, and
+ *         6bii. The line segment of each control point does not 
+ *               cross the extended line of the other control point.
+ *         ** Simplification -- see documentation and lref_cp below.
  */
 enum ShapeType NibIsValid(SplineSet *ss) {
     Spline *s;
@@ -351,6 +367,7 @@ enum ShapeType NibIsValid(SplineSet *ss) {
     s = ss->first->next;
     SplinePointListSelect(ss, false);
     SplinePointListClearCPSel(ss);
+    // Polygonal checks
     while ( true ) {
 	s->from->selected = true;
 	if ( BPWITHIN(s->from->me, s->to->me,1e-2) )
@@ -376,6 +393,7 @@ enum ShapeType NibIsValid(SplineSet *ss) {
 	return Shape_SelfIntersects;
 
     assert( s==ss->first->next );
+    // Curve/control point checks
     while ( true ) {
 	if ( SplineIsLinear(s) )
 	    lref_cp = s->from->me;
@@ -442,6 +460,8 @@ const char *NibShapeTypeMsg(enum ShapeType st) {
 	return _("The selected control point is out of bounds.");
     else if ( st==Shape_SelfIntersects )
 	return _("The contour intersects itself; a nib must non-intersecting.");
+    else if ( st!=Shape_Convex )
+	return _("Unrecognized nib shape error.");
 
     return NULL;
 }
@@ -492,7 +512,8 @@ static void BuildNibCorners(NibCorner **ncp, SplineSet *nib, int *maxp,
     *ncp = nc;
 }
 
-// The index into c->nibcorners associated with unit tangent ut
+/* The index into c->nibcorners associated with unit tangent ut
+ */
 static int _IndexForUTanVec(NibCorner *nc, int n, BasePoint ut, int nci_hint) {
     int nci;
 
@@ -560,16 +581,16 @@ static NibOffset *_CalcNibOffset(NibCorner *nc, int n, BasePoint ut,
 	no->off[NIBOFF_CW_IDX] = nc[nci].on_nib->me;
 	no->at_line = true;
 	no->curve = false;
-    // Whether ut is (effectively) between IN and OUT, in 
-    // which case the point draws the offset curve
+    // When ut is (effectively) between IN and OUT the point
+    // draws the offset curve
     } else if (   UTanVecsSequent(nc[nci].utv[NC_IN_IDX], ut,
                                   nc[nci].utv[NC_OUT_IDX], false) 
                || BPNEAR(ut, nc[nci].utv[NC_OUT_IDX] ) ) {
 	no->nt = 0.0;
 	no->off[0] = no->off[1] = nc[nci].on_nib->me;
 	no->curve = false;
+    // Otherwise ut is on a spline curve clockwise from point nci
     } else {
-	// ut is on a spline curve clockwise from point nci
 	assert( UTanVecsSequent(nc[nci].utv[NC_OUT_IDX], ut,
 	                        nc[ncni].utv[NC_IN_IDX], false) );
 	// Nib splines are locally convex and therefore have t value per slope
@@ -585,397 +606,6 @@ static NibOffset *CalcNibOffset(StrokeContext *c, BasePoint ut, int reverse,
                                 NibOffset *no, int nci_hint) {
     return _CalcNibOffset(c->nibcorners, c->n, ut, reverse, no, nci_hint);
 }
-
-/* This is a convenience function that also concisely demonstrates
- * the calculation of an offseted point
- */
-BasePoint SplineOffsetAt(StrokeContext *c, Spline *s, bigreal t, int is_right) {
-    int is_ccw;
-    BasePoint xy, ut;
-    NibOffset no;
-
-    xy = SPLINEPVAL(s, t);
-    is_ccw = SplineTurningCCWAt(s, t);
-
-    ut = SplineUTanVecAt(s, t);
-    CalcNibOffset(c, ut, is_right, &no, -1);
-
-    return BP_ADD(xy, no.off[is_ccw]);
-}
-
-/* Copies the portion of s from t_start to t_end and then translates
- * and appends it to t_start. The new end point is returned. "Reversing"
- * t_start and t_end reverses the copy's direction.
- *
- * Calculations cribbed from https://stackoverflow.com/a/879213
- */
-SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_start, bigreal t_end,
-                                 SplinePoint *start) {
-    extended u_start = 1-t_start, u_end = 1-t_end;
-    SplinePoint *end;
-    BasePoint v, qf, qcf, qct, qt;
-
-    // XXX Maybe this should be length based
-    if ( RealWithin(t_start, t_end, 1e-4) )
-	return start;
-
-    // Intermediate calculations
-    qf.x =    s->from->me.x*u_start*u_start
-            + s->from->nextcp.x*2*t_start*u_start
-            + s->to->prevcp.x*t_start*t_start;
-    qcf.x =   s->from->me.x*u_end*u_end
-            + s->from->nextcp.x*2*t_end*u_end
-            + s->to->prevcp.x*t_end*t_end;
-    qct.x =   s->from->nextcp.x*u_start*u_start
-            + s->to->prevcp.x*2*t_start*u_start
-            + s->to->me.x*t_start*t_start;
-    qt.x =    s->from->nextcp.x*u_end*u_end
-            + s->to->prevcp.x*2*t_end*u_end
-            + s->to->me.x*t_end*t_end;
-
-    qf.y =    s->from->me.y*u_start*u_start
-	    + s->from->nextcp.y*2*t_start*u_start
-            + s->to->prevcp.y*t_start*t_start;
-    qcf.y =   s->from->me.y*u_end*u_end
-            + s->from->nextcp.y*2*t_end*u_end
-            + s->to->prevcp.y*t_end*t_end;
-    qct.y =   s->from->nextcp.y*u_start*u_start
-            + s->to->prevcp.y*2*t_start*u_start
-            + s->to->me.y*t_start*t_start;
-    qt.y =    s->from->nextcp.y*u_end*u_end
-            + s->to->prevcp.y*2*t_end*u_end
-            + s->to->me.y*t_end*t_end;
-
-    // Difference vector to offset other points
-    v.x = start->me.x - (qf.x*u_start + qct.x*t_start);
-    v.y = start->me.y - (qf.y*u_start + qct.y*t_start);
-
-    end = SplinePointCreate(qcf.x*u_end + qt.x*t_end + v.x,
-                            qcf.y*u_end + qt.y*t_end + v.y);
-
-    start->nonextcp = false; end->noprevcp = false;
-    start->nextcp.x = qf.x*u_end + qct.x*t_end + v.x;
-    start->nextcp.y = qf.y*u_end + qct.y*t_end + v.y;
-    end->prevcp.x = qcf.x*u_start + qt.x*t_start + v.x;
-    end->prevcp.y = qcf.y*u_start + qt.y*t_start + v.y;
-
-    SplineMake3(start,end);
-
-    if ( SplineIsLinear(start->next)) { // Linearish instead?
-        start->nextcp = start->me;
-        end->prevcp = end->me;
-        start->nonextcp = end->noprevcp = true;
-        SplineRefigure(start->next);
-    } 
-    return end;
-}
-
-/* Copies the splines between s_start (at t_start) and s_end (at t_end)
- * after point dst_start. "backward" (and therefore forward) is relative
- * to next/prev rather than clockwise/counter-clockwise.
- */
-SplinePoint *AppendCubicSplineSetPortion(Spline *s_start, bigreal t_start,
-                                         Spline *s_end, bigreal t_end,
-					 SplinePoint *dst_start, int backward) {
-    Spline *s;
-
-    if ( backward && RealWithin(t_start, 0.0, 1e-4) ) {
-	t_start = 1;
-	s_start = s_start->from->prev;
-    } else if ( !backward && RealWithin(t_start, 1.0, 1e-4) ) {
-	t_start = 0;
-	s_start = s_start->to->next;
-    }
-    if ( backward && RealWithin(t_end, 1.0, 1e-4) ) {
-	t_end = 0.0;
-	s_end = s_end->to->next;
-    } else if ( !backward && RealWithin(t_end, 0.0, 1e-4) ) {
-	t_end = 1.0;
-	s_end = s_end->from->prev;
-    }
-    s = s_start;
-
-    // Handle the single spline case
-    if (    s==s_end
-         && (( t_start<t_end && !backward ) || (t_start>t_end && backward))) {
-	dst_start = AppendCubicSplinePortion(s, t_start, t_end, dst_start);
-	return dst_start;
-    }
-
-    dst_start = AppendCubicSplinePortion(s, t_start, backward ? 0 : 1,
-                                         dst_start);
-
-    while ( 1 ) {
-        s = backward ? s->from->prev : s->to->next;
-	if ( s==s_end )
-	    break;
-	assert( s!=NULL && s!=s_start ); // XXX turn into runtime warning?
-        dst_start = AppendCubicSplinePortion(s, backward ? 1 : 0,
-	                                     backward ? 0 : 1, dst_start);
-    }
-    dst_start = AppendCubicSplinePortion(s, backward ? 1 : 0, t_end, dst_start);
-    return dst_start;
-}
-
-static SplinePoint *AddNibPortion(NibCorner *nc, SplinePoint *start_p,
-                                  NibOffset *nos, int is_ccw_s, NibOffset *noe,
-			          int is_ccw_e, int bk) {
-    SplinePoint *sp, *start_np, *end_np;
-
-    start_np = nc[nos->nci[is_ccw_s]].on_nib;
-    end_np = nc[noe->nci[is_ccw_e]].on_nib;
-    sp = AppendCubicSplineSetPortion(start_np->next, nos->nt, end_np->next,
-                                     noe->nt, start_p, bk);
-    return sp;
-}
-
-static void SSAppendSemiCircle(SplineSet *cur, bigreal radius, BasePoint ut,
-                               int bk) {
-    SplineSet *circ;
-    real trans[6];
-    BasePoint cxy = cur->last->me;
-    SplinePoint *sp;
-    NibOffset nos, noe;
-    NibCorner *nc = NULL;
-    int n, mn=4;
-
-    circ = UnitShape(0);
-    memset(&trans, 0, sizeof(trans));
-    trans[0] = trans[3] = radius;
-    SplinePointListTransformExtended(circ, trans, tpt_AllPoints,
-	                             tpmask_dontTrimValues);
-    BuildNibCorners(&nc, circ, &mn, &n);
-    assert( n==4 && nc!=NULL );
-
-    _CalcNibOffset(nc, n, ut, false, &nos, -1);
-    _CalcNibOffset(nc, n, ut, true, &noe, -1);
-    sp = AddNibPortion(nc, cur->last, &nos, false, &noe, false, bk);
-    cur->last = sp;
-    SplinePointListFree(circ);
-    free(nc);
-}
-
-static BasePoint SplineStrokeVerifyCorner(BasePoint sxy, BasePoint txy, 
-                                          NibOffset *noe, int is_ccw,
-				          BasePoint *dxyp, bigreal *mgp) {
-    BasePoint oxy;
-
-    oxy = BP_ADD(sxy, noe->off[is_ccw]);
-    *dxyp = BP_ADD(oxy, BP_REV(txy));
-    *mgp = fmax(fabs(dxyp->x), fabs(dxyp->y));
-    return oxy;
-}
-
-static int SplineStrokeFindCorner(BasePoint sxy, BasePoint txy, 
-                                  NibOffset *noe) {
-    bigreal mg, mg2;
-    BasePoint tmp;
-
-    SplineStrokeVerifyCorner(sxy, txy, noe, 0, &tmp, &mg);
-    SplineStrokeVerifyCorner(sxy, txy, noe, 1, &tmp, &mg2);
-    return mg > mg2 ? 1 : 0;
-}
-
-/* Put the new endpoint exactly where the NibOffset calculation says it
- * should be to avoid cumulative append errors.
- */
-static int SplineStrokeAppendFixup(SplinePoint *endp, BasePoint sxy,
-                                   NibOffset *noe, int is_ccw) {
-    bigreal mg, mg2;
-    BasePoint oxy, oxy2, dxy, dxy2;
-
-    if ( is_ccw==-1 ) {
-	oxy = SplineStrokeVerifyCorner(sxy, endp->me, noe, 0, &dxy, &mg);
-	oxy2 = SplineStrokeVerifyCorner(sxy, endp->me, noe, 1, &dxy2, &mg2);
-	if ( mg2<mg ) {
-	    mg = mg2;
-	    oxy = oxy2;
-	    dxy = dxy2;
-	    is_ccw = 1;
-	} else
-	    is_ccw = 0;
-    } else
-	oxy = SplineStrokeVerifyCorner(sxy, endp->me, noe, is_ccw, &dxy, &mg);
-
-    assert( mg < 1 );
-    if ( mg > FIXUP_MARGIN ) {
-	LogError(_("Warning: Coordinate diff %lf greater than margin %lf\n"),
-	         mg, FIXUP_MARGIN);
-    }
-
-    endp->nextcp = BP_ADD(endp->nextcp, dxy);
-    endp->me = oxy;
-    return is_ccw;
-}
-
-/* Note that is_ccw relates to the relevant NibOffset entries, and not
- * necessarily the direction of the curve at t.
- */
-static int OffsetOnCuspAt(StrokeContext *c, Spline *s, bigreal t,
-                          NibOffset *nop, int is_right, int is_ccw)
-{
-    bigreal cs, cn;
-    NibOffset no;
-
-    cs = SplineCurvature(s, t);
-
-    // Cusps aren't a problem when increasing the radius of the curve
-    if ( (cs>0) == !!is_right )
-	return false;
-
-    if ( nop==NULL ) {
-	nop = &no;
-	CalcNibOffset(c, SplineUTanVecAt(s, t), is_right, nop, -1);
-    }
-    cn = SplineCurvature(c->nibcorners[nop->nci[is_ccw]].on_nib->next, nop->nt);
-
-    // printf("t: %lf, SplineCurvature: %lf and %lf, right: %d, ccw: %d\n", t, cs, cn, is_right, is_ccw);
-    return RealWithin(cn, 0, 1e-6) ? false : is_right ? (cn >= cs) : (cn >= -cs);
-}
-
-static bigreal SplineFindCuspSing(StrokeContext *c, Spline *s, bigreal t_start,
-                                  bigreal t_end, int is_right, int is_ccw,
-				  bigreal margin, int on_cusp)
-{
-    bigreal t_mid;
-    int cusp_mid;
-    assert( t_start >= 0.0 && t_start <= 1.0 );
-    assert( t_end >= 0.0 && t_end <= 1.0 );
-    assert( t_start < t_end );
-    assert( OffsetOnCuspAt(c, s, t_start, NULL, is_right, is_ccw) == on_cusp );
-    assert( OffsetOnCuspAt(c, s, t_end, NULL, is_right, is_ccw) != on_cusp );
-    while ( t_end-t_start > margin ) {
-	t_mid = (t_start+t_end)/2;
-	cusp_mid = OffsetOnCuspAt(c, s, t_mid, NULL, is_right, is_ccw);
-	if ( cusp_mid==on_cusp )
-	    t_start = t_mid;
-	else
-	    t_end = t_mid;
-    }
-    return t_end;
-}
-
-typedef struct stroketraceinfo {
-    StrokeContext *c;
-    Spline *s;
-    bigreal cusp_trans;
-    int nci_hint;
-    int num_points;
-    unsigned int is_right: 1;
-    unsigned int starts_on_cusp: 1;
-    unsigned int first_pass: 1;
-    unsigned int found_trans: 1;
-} StrokeTraceInfo;
-
-int GenStrokeTracePoints(void *vinfo, bigreal t_start, bigreal t_end,
-                         FitPoint **fpp) {
-    StrokeTraceInfo *stip = (StrokeTraceInfo *)vinfo;
-    int i, nib_ccw, on_cusp;
-    NibOffset no;
-    FitPoint *fp, tmp_fp;
-    bigreal nidiff, t, csd;
-    BasePoint xy, rel_ut;
-
-    fp = calloc(stip->num_points, sizeof(FitPoint));
-    nidiff = (t_end - t_start) / (stip->num_points-1);
-
-    nib_ccw = SplineTurningCCWAt(stip->s, t_start);
-    no.nci[0] = no.nci[1] = stip->nci_hint;
-    for ( i=0, t=t_start; i<stip->num_points; ++i, t+= nidiff ) {
-	if ( i==(stip->num_points-1) ) {
-	    nib_ccw = !nib_ccw; // Stop at the closer corner
-	    t = t_end; // side-step nidiff rounding errors
-	}
-	xy = SPLINEPVAL(stip->s, t);
-	fp[i].ut = SplineUTanVecAt(stip->s, t);
-	CalcNibOffset(stip->c, fp[i].ut, stip->is_right, &no, no.nci[nib_ccw]);
-	fp[i].p = BP_ADD(xy, no.off[nib_ccw]);
-	fp[i].t = t;
-	if ( stip->first_pass ) {
-	    on_cusp = OffsetOnCuspAt(stip->c, stip->s, t, &no,
-	                             stip->is_right, nib_ccw);
-	    if ( on_cusp!=stip->starts_on_cusp ) {
-		stip->found_trans = true;
-		stip->cusp_trans = SplineFindCuspSing(stip->c, stip->s, t-nidiff,
-		                                      t, stip->is_right, 
-		                                      nib_ccw, CUSPD_MARGIN,
-						      stip->starts_on_cusp);
-		free(fp);
-		// printf("Found %s cusp transition at %lf\n", stip->starts_on_cusp ? "1 to 0" : "0 to 1", stip->cusp_trans);
-		return 0;
-	    }
-	} else {
-#ifndef NODEBUG
-	;
-#else 
-	;
-#endif // NODEBUG
-	}
-	if ( stip->starts_on_cusp )
-	    fp[i].ut = BP_REV(fp[i].ut);
-    }
-    *fpp = fp;
-    stip->first_pass = false;
-    return stip->num_points;
-}
-
-#define TRACE_CUSPS false
-SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_start,
-                               bigreal t_end, SplinePoint *start,
-			       int nci_hint, int is_right, int on_cusp) {
-    SplinePoint *sp = NULL;
-    StrokeTraceInfo sti;
-    FitPoint *fpp;
-    BasePoint xy;
-
-    sti.c = c;
-    sti.s = s;
-    sti.nci_hint = nci_hint;
-    sti.num_points = 10;
-    sti.is_right = is_right;
-    sti.first_pass = true;
-    sti.starts_on_cusp = on_cusp;
-    sti.found_trans = false;
-
-    if ( on_cusp && !TRACE_CUSPS )
-	GenStrokeTracePoints((void *)&sti, t_start, t_end, &fpp);
-    else 
-	sp = ApproximateSplineSetFromGen(start, NULL, t_start, t_end, 
-	                                 c->acctarget, false,
-	                                 &GenStrokeTracePoints, (void *) &sti,
-	                                 false);
-    if ( !sti.found_trans ) {
-	if ( sp==NULL ) {
-	    assert( on_cusp && !TRACE_CUSPS );
-	    xy = SplineOffsetAt(c, s, t_end, is_right);
-	    sp = SplinePointCreate(xy.x, xy.y);
-	    SplineMake3(start, sp);
-	}
-   	return sp;
-    }
-
-    assert ( sti.found_trans && sp==NULL );
-    assert ( sti.cusp_trans >= t_start && sti.cusp_trans <= t_end );
-    if ( on_cusp && !TRACE_CUSPS ) {
-	xy = SplineOffsetAt(c, s, sti.cusp_trans, is_right);
-	sp = SplinePointCreate(xy.x, xy.y);
-	SplineMake3(start, sp);
-    } else {
-	sti.first_pass = false;
-	sp = ApproximateSplineSetFromGen(start, NULL, t_start, sti.cusp_trans, 
-	                                 c->acctarget, false,
-	                                 &GenStrokeTracePoints, (void *) &sti,
-	                                 false);
-    }
-    assert( sp!=NULL );
-    sp->pointtype = pt_corner;
-    on_cusp = !on_cusp;
-    if ( RealWithin(sti.cusp_trans, t_end, CUSPD_MARGIN) )
-	return sp;
-    return TraceAndFitSpline(c, s, sti.cusp_trans, t_end, sp, nci_hint,
-                             is_right, on_cusp);
-}
-#undef TRACE_CUSPS
 
 static BasePoint SplineStrokeNextAngle(StrokeContext *c, BasePoint ut,
                                        int is_ccw, int *curved, int reverse,
@@ -1065,6 +695,414 @@ static BasePoint SplineStrokeNextAngle(StrokeContext *c, BasePoint ut,
     return BP_REV_IF(reverse, c->nibcorners[nci].utv[inout]);
 }
 
+/******************************************************************************/
+/* *************************** Spline Manipulation ************************** */
+/******************************************************************************/
+
+/* This is a convenience function that also concisely demonstrates
+ * the calculation of an offseted point.
+ */
+BasePoint SplineOffsetAt(StrokeContext *c, Spline *s, bigreal t, int is_right) {
+    int is_ccw;
+    BasePoint xy, ut;
+    NibOffset no;
+
+    // The coordinate of the spline at t
+    xy = SPLINEPVAL(s, t);
+    // The turning direction of the spline at t
+    is_ccw = SplineTurningCCWAt(s, t);
+    // The tangent angle of the spline at t
+    ut = SplineUTanVecAt(s, t);
+
+    // The offsets of the nib tracing at that angle (where is_right 
+    // reverses the angle and therefore the side of the nib)
+    CalcNibOffset(c, ut, is_right, &no, -1);
+
+    // (The spline coordinate at t) + (the offset). If the angle is on a
+    // nib line, use the turning direction to pick the corner that will be
+    // continuous with the next points to be drawn based on the turning
+    // direction (and therefore the next angle).
+    return BP_ADD(xy, no.off[is_ccw]);
+}
+
+/* Copies the portion of s from t_fm to t_to and then translates
+ * and appends it to tailp. The new end point is returned. "Reversing"
+ * t_fm and t_to reverses the copy's direction.
+ *
+ * Direct calculations cribbed from https://stackoverflow.com/a/879213
+ */
+SplinePoint *AppendCubicSplinePortion(Spline *s, bigreal t_fm, bigreal t_to,
+                                      SplinePoint *tailp) {
+    extended u_fm = 1-t_fm, u_to = 1-t_to;
+    SplinePoint *sp;
+    BasePoint v, qf, qcf, qct, qt;
+
+    // XXX maybe this should be length based
+    if ( RealWithin(t_fm, t_to, 1e-4) )
+	return tailp;
+
+    // Intermediate calculations
+    qf.x =    s->from->me.x*u_fm*u_fm
+            + s->from->nextcp.x*2*t_fm*u_fm
+            + s->to->prevcp.x*t_fm*t_fm;
+    qcf.x =   s->from->me.x*u_to*u_to
+            + s->from->nextcp.x*2*t_to*u_to
+            + s->to->prevcp.x*t_to*t_to;
+    qct.x =   s->from->nextcp.x*u_fm*u_fm
+            + s->to->prevcp.x*2*t_fm*u_fm
+            + s->to->me.x*t_fm*t_fm;
+    qt.x =    s->from->nextcp.x*u_to*u_to
+            + s->to->prevcp.x*2*t_to*u_to
+            + s->to->me.x*t_to*t_to;
+
+    qf.y =    s->from->me.y*u_fm*u_fm
+	    + s->from->nextcp.y*2*t_fm*u_fm
+            + s->to->prevcp.y*t_fm*t_fm;
+    qcf.y =   s->from->me.y*u_to*u_to
+            + s->from->nextcp.y*2*t_to*u_to
+            + s->to->prevcp.y*t_to*t_to;
+    qct.y =   s->from->nextcp.y*u_fm*u_fm
+            + s->to->prevcp.y*2*t_fm*u_fm
+            + s->to->me.y*t_fm*t_fm;
+    qt.y =    s->from->nextcp.y*u_to*u_to
+            + s->to->prevcp.y*2*t_to*u_to
+            + s->to->me.y*t_to*t_to;
+
+    // Difference vector to offset other points
+    v.x = tailp->me.x - (qf.x*u_fm + qct.x*t_fm);
+    v.y = tailp->me.y - (qf.y*u_fm + qct.y*t_fm);
+
+    sp = SplinePointCreate(qcf.x*u_to + qt.x*t_to + v.x,
+                            qcf.y*u_to + qt.y*t_to + v.y);
+
+    tailp->nonextcp = false; sp->noprevcp = false;
+    tailp->nextcp.x = qf.x*u_to + qct.x*t_to + v.x;
+    tailp->nextcp.y = qf.y*u_to + qct.y*t_to + v.y;
+    sp->prevcp.x = qcf.x*u_fm + qt.x*t_fm + v.x;
+    sp->prevcp.y = qcf.y*u_fm + qt.y*t_fm + v.y;
+
+    SplineMake3(tailp,sp);
+
+    if ( SplineIsLinear(tailp->next)) { // Linearish instead?
+        tailp->nextcp = tailp->me;
+        sp->prevcp = sp->me;
+        tailp->nonextcp = sp->noprevcp = true;
+        SplineRefigure(tailp->next);
+    } 
+    return sp;
+}
+
+/* Copies the splines between spline_fm (at t_fm) and spline_to (at t_to)
+ * after point tailp. "backward" (and therefore forward) is relative
+ * to next/prev rather than clockwise/counter-clockwise.
+ */
+SplinePoint *AppendCubicSplineSetPortion(Spline *spline_fm, bigreal t_fm,
+                                         Spline *spline_to, bigreal t_to,
+					 SplinePoint *tailp, int backward) {
+    Spline *s;
+
+    if ( backward && RealWithin(t_fm, 0.0, 1e-4) ) {
+	t_fm = 1;
+	spline_fm = spline_fm->from->prev;
+    } else if ( !backward && RealWithin(t_fm, 1.0, 1e-4) ) {
+	t_fm = 0;
+	spline_fm = spline_fm->to->next;
+    }
+    if ( backward && RealWithin(t_to, 1.0, 1e-4) ) {
+	t_to = 0.0;
+	spline_to = spline_to->to->next;
+    } else if ( !backward && RealWithin(t_to, 0.0, 1e-4) ) {
+	t_to = 1.0;
+	spline_to = spline_to->from->prev;
+    }
+    s = spline_fm;
+
+    // Handle the single spline case
+    if (    s==spline_to
+         && (( t_fm<t_to && !backward ) || (t_fm>t_to && backward))) {
+	tailp = AppendCubicSplinePortion(s, t_fm, t_to, tailp);
+	return tailp;
+    }
+
+    tailp = AppendCubicSplinePortion(s, t_fm, backward ? 0 : 1, tailp);
+
+    while ( 1 ) {
+        s = backward ? s->from->prev : s->to->next;
+	if ( s==spline_to )
+	    break;
+	assert( s!=NULL && s!=spline_fm ); // XXX turn into runtime warning?
+        tailp = AppendCubicSplinePortion(s, backward ? 1 : 0,
+	                                  backward ? 0 : 1, tailp);
+    }
+    tailp = AppendCubicSplinePortion(s, backward ? 1 : 0, t_to, tailp);
+    return tailp;
+}
+
+/******************************************************************************/
+/* *********************** Tracing, Caps and Joins ************************** */
+/******************************************************************************/
+
+static SplinePoint *AddNibPortion(NibCorner *nc, SplinePoint *tailp,
+                                  NibOffset *no_fm, int is_ccw_fm,
+				  NibOffset *no_to, int is_ccw_to, int bk) {
+    SplinePoint *sp, *nibp_fm, *nibp_to;
+
+    nibp_fm = nc[no_fm->nci[is_ccw_fm]].on_nib;
+    nibp_to = nc[no_to->nci[is_ccw_to]].on_nib;
+    sp = AppendCubicSplineSetPortion(nibp_fm->next, no_fm->nt, nibp_to->next,
+                                     no_to->nt, tailp, bk);
+    return sp;
+}
+
+static void SSAppendSemiCircle(SplineSet *cur, bigreal radius, BasePoint ut,
+                               int bk) {
+    SplineSet *circ;
+    real trans[6];
+    BasePoint cxy = cur->last->me;
+    SplinePoint *sp;
+    NibOffset no_fm, no_to;
+    NibCorner *nc = NULL;
+    int n, mn=4;
+
+    circ = UnitShape(0);
+    memset(&trans, 0, sizeof(trans));
+    trans[0] = trans[3] = radius;
+    SplinePointListTransformExtended(circ, trans, tpt_AllPoints,
+	                             tpmask_dontTrimValues);
+    BuildNibCorners(&nc, circ, &mn, &n);
+    assert( n==4 && nc!=NULL );
+
+    _CalcNibOffset(nc, n, ut, false, &no_fm, -1);
+    _CalcNibOffset(nc, n, ut, true, &no_to, -1);
+    sp = AddNibPortion(nc, cur->last, &no_fm, false, &no_to, false, bk);
+    cur->last = sp;
+    SplinePointListFree(circ);
+    free(nc);
+}
+
+static BasePoint SplineStrokeVerifyCorner(BasePoint sxy, BasePoint txy, 
+                                          NibOffset *no, int is_ccw,
+				          BasePoint *dxyp, bigreal *mgp) {
+    BasePoint oxy;
+
+    oxy = BP_ADD(sxy, no->off[is_ccw]);
+    *dxyp = BP_ADD(oxy, BP_REV(txy));
+    *mgp = fmax(fabs(dxyp->x), fabs(dxyp->y));
+    return oxy;
+}
+
+static int SplineStrokeFindCorner(BasePoint sxy, BasePoint txy, NibOffset *no) {
+    bigreal mg, mg2;
+    BasePoint tmp;
+
+    SplineStrokeVerifyCorner(sxy, txy, no, 0, &tmp, &mg);
+    SplineStrokeVerifyCorner(sxy, txy, no, 1, &tmp, &mg2);
+    return mg > mg2 ? 1 : 0;
+}
+
+/* Put the new endpoint exactly where the NibOffset calculation says it
+ * should be to avoid cumulative append errors.
+ */
+static int SplineStrokeAppendFixup(SplinePoint *tailp, BasePoint sxy,
+                                   NibOffset *no, int is_ccw) {
+    bigreal mg, mg2;
+    BasePoint oxy, oxy2, dxy, dxy2;
+
+    if ( is_ccw==-1 ) {
+	oxy  = SplineStrokeVerifyCorner(sxy, tailp->me, no, 0, &dxy, &mg);
+	oxy2 = SplineStrokeVerifyCorner(sxy, tailp->me, no, 1, &dxy2, &mg2);
+	if ( mg2<mg ) {
+	    mg = mg2;
+	    oxy = oxy2;
+	    dxy = dxy2;
+	    is_ccw = 1;
+	} else
+	    is_ccw = 0;
+    } else
+	oxy = SplineStrokeVerifyCorner(sxy, tailp->me, no, is_ccw, &dxy, &mg);
+
+    assert( mg < 1 );
+    if ( mg > FIXUP_MARGIN ) {
+	LogError(_("Warning: Coordinate diff %lf greater than margin %lf\n"),
+	         mg, FIXUP_MARGIN);
+    }
+
+    tailp->nextcp = BP_ADD(tailp->nextcp, dxy);
+    tailp->me = oxy;
+    return is_ccw;
+}
+
+/* Note that is_ccw relates to the relevant NibOffset entries, and not
+ * necessarily the direction of the curve at t.
+ */
+static int OffsetOnCuspAt(StrokeContext *c, Spline *s, bigreal t,
+                          NibOffset *nop, int is_right, int is_ccw)
+{
+    bigreal cs, cn;
+    NibOffset no;
+
+    cs = SplineCurvature(s, t);
+
+    // Cusps aren't a problem when increasing the radius of the curve
+    if ( (cs>0)==is_right )
+	return false;
+
+    if ( nop==NULL ) {
+	nop = &no;
+	CalcNibOffset(c, SplineUTanVecAt(s, t), is_right, nop, -1);
+    }
+    cn = SplineCurvature(c->nibcorners[nop->nci[is_ccw]].on_nib->next, nop->nt);
+
+    return RealWithin(cn, 0, 1e-6) ? false : is_right ? (cn >= cs) : (cn >= -cs);
+}
+
+/* I didn't find or derive a closed form of this calculation, so this just
+ * does a binary search within the range, which is assumed (here) to contain
+ * a single transition.
+ */
+static bigreal SplineFindCuspSing(StrokeContext *c, Spline *s, bigreal t_fm,
+                                  bigreal t_to, int is_right, int is_ccw,
+				  bigreal margin, int on_cusp)
+{
+    bigreal t_mid;
+    int cusp_mid;
+    assert( t_fm >= 0.0 && t_fm <= 1.0 );
+    assert( t_to >= 0.0 && t_to <= 1.0 );
+    assert( t_fm < t_to );
+    assert( OffsetOnCuspAt(c, s, t_fm, NULL, is_right, is_ccw) == on_cusp );
+    assert( OffsetOnCuspAt(c, s, t_to, NULL, is_right, is_ccw) != on_cusp );
+    while ( t_fm-t_to > margin ) {
+	t_mid = (t_fm+t_to)/2;
+	cusp_mid = OffsetOnCuspAt(c, s, t_mid, NULL, is_right, is_ccw);
+	if ( cusp_mid==on_cusp )
+	    t_fm = t_mid;
+	else
+	    t_to = t_mid;
+    }
+    return t_to;
+}
+
+typedef struct stroketraceinfo {
+    StrokeContext *c;
+    Spline *s;
+    bigreal cusp_trans;
+    int nci_hint;
+    int num_points;
+    unsigned int is_right: 1;
+    unsigned int starts_on_cusp: 1;
+    unsigned int first_pass: 1;
+    unsigned int found_trans: 1;
+} StrokeTraceInfo;
+
+int GenStrokeTracePoints(void *vinfo, bigreal t_fm, bigreal t_to,
+                         FitPoint **fpp) {
+    StrokeTraceInfo *stip = (StrokeTraceInfo *)vinfo;
+    int i, nib_ccw, on_cusp;
+    NibOffset no;
+    FitPoint *fp, tmp_fp;
+    bigreal nidiff, t, csd;
+    BasePoint xy, rel_ut;
+
+    fp = calloc(stip->num_points, sizeof(FitPoint));
+    nidiff = (t_to - t_fm) / (stip->num_points-1);
+
+    nib_ccw = SplineTurningCCWAt(stip->s, t_fm);
+    no.nci[0] = no.nci[1] = stip->nci_hint;
+    for ( i=0, t=t_fm; i<stip->num_points; ++i, t+=nidiff ) {
+	if ( i==(stip->num_points-1) ) {
+	    nib_ccw = !nib_ccw; // Stop at the closer corner
+	    t = t_to; // side-step nidiff rounding errors
+	}
+	xy = SPLINEPVAL(stip->s, t);
+	fp[i].ut = SplineUTanVecAt(stip->s, t);
+	CalcNibOffset(stip->c, fp[i].ut, stip->is_right, &no, no.nci[nib_ccw]);
+	fp[i].p = BP_ADD(xy, no.off[nib_ccw]);
+	fp[i].t = t;
+	if ( stip->first_pass ) {
+	    on_cusp = OffsetOnCuspAt(stip->c, stip->s, t, &no,
+	                             stip->is_right, nib_ccw);
+	    if ( on_cusp!=stip->starts_on_cusp ) {
+		stip->found_trans = true;
+		stip->cusp_trans = SplineFindCuspSing(stip->c, stip->s,
+		                                      t-nidiff, t,
+		                                      stip->is_right, 
+		                                      nib_ccw, CUSPD_MARGIN,
+						      stip->starts_on_cusp);
+		free(fp);
+		return 0;
+	    }
+	} else {
+#ifndef NODEBUG
+	; // Could add consistency asserts for shorter passes here
+#else 
+	;
+#endif // NODEBUG
+	}
+	if ( stip->starts_on_cusp ) // Cusp tangent point the other way
+	    fp[i].ut = BP_REV(fp[i].ut);
+    }
+    *fpp = fp;
+    stip->first_pass = false;
+    return stip->num_points;
+}
+
+#define TRACE_CUSPS false
+SplinePoint *TraceAndFitSpline(StrokeContext *c, Spline *s, bigreal t_fm,
+                               bigreal t_to, SplinePoint *tailp,
+			       int nci_hint, int is_right, int on_cusp) {
+    SplinePoint *sp = NULL;
+    StrokeTraceInfo sti;
+    FitPoint *fpp;
+    BasePoint xy;
+
+    sti.c = c;
+    sti.s = s;
+    sti.nci_hint = nci_hint;
+    sti.num_points = 10;
+    sti.is_right = is_right;
+    sti.first_pass = true;
+    sti.starts_on_cusp = on_cusp;
+    sti.found_trans = false;
+
+    if ( on_cusp && !TRACE_CUSPS )
+	GenStrokeTracePoints((void *)&sti, t_fm, t_to, &fpp);
+    else 
+	sp = ApproximateSplineSetFromGen(tailp, NULL, t_fm, t_to, c->acctarget,
+	                                 false, &GenStrokeTracePoints,
+	                                 (void *) &sti, false);
+    if ( !sti.found_trans ) {
+	if ( sp==NULL ) {
+	    assert( on_cusp && !TRACE_CUSPS );
+	    xy = SplineOffsetAt(c, s, t_to, is_right);
+	    sp = SplinePointCreate(xy.x, xy.y);
+	    SplineMake3(tailp, sp);
+	}
+   	return sp;
+    }
+
+    assert ( sti.found_trans && sp==NULL );
+    assert ( sti.cusp_trans >= t_fm && sti.cusp_trans <= t_to );
+    if ( on_cusp && !TRACE_CUSPS ) {
+	xy = SplineOffsetAt(c, s, sti.cusp_trans, is_right);
+	sp = SplinePointCreate(xy.x, xy.y);
+	SplineMake3(tailp, sp);
+    } else {
+	sti.first_pass = false;
+	sp = ApproximateSplineSetFromGen(tailp, NULL, t_fm, sti.cusp_trans, 
+	                                 c->acctarget, false,
+	                                 &GenStrokeTracePoints, (void *) &sti,
+	                                 false);
+    }
+    assert( sp!=NULL );
+    sp->pointtype = pt_corner;
+    on_cusp = !on_cusp;
+    if ( RealWithin(sti.cusp_trans, t_to, CUSPD_MARGIN) )
+	return sp;
+    return TraceAndFitSpline(c, s, sti.cusp_trans, t_to, sp, nci_hint,
+                             is_right, on_cusp);
+}
+#undef TRACE_CUSPS
+
 static bigreal SplineStrokeNextT(StrokeContext *c, Spline *s, bigreal cur_t,
 		                 int is_ccw, BasePoint *cur_ut,
 				 int *curved, int reverse, int nci_hint) {
@@ -1151,7 +1189,6 @@ static bigreal FalseStrokeWidth(StrokeContext *c, BasePoint ut) {
 	                             tpmask_dontTrimValues);
     SplineSetFindBounds(tss,&b);
     SplinePointListFree(tss);
-    // printf("maxy: %lf, miny: %lf\n", b.maxy, b.miny);
     return b.maxy - b.miny;
 }
 
@@ -1228,6 +1265,10 @@ static void CalcDualBasis(BasePoint v1, BasePoint v2, BasePoint *q1,
 }
 */
 
+/* (When necessary) extends the splines drawn by an arbitrary nib at angle
+ * ut (so either a cap or a 180 degree join) so have a butt geometry (for
+ * a butt/square end or to add a semi-circle on to).
+ */
 static void CalcExtend(BasePoint refp, BasePoint ut, BasePoint op1,
                        BasePoint op2, bigreal min,
                        BasePoint *np1, BasePoint *np2) {
@@ -1257,9 +1298,9 @@ static void CalcExtend(BasePoint refp, BasePoint ut, BasePoint op1,
 typedef struct joinparams {
     StrokeContext *c;
     SplineSet *cur;
-    BasePoint sxy, oxy, ut_endlast;
-    NibOffset  *noi;
-    int is_ccw, was_ccw, is_right, bend_is_ccw;
+    BasePoint sxy, oxy, ut_fm;
+    NibOffset  *no_to;
+    int ccw_fm, ccw_to, is_right, bend_is_ccw;
 } JoinParams;
 
 static void BevelJoin(JoinParams *jpp) {
@@ -1267,15 +1308,15 @@ static void BevelJoin(JoinParams *jpp) {
 }
 
 static void NibJoin(JoinParams *jpp) {
-    NibOffset now;
+    NibOffset no_fm;
     SplinePoint *sp;
-    int was_ccw;
+    int ccw_fm;
 
-    CalcNibOffset(jpp->c, jpp->ut_endlast, jpp->is_right, &now, -1);
-    was_ccw = SplineStrokeAppendFixup(jpp->cur->last, jpp->sxy, &now, -1);
-    sp = AddNibPortion(jpp->c->nibcorners, jpp->cur->last, &now, was_ccw,
-                       jpp->noi, jpp->is_ccw, !jpp->bend_is_ccw);
-    SplineStrokeAppendFixup(sp, jpp->sxy, jpp->noi, jpp->is_ccw);
+    CalcNibOffset(jpp->c, jpp->ut_fm, jpp->is_right, &no_fm, -1);
+    ccw_fm = SplineStrokeAppendFixup(jpp->cur->last, jpp->sxy, &no_fm, -1);
+    sp = AddNibPortion(jpp->c->nibcorners, jpp->cur->last, &no_fm, ccw_fm,
+                       jpp->no_to, jpp->ccw_to, !jpp->bend_is_ccw);
+    SplineStrokeAppendFixup(sp, jpp->sxy, jpp->no_to, jpp->ccw_to);
     jpp->cur->last = sp;
 }
 
@@ -1284,12 +1325,12 @@ static void DoubleBackJoin(JoinParams *jpp) {
     bigreal fsw, jlim, d1 = 0, d2 = 0;
 
     assert( jpp->c->join==lj_miterclip || jpp->c->join==lj_arcs );
-    assert( RealWithin( BP_DOT(jpp->ut_endlast, jpp->noi->utanvec),
+    assert( RealWithin( BP_DOT(jpp->ut_fm, jpp->no_to->utanvec),
                         -1, COS_MARGIN) );
     refp = BP_ADD(jpp->sxy, jpp->c->pseudo_origin);
-    fsw = FalseStrokeWidth(jpp->c, jpp->ut_endlast);
+    fsw = FalseStrokeWidth(jpp->c, jpp->ut_fm);
     jlim = CalcJoinLimit(jpp->c, fsw);
-    CalcExtend(refp, jpp->ut_endlast, jpp->cur->last->me, jpp->oxy, jlim/2,
+    CalcExtend(refp, jpp->ut_fm, jpp->cur->last->me, jpp->oxy, jlim/2,
                &p1, &p2);
     SplineSetLineTo(jpp->cur, p1);
     SplineSetLineTo(jpp->cur, p2);
@@ -1304,8 +1345,8 @@ static void RoundJoin(JoinParams *jpp) {
     c = BP_AVG(jpp->cur->last->me, jpp->oxy);
     cut = NormVec(BP_ADD(BP_REV(jpp->cur->last->me), jpp->oxy));
     alpha = BP_DIST(jpp->cur->last->me, jpp->oxy)/2;
-    ut1 = BP_ROT(BP_REV(jpp->ut_endlast), UT_NEG(cut));
-    ut2 = BP_ROT(jpp->noi->utanvec, UT_NEG(cut));
+    ut1 = BP_ROT(BP_REV(jpp->ut_fm), UT_NEG(cut));
+    ut2 = BP_ROT(jpp->no_to->utanvec, UT_NEG(cut));
     BasePoint pp1 = BP_ROT(jpp->cur->last->me, UT_NEG(cut)), pp2 = BP_ROT(jpp->oxy, UT_NEG(cut));
     // printf("p1: %lf,%lf p2: %lf,%lf pp1: %lf,%lf: pp2: %lf,%lf, c: %lf,%lf cut: %lf, alpha: %lf\n", jpp->cur->last->me.x, jpp->cur->last->me.y, jpp->oxy.x, jpp->oxy.y, pp1.x, pp1.y, pp2.x, pp2.y, c.x, c.y, atan2(cut.y, cut.x) * 180 / PI, alpha);
     mu = -ut1.x/ut1.y;
@@ -1330,14 +1371,14 @@ static void MiterJoin(JoinParams *jpp) {
     SplineSet *cur = jpp->cur;
     bigreal fsw, jlen, jlim;
 
-    cow = BP_ADD(cur->last->me, jpp->ut_endlast);
-    coi = BP_ADD(jpp->oxy, jpp->noi->utanvec);
+    cow = BP_ADD(cur->last->me, jpp->ut_fm);
+    coi = BP_ADD(jpp->oxy, jpp->no_to->utanvec);
     intersects = IntersectLines(&ixy, &cur->last->me, &cow, &coi, &jpp->oxy);
     assert(intersects); // Shouldn't be called with parallel tangents
-    fsw = FalseStrokeWidth(jpp->c, NormVec(BP_ADD(jpp->ut_endlast,
-                                                  jpp->noi->utanvec)));
+    fsw = FalseStrokeWidth(jpp->c, NormVec(BP_ADD(jpp->ut_fm,
+                                                  jpp->no_to->utanvec)));
     jlim = CalcJoinLimit(jpp->c, fsw);
-    jlen = CalcJoinLength(fsw, jpp->ut_endlast, jpp->noi->utanvec);
+    jlen = CalcJoinLength(fsw, jpp->ut_fm, jpp->no_to->utanvec);
 
     if ( jlen<=jlim ) {
 	// Normal miter join
@@ -1380,7 +1421,7 @@ static int _HandleJoin(JoinParams *jpp) {
     BasePoint oxy = jpp->oxy;
     StrokeContext *c = jpp->c;
     int is_flat = false;
-    bigreal costheta = BP_DOT(jpp->ut_endlast, jpp->noi->utanvec);
+    bigreal costheta = BP_DOT(jpp->ut_fm, jpp->no_to->utanvec);
 
     if ( cur->first==NULL ) {
 	// Create initial spline point
@@ -1388,7 +1429,7 @@ static int _HandleJoin(JoinParams *jpp) {
 	cur->last = cur->first;
     } else if ( BPWITHIN(cur->last->me, oxy, INTERSPLINE_MARGIN) ) {
 	// Close enough to just move the point
-	SplineStrokeAppendFixup(cur->last, jpp->sxy, jpp->noi, jpp->is_ccw);
+	SplineStrokeAppendFixup(cur->last, jpp->sxy, jpp->no_to, jpp->ccw_to);
 	is_flat = true;
     } else if ( RealWithin(costheta, 1, COS_MARGIN) ) {
 	SplineSetLineTo(cur, oxy);
@@ -1420,24 +1461,23 @@ static int _HandleJoin(JoinParams *jpp) {
 }
 
 static int HandleJoin(StrokeContext *c, SplineSet *cur,
-                      BasePoint sxy, NibOffset *noi, int is_ccw,
-                      BasePoint ut_endlast, int was_ccw,
-                      int is_right) {
-    JoinParams jp = { c, cur, sxy, BP_UNINIT, ut_endlast, noi,
-                      is_ccw, was_ccw, is_right, false };
-    jp.oxy = BP_ADD(sxy, noi->off[is_ccw]);
-    jp.bend_is_ccw = !JointBendsCW(ut_endlast, noi->utanvec);
+                      BasePoint sxy, NibOffset *no_to, int ccw_to,
+                      BasePoint ut_fm, int ccw_fm, int is_right) {
+    JoinParams jp = { c, cur, sxy, BP_UNINIT, ut_fm, no_to,
+                      ccw_fm, ccw_to, is_right, false };
+    jp.oxy = BP_ADD(sxy, no_to->off[ccw_to]);
+    jp.bend_is_ccw = !JointBendsCW(ut_fm, no_to->utanvec);
     return _HandleJoin(&jp);
 }
 
    
 static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
                       BasePoint ut, BasePoint oxy, int is_right) {
-    NibOffset nof, not;
+    NibOffset no_fm, no_to;
     BasePoint refp = BP_ADD(sxy, c->pseudo_origin), p1, p2;
     SplinePoint *sp;
     bigreal fsw, cel;
-    int was_corner, is_corner;
+    int corner_fm, corner_to;
 
     if ( c->cap==lc_bevel ) {
 	SplineSetLineTo(cur, oxy);
@@ -1465,19 +1505,21 @@ static void HandleCap(StrokeContext *c, SplineSet *cur, BasePoint sxy,
 	if ( c->cap!=lc_nib && c->cap!=lc_inherited )
 	    LogError( _("Warning: Unrecognized or unsupported cap type, defaulting to 'nib'.\n") );
 
-	CalcNibOffset(c, ut, false, &nof, -1);
-	was_corner = SplineStrokeFindCorner(sxy, cur->last->me, &nof);
-	CalcNibOffset(c, ut, true, &not, -1);
-	is_corner = SplineStrokeFindCorner(sxy, oxy, &not);
-	sp = AddNibPortion(c->nibcorners, cur->last, &nof, was_corner, &not,
-	                   is_corner, !is_right);
-	SplineStrokeAppendFixup(sp, sxy, &not, is_corner);
+	CalcNibOffset(c, ut, false, &no_fm, -1);
+	corner_fm = SplineStrokeFindCorner(sxy, cur->last->me, &no_fm);
+	CalcNibOffset(c, ut, true, &no_to, -1);
+	corner_to = SplineStrokeFindCorner(sxy, oxy, &no_to);
+	sp = AddNibPortion(c->nibcorners, cur->last, &no_fm, corner_fm, &no_to,
+	                   corner_to, !is_right);
+	SplineStrokeAppendFixup(sp, sxy, &no_to, corner_to);
 	cur->last = sp;
     }
 }
 
-/* The main loop of the stroking algorithm.
- */
+/******************************************************************************/
+/* ******************************* Main Loop ******************************** */
+/******************************************************************************/
+
 static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
     NibOffset no, no_last;
     Spline *s, *first=NULL;
@@ -1499,8 +1541,8 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 	if ( first==NULL )
 	    first = s;
 
-	if ( SplineLength(s)==0 )
-	    continue;		// Can ignore zero length splines
+	if ( SplineLength(s)==0 ) // Can ignore zero length splines
+	    continue;
 
 	ut_start = SplineUTanVecAt(s, 0.0);
 	linear = SplineIsLinearish(s);
@@ -1530,13 +1572,10 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 	    sxy = SPLINEPVAL(s, 0.0);
 	    CalcNibOffset(c, ut_start, is_right, &no, -1);
 
-	    if ( !HandleJoin(c, cur, sxy, &no, is_ccw_start, ut_endlast,
-	                     was_ccw, is_right) )
-		// XXX Handle cusp value change here
-		;
-	    on_cusp = OffsetOnCuspAt(c, s, 0.0, &no, is_right, is_ccw_start);
+	    HandleJoin(c, cur, sxy, &no, is_ccw_start, ut_endlast, was_ccw,
+	               is_right);
 
-	    // printf("is_right=%d nci=%d is_ccw:%d nc.x=%lf nc.y=%lf, ut_start=%lf,%lf\n", is_right, no.nci[is_ccw_start], is_ccw_start, c->nibcorners[no.nci[is_ccw_start]].on_nib->me.x, c->nibcorners[no.nci[is_ccw_start]].on_nib->me.y, ut_start.x, ut_start.y);
+	    on_cusp = OffsetOnCuspAt(c, s, 0.0, &no, is_right, is_ccw_start);
 
 	    // The path for this spline
 	    if ( linear ) {
@@ -1552,8 +1591,6 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 		                          is_right, no.nci[is_ccw_mid]);
 		    assert( t > last_t && t <= 1.0 );
 
-		    // printf("nci: %d, ut_mid=%lf,%lf, t=%.15lf, curved=%d\n", no.nci[is_ccw_mid], ut_mid.x, ut_mid.y, t, curved);
-
 		    if ( curved )
 			sp = TraceAndFitSpline(c, s, last_t, t, cur->last,
 			                       no.nci[is_ccw_mid], is_right,
@@ -1567,7 +1604,6 @@ static SplineSet *OffsetSplineSet(SplineSet *ss, StrokeContext *c) {
 		    CalcNibOffset(c, ut_mid, is_right, &no, no.nci[is_ccw_mid]);
 		    is_ccw_mid = SplineTurningCCWAt(s, t);
 		    SplineStrokeAppendFixup(cur->last, sxy, &no, -1);
-		    //                        on_cusp ? is_ccw_mid : !is_ccw_mid);
 
 		    if ( t < 1.0 )
 			HandleFlat(cur, sxy, &no, is_ccw_mid);
@@ -1745,12 +1781,13 @@ static SplinePointList *SinglePointStroke(SplinePoint *sp,
     SplineSet *ret;
     real trans[6];
 
-    if ( c->pentype==pt_circle && c->cap==lc_butt ) {
+    if ( c->nibtype==nib_ellip && c->cap==lc_butt ) {
+	// Leave as a single point
 	ret = chunkalloc(sizeof(SplineSet));
-	/* Leave as a single point */
 	ret->first = ret->last = SplinePointCreate(sp->me.x,sp->me.y);
 	ret->first->pointtype = pt_corner;
-    } else { 
+    } else {
+	 // Draw a nib
 	memset(&trans, 0, sizeof(trans));
 	trans[0] = trans[3] = 1;
 	trans[4] = sp->me.x;
@@ -1817,7 +1854,9 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     bigreal sn = 0.0, co = 1.0, mr;
     DBounds b;
     real trans[6];
-    struct simplifyinfo smpl = { sf_forcelines&sf_mergelines&sf_smoothcurves&sf_ignoreslopes, 0.25, 0.1, .005, 0, 0, 0 };
+    struct simplifyinfo smpl = { sf_forcelines & sf_mergelines & 
+                                 sf_smoothcurves & sf_ignoreslopes,
+                                 0.25, 0.1, .005, 0, 0, 0 };
 
     if ( si->stroke_type==si_centerline )
 	IError("centerline not handled");
@@ -1840,10 +1879,10 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
 	mr = si->minorradius;
     else
 	mr = si->radius;
-    //c.scaled_or_rotated = si->factor!=NULL;
     
     if ( c.acctarget<MIN_ACCURACY ) {
-         LogError( _("Warning: Accuracy target %lf less than minimum %lf, using %lf instead\n"), c.acctarget, MIN_ACCURACY );
+         LogError( _("Warning: Accuracy target %lf less than minimum %lf, "
+	             "using %lf instead\n"), c.acctarget, MIN_ACCURACY );
 	 c.acctarget = MIN_ACCURACY;
     }
     smpl.err = c.acctarget;
@@ -1859,7 +1898,7 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     trans[4] = trans[5] = 0;
 
     if ( si->stroke_type==si_round || si->stroke_type==si_calligraphic ) {
-	c.pentype = si->stroke_type==si_round ? pt_circle : pt_square;
+	c.nibtype = si->stroke_type==si_round ? nib_ellip : nib_rect;
 	max_pc = 4;
 	nibs = UnitShape(si->stroke_type==si_round ? 0 : -4);
 	trans[0] *= si->radius;
@@ -1867,8 +1906,8 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
 	trans[2] *= mr;
 	trans[3] *= mr;
     } else {
-	c.pentype = pt_convex;
-	max_pc = 20; // a guess
+	c.nibtype = nib_convex;
+	max_pc = 20; // a guess, will be reallocated if needed
 	nibs = SplinePointListCopy(si->nib);
 	SplineSetFindBounds(nibs,&b);
 	if ( !c.leave_users_center ) {
@@ -1888,6 +1927,7 @@ SplineSet *SplineSetStroke(SplineSet *ss,StrokeInfo *si, int order2) {
     for ( nib=nibs; nib!=NULL; nib=nib->next ) {
 	int reversed = false;
 	if ( !SplinePointListIsClockwise(nib) ) {
+	    assert( 0 );
 	    reversed = true;
 	    SplineSetReverse(nib);
 	}
