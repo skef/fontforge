@@ -1631,14 +1631,14 @@ Layers may be compared to see if their contours are similar.
 	&nbsp;[,CAP,JOIN,ANGLE,KEYWORD])<BR>
 	("elliptical",width,minor-width<BR>
 	&nbsp;[,ANGLE,CAP,JOIN,KEYWORD])<BR>
-	("caligraphic",width,height<BR>
+	("calligraphic",width,height<BR>
 	&nbsp;[,ANGLE,CAP,JOIN,KEYWORD])<BR>
 	("convex",contour[,ANGLE,CAP,JOIN,KEYWORD])</CODE><P>
 	or legacy interface:<P>
 	<CODE>("circular",width[,CAP,JOIN,FLAGS])<BR>
 	("elliptical",width,minor-width,ANGLE<BR>
 	&nbsp;[,CAP,JOIN,FLAGS])<BR>
-	("caligraphic",width,height,angle[,FLAGS])<BR>
+	("calligraphic",width,height,angle[,FLAGS])<BR>
 	("polygon",contour[,FLAGS])</CODE>
       </TD>
       <TD>Strokes the lines of each contour in the layer according to
@@ -2767,24 +2767,25 @@ must be created through the font.
 	&nbsp;[,CAP,JOIN,ANGLE,KEYWORD])<BR>
 	("elliptical",width,minor-width<BR>
 	&nbsp;[,ANGLE,CAP,JOIN,KEYWORD])<BR>
-	("caligraphic",width,height<BR>
+	("calligraphic",width,height<BR>
 	&nbsp;[,ANGLE,CAP,JOIN,KEYWORD])<BR>
 	("convex",contour[,ANGLE,CAP,JOIN,KEYWORD])</CODE><P>
 	or legacy interface:<P>
 	<CODE>("circular",width[,CAP,JOIN,FLAGS])<BR>
 	("elliptical",width,minor-width,ANGLE<BR>
 	&nbsp;[,CAP,JOIN,FLAGS])<BR>
-	("caligraphic",width,height,angle[,FLAGS])<BR>
+	("calligraphic",width,height,angle[,FLAGS])<BR>
 	("polygon",contour[,FLAGS])</CODE>
       </TD>
       <TD>Strokes the contours of the glyph according to the supplied
 	parameters. See the <A HREF="stroke.html">stroke</A> documentation
-	for a more complete description of the facility and its configuration.</P>
+	for a more complete description of the facility and its
+	parameters.</P>
 
 	A "circular" nib just has a <CODE>width</CODE> (the
 	diameter), while an "elliptical" nib has a <CODE>width</CODE>
 	(major axis) and a <CODE>minor-width</CODE> (minor axis). A
-	"caligraphic" or "rectangular" nib is similar in that it has
+	"calligraphic" or "rectangular" nib is similar in that it has
 	a <CODE>width</CODE> and a <CODE>height</CODE> Finally a 
 	"convex" nib is one supplied by the user as a
 	<CODE>fontforge</CODE> contour or layer. It must be <EM>convex</EM>
@@ -2792,7 +2793,7 @@ must be created through the font.
 	<CODE>ANGLE</CODE> is optional. It can be specified either 
 	positionally or with <CODE>angle=<EM>float</EM></CODE>. 
 	It must be a floating point number in units of radians and
-	defaults to zero. The nib is rotated by this amount before
+	defaults to zero. The nib is rotated by this angle before
 	stroking the path.<P>
 	<CODE>CAP</CODE> is optional. It can be specified either 
 	positionally or with <CODE>cap=<EM>string</EM></CODE>. 
@@ -2801,7 +2802,7 @@ must be created through the font.
 	<CODE>JOIN</CODE> is optional. It can be specified either 
 	positionally or with <CODE>join=<EM>string</EM></CODE>. 
 	It must be one of the strings "nib" (the default), "bevel",
-	"miter", "miterclip", "round", and "arcs".<P>
+	"miter", and "miterclip"<!--, "round", and "arcs"-->.<P>
 	<CODE>KEYWORD</CODE> Parameters:
 	<DL>
 	 <DT> <CODE>removeinternal</CODE> (boolean, default=False)
@@ -2821,9 +2822,10 @@ must be created through the font.
 	 <DD> Specifies whether, and on what basis, remove-overlap should be run.
 	"layer" corresponds to running remove-overlap on the layer as a whole.
 	"contour" corresponds to running remove-overlap on individual contours. 
-	"none" corresponds to not running remove-overlap. Note, however, that
-	the stroke facility relies on remove-overlap to eliminate cusps and other
-	artifacts, and "none" is available primarily for debugging purposes. 
+	"none" corresponds to not running remove-overlap. Note that because
+	the stroke facility relies on remove-overlap to eliminate cusps and 
+	other artifacts, "none" is an unusual choice and available primarily
+	for debugging purposes. 
 	 <DT> <CODE>accuracy</CODE> (float, default=0.25)
 	 <DD> This is a target (but not a guarantee) for the allowed error, in
 	em-units, of the output relative to the input path and nib geometries.
@@ -2832,9 +2834,9 @@ must be created through the font.
 	 <DT> <CODE>jlrelative</CODE> (boolean, default=True)
 	 <DD> See below.
 	 <DT> <CODE>joinlimit</CODE> (float, default=20)
-	 <DD> Specifies the maximum length of a "miter", "miterclip", or "arcs"
+	 <DD> Specifies the maximum length of a "miter" or "miterclip"<!--, or "arcs"-->
 	join. For "miter" joins that would be longer will fall back to "bevel".
-	With "miterclip" and "arcs" a longer join will be trimmed to the specified
+	With "miterclip"<!-- and "arcs"--> a longer join will be trimmed to the specified
 	length. Note, however, that no join is trimmed past the "bevel line" and
 	therefore lower values do not guarantee a given length.<BR><BR>
 	When <CODE>jlrelative</CODE> is false the value is interpreted as a length
@@ -5368,7 +5370,7 @@ This type may not be pickled.
 	&nbsp;minor-width<BR>
 	&nbsp;[,ANGLE,CAP,<BR>
 	&nbsp;JOIN,KEYWORD])<BR>
-	("caligraphic",width,height<BR>
+	("calligraphic",width,height<BR>
 	&nbsp;[,ANGLE,CAP,<BR>
 	&nbsp;JOIN,KEYWORD])<BR>
 	("convex",contour<BR>
@@ -5380,7 +5382,7 @@ This type may not be pickled.
 	("elliptical",width,<BR>
 	&nbsp;minor-width,ANGLE<BR>
 	&nbsp;[,CAP,JOIN,FLAGS])<BR>
-	("caligraphic",width,<BR>
+	("calligraphic",width,<BR>
 	&nbsp;height,angle[,FLAGS])<BR>
 	("polygon",contour[,FLAGS])</CODE>
       </TD>
