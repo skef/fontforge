@@ -138,6 +138,10 @@ static void NOUI_import_params_dlg(struct importparams *ip) {
 static void NOUI_export_params_dlg(struct exportparams *ep) {
 }
 
+static int NOUI_ask_multi(const char *title, struct multi_dlg_spec *spec) {
+    return false;
+}
+
 static struct ui_interface noui_interface = {
     NOUI_IError,
     NOUI_post_error,
@@ -171,7 +175,8 @@ static struct ui_interface noui_interface = {
     NOUI_TTFNameIds,
     NOUI_MSLangString,
     NOUI_import_params_dlg,
-    NOUI_export_params_dlg
+    NOUI_export_params_dlg,
+    NOUI_ask_multi
 };
 struct ui_interface *ui_interface = &noui_interface;
 

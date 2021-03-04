@@ -43,6 +43,7 @@
 
 struct importparams;
 struct exportparams;
+struct multi_dlg_spec;
 
 struct ui_interface {
    /* The following is used to post a fontforge internal error */
@@ -129,6 +130,7 @@ struct ui_interface {
 
     void (*import_dlg)(struct importparams *ip);
     void (*export_dlg)(struct exportparams *ep);
+    int (*ask_multi)(const char *title, struct multi_dlg_spec *spec);
 };
 extern struct ui_interface *ui_interface;
 
@@ -167,6 +169,7 @@ extern struct ui_interface *ui_interface;
 
 #define ImportParamsDlg			(ui_interface->import_dlg)
 #define ExportParamsDlg			(ui_interface->export_dlg)
+#define ff_ask_multi			(ui_interface->ask_multi)
 
 void FF_SetUiInterface(struct ui_interface *uii);
 

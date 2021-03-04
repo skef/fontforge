@@ -53,6 +53,7 @@
 #include "lookups.h"
 #include "mathconstants.h"
 #include "mem.h"
+#include "multidialog.h"
 #include "namelist.h"
 #include "nonlineartrans.h"
 #include "othersubrs.h"
@@ -1748,7 +1749,9 @@ static PyObject *PyFF_askChoices(PyObject *UNUSED(self), PyObject *args, PyObjec
     return( Py_BuildValue("i", ret) );
 }
 
-static PyObject *PyFF_askString(PyObject *UNUSED(self), PyObject *args) {
+static const char *askString_keywords[] = { "title", "question", "default", NULL };
+
+static PyObject *PyFF_askString(PyObject *UNUSED(self), PyObject *args, PyObject *kwargs) {
     char *title,*quest, *def = NULL;
     char *ret;
     PyObject *reto;
@@ -1758,8 +1761,11 @@ static PyObject *PyFF_askString(PyObject *UNUSED(self), PyObject *args) {
 return( NULL );
     }
 
-    if ( !PyArg_ParseTuple(args,"ss|s", &title, &quest, &def) )
-return( NULL );
+    if ( !PyArg_ParseTupleAndKeywords(args, kwargs, "ss|s", (char**) askString_keywords,
+                                      &title, &quest, &def) ) {
+        PyErr_Format(PyExc_TypeError, "Failed to parse arguments");
+        return( NULL );
+    }
 
     ret = ff_ask_string(title,def,quest);
     if ( ret==NULL )
@@ -1767,6 +1773,213 @@ Py_RETURN_NONE;
     reto = Py_BuildValue("s",ret);
     free(ret);
 return( reto );
+}
+
+struct flaglist multielemtype[] = {
+    { "savepath", mde_savepath },
+    { "openpath", mde_openpath },
+    { "string", mde_string },
+    { "choice", mde_choice },
+    FLAGLIST_EMPTY /* Sentinel */
+};
+
+void multiDlgFree(MultiDlgSpec *dlg, int do_top) {
+    for (int i=0; i<dlg->size; ++i) {
+	MultiDlgCategory *category = &dlg->categories[i];
+	for (int j=0; j<category->size; ++j) {
+	    MultiDlgElem *elem = &category->elems[j];
+	    for (int k=0; k<elem->answer_size; ++k) {
+		free(elem->answers[k].tag);
+		free(elem->answers[k].name);
+	    }
+	    free(elem->answers);
+	    free(elem->question);
+	    free(elem->dflt);
+	    free(elem->result);
+	    free(elem->tag);
+	}
+	free(category->elems);
+	free(category->label);
+    }
+    free(dlg->categories);
+    if (do_top)
+	free(dlg);
+} 
+
+void multiDlgPrint(MultiDlgSpec *dlg) {
+    for (int i=0; i<dlg->size; ++i) {
+	MultiDlgCategory *category = dlg->categories + i;
+	if (dlg->size>1)
+	    printf("Category: %s\n", category->label);
+	for (int j=0; j<category->size; ++j) {
+	    MultiDlgElem *elem = category->elems + j;
+            printf("  Elem: tag='%s', question='%s', default='%s', multiple=%d, checks=%d, align=%d\n", elem->tag, elem->question, elem->dflt, elem->multiple, elem->checks, elem->align);
+	    for (int k=0; k<elem->answer_size; ++k) {
+		MultiDlgAnswer *answer = elem->answers + k;
+		printf("      Answer: tag='%s', name='%s', is_default='%d', is_checked=%d\n", answer->tag, answer->name, answer->is_default, answer->is_checked);
+	    }
+	}
+    }
+}
+
+static char *getDictItemStringString(PyObject *dict, const char *key) {
+    if ( !PyDict_Check(dict) )
+	return NULL;
+    PyObject *t = PyDict_GetItemString(dict, key);
+    if ( t==NULL || !PyUnicode_Check(t) )
+	return NULL;
+    return copy(PyUnicode_AsUTF8(t));
+}
+
+static int getDictItemStringBool(PyObject *dict, const char *key, int do_err) {
+    if ( !PyDict_Check(dict) )
+	return do_err ? -1 : false;
+    PyObject *t = PyDict_GetItemString(dict, key);
+    if ( t==NULL )
+	return do_err ? -1 : false;
+    int r = PyObject_IsTrue(t);
+    return do_err && r==-1 ? -1 : r;
+}
+
+static int multiDlgDecodeElem(MultiDlgElem *elem, PyObject *rec) {
+    char *t;
+    if ( (t = getDictItemStringString(rec, "type")) == NULL ) {
+	PyErr_Format(PyExc_TypeError, "askMulti: Missing 'category' key in Category specification.");
+	return false;
+    }
+    if ( ( elem->type = FlagsFromString(t, multielemtype, "askMulti Element type") ) == -1) {
+        free(t);
+	return false;
+    }
+    free(t);
+    elem->tag = getDictItemStringString(rec, "tag");
+    elem->question = getDictItemStringString(rec, "question");
+    if ( elem->tag==NULL && elem->question==NULL ) {
+	PyErr_Format(PyExc_TypeError, "askMulti: Element specification must include either `question` or `tag`.");
+	return false;
+    }
+    elem->multiple = getDictItemStringBool(rec, "multiple", false);
+    elem->checks = getDictItemStringBool(rec, "checks", false);
+    elem->align = getDictItemStringBool(rec, "align", false);
+    if ( elem->type==mde_choice ) {
+	PyObject *answers_rec = PyDict_GetItemString(rec, "answers");
+	if ( answers_rec==NULL || !PySequence_Check(answers_rec) ) {
+	    PyErr_Format(PyExc_TypeError, "askMulti: Element 'answers' key for '%s' is missing or is not a list.", elem->tag==NULL ? elem->tag : elem->question );
+	    return false;
+	}
+	elem->answer_size = PySequence_Size(answers_rec);
+	elem->answers = calloc(elem->answer_size, sizeof(MultiDlgAnswer));
+	for (int i = 0; i<elem->answer_size; ++i) {
+	    PyObject *answer_rec = PySequence_GetItem(answers_rec, i);
+	    MultiDlgAnswer *answer = &elem->answers[i];
+	    if ( !PyDict_Check(answer_rec) ) {
+		PyErr_Format(PyExc_TypeError, "askMulti: Answer for element '%s' not a dictionary", elem->tag==NULL ? elem->tag : elem->question );
+		Py_DECREF(answer_rec);
+		return false;
+	    }
+	    answer->is_default = getDictItemStringBool(answer_rec, "default", false);
+	    answer->name = getDictItemStringString(answer_rec, "name");
+	    answer->tag = getDictItemStringString(answer_rec, "tag");
+	    if ( answer->tag==NULL && answer->name==NULL ) {
+		PyErr_Format(PyExc_TypeError, "askMulti: 'choice' answer specification must include either `name` or `tag`.");
+		Py_DECREF(answer_rec);
+		return false;
+	    }
+	    Py_DECREF(answer_rec);
+	}
+    } else {
+	elem->dflt = getDictItemStringString(rec, "default");
+    }
+    return true;
+}
+
+static int multiDlgDecodeCategory(MultiDlgCategory *category, PyObject *rec) {
+    if ( (category->label = getDictItemStringString(rec, "category")) == NULL) {
+	PyErr_Format(PyExc_TypeError, "askMulti: Missing 'category' key in Category specification.");
+	return false;
+    }
+    PyObject *elems_rec = PyDict_GetItemString(rec, "elements");
+    if ( elems_rec==NULL || !PySequence_Check(elems_rec) ) {
+	PyErr_Format(PyExc_TypeError, "askMulti: Category 'elements' key for '%s' is missing or is not a list.", category->label);
+	return false;
+    }
+    category->size = PySequence_Size(elems_rec);
+    category->elems = calloc(category->size, sizeof(MultiDlgElem));
+    for (int i = 0; i<category->size; ++i) {
+        PyObject *elem = PySequence_GetItem(elems_rec, i);
+        if ( !multiDlgDecodeElem(&category->elems[i], elem) ) {
+            return false;
+        }
+        Py_DECREF(elem);
+    }
+    return true;
+}
+
+static const char *askMulti_keywords[] = { "title", "spec", NULL };
+
+static PyObject *PyFF_askMulti(PyObject *UNUSED(self), PyObject *args, PyObject *kwargs) {
+    char *title;
+    PyObject *spec, *r;
+    MultiDlgSpec dlg;
+
+    if ( no_windowing_ui ) {
+	PyErr_Format(PyExc_EnvironmentError, "No user interface");
+	return NULL;
+    }
+
+    if ( !PyArg_ParseTupleAndKeywords(args, kwargs, "sO", (char**) askMulti_keywords,
+                                      &title, &spec) ) {
+        PyErr_Format(PyExc_TypeError, "askMulti: Failed to parse arguments");
+        return NULL;
+    }
+    if ( PySequence_Check(spec) ) {
+	PyObject *test = PySequence_GetItem(spec, 0);
+	if ( test==NULL || !PyDict_Check(test) ) {
+	    PyErr_Format(PyExc_TypeError, "askMulti: Failed to parse arguments");
+	    return NULL;
+	}
+	if ( PyDict_GetItemString(test, "category") ) {
+	    dlg.size = PySequence_Size(spec);
+	    dlg.categories = calloc(dlg.size, sizeof(MultiDlgCategory));
+	    for (int i = 0; i<dlg.size; ++i) {
+		PyObject *cat = PySequence_GetItem(spec, i);
+		if ( !multiDlgDecodeCategory(&dlg.categories[i], cat) ) {
+		    multiDlgFree(&dlg, false);
+		    return NULL;
+		}
+		Py_DECREF(cat);
+	    }
+	} else {
+	    dlg.size = 1;
+	    dlg.categories = calloc(1, sizeof(MultiDlgCategory));
+	    dlg.categories[0].size = PySequence_Size(spec);
+	    dlg.categories[0].elems = calloc(dlg.categories[0].size, sizeof(MultiDlgElem));
+	    for (int i = 0; i<dlg.categories[0].size; ++i) {
+		PyObject *elem = PySequence_GetItem(spec, i);
+		if ( !multiDlgDecodeElem(&dlg.categories[0].elems[i], elem) ) {
+		    multiDlgFree(&dlg, false);
+		    return NULL;
+		}
+		Py_DECREF(elem);
+	    }
+	}
+	Py_DECREF(test);
+    } else if ( PyDict_Check(spec) ) {
+	dlg.size = 1;
+	dlg.categories = calloc(1, sizeof(MultiDlgCategory));
+	dlg.categories[0].size = 1;
+	dlg.categories[0].elems = calloc(1, sizeof(MultiDlgElem));
+	if ( !multiDlgDecodeElem(&dlg.categories[0].elems[0], spec) ) {
+	    multiDlgFree(&dlg, false);
+	    return NULL;
+	}
+    } else {
+        PyErr_Format(PyExc_TypeError, "askMulti: Specification must be either a sequence or dictionary.");
+	return NULL;
+    }
+    ff_ask_multi(title, &dlg);
+    multiDlgPrint(&dlg);
+    return Py_None;
 }
 
 /* ************************************************************************** */
@@ -9401,16 +9614,45 @@ Py_RETURN( self );
 
 static PyObject *PyFFGlyph_preserveLayer(PyFF_Glyph *self, PyObject *args) {
     int layer = self->layer, dohints=false;
+    PyObject *layerObj=NULL;
     SplineChar *sc = self->sc;
 
-    if ( !PyArg_ParseTuple(args,"|ii", &layer, &dohints ) )
+    if ( !PyArg_ParseTuple(args,"|Op", &layerObj, &dohints ) )
         return( NULL );
-    if ( layer<0 || layer>=sc->layer_cnt ) {
+    if ( layerObj!=NULL ) {
+	layer = LayerArgToLayer(sc->parent, layerObj);
+	if ( layer == ly_none )
+	    return NULL;
+    }
+    else if ( layer<0 || layer>=sc->layer_cnt ) {
         PyErr_Format(PyExc_ValueError, "Layer is out of range" );
         return( NULL );
     }
-    _SCPreserveLayer(self->sc,layer,dohints);
-Py_RETURN( self );
+    _SCPreserveLayer(sc,layer,dohints);
+    Py_RETURN( self );
+}
+
+static PyObject *PyFFGlyph_doUndo(PyFF_Glyph *self, PyObject *args) {
+    int layer = self->layer, redo=false;
+    PyObject *layerObj=NULL;
+    SplineChar *sc = self->sc;
+
+    if ( !PyArg_ParseTuple(args,"|Op", &layerObj, &redo ) )
+        return( NULL );
+    if ( layerObj!=NULL ) {
+	layer = LayerArgToLayer(sc->parent, layerObj);
+	if ( layer == ly_none )
+	    return NULL;
+    }
+    else if ( layer<0 || layer>=sc->layer_cnt ) {
+        PyErr_Format(PyExc_ValueError, "Layer is out of range" );
+        return( NULL );
+    }
+    if ( redo )
+	SCDoRedo(sc, layer);
+    else
+	SCDoUndo(sc, layer);
+    Py_RETURN( self );
 }
 
 static int LayerArgToLayer(SplineFont *sf, PyObject* layerp) {
@@ -9635,6 +9877,7 @@ static PyMethodDef PyFF_Glyph_methods[] = {
     { "xBoundsAtY", (PyCFunction)PyFFGlyph_xBoundsAtY, METH_VARARGS | METH_KEYWORDS, "The minimum and maximum values of x attained for a given y (range), or returns None"},
     { "yBoundsAtX", (PyCFunction)PyFFGlyph_yBoundsAtX, METH_VARARGS | METH_KEYWORDS, "The minimum and maximum values of y attained for a given x (range), or returns None"},
     { "preserveLayerAsUndo", (PyCFunction)PyFFGlyph_preserveLayer, METH_VARARGS, "Preserves the current layer -- as it now is -- in an undo"},
+    { "doUndoLayer", (PyCFunction)PyFFGlyph_doUndo, METH_VARARGS, "Undo the last change to the layer or, if reverse is True, redo the last undo."},
     PYMETHODDEF_EMPTY /* Sentinel */
 };
 /* ************************************************************************** */
@@ -18803,7 +19046,8 @@ PyMethodDef module_fontforge_methods[] = {
     { "saveFilename", PyFF_saveFilename, METH_VARARGS, "Pops up a file picker dialog asking the user for a filename to use for saving" },
     { "ask", PyFF_ask, METH_VARARGS, "Pops up a dialog asking the user a question and providing a set of buttons for the user to reply with" },
     { "askChoices", (PyCFunction)PyFF_askChoices, METH_VARARGS | METH_KEYWORDS, "Pops up a dialog asking the user a question and providing a scrolling list for the user to reply with" },
-    { "askString", PyFF_askString, METH_VARARGS, "Pops up a dialog asking the user a question and providing a textfield for the user to reply with" },
+    { "askString", (PyCFunction)PyFF_askString, METH_VARARGS | METH_KEYWORDS, "Pops up a dialog asking the user a question and providing a textfield for the user to reply with" },
+    { "askMulti", (PyCFunction)PyFF_askMulti, METH_VARARGS | METH_KEYWORDS, "Pops up a dialog asking the user a question and providing a textfield for the user to reply with" },
     // Leave some sentinel slots here so that the UI
     // code can add it's methods to the end of the object declaration.
     PYMETHODDEF_EMPTY,

@@ -37,6 +37,7 @@
 
 #include "dlist.h"
 #include "ggadget.h"
+#include "multidialog.h"
 #include "search.h"
 
 
@@ -1284,6 +1285,7 @@ extern void FontInfoInit(void);
 extern void LookupUIInit(void);
 extern void _ImportParamsDlg(ImportParams *ip);
 extern void _ExportParamsDlg(ExportParams *ep);
+extern int UI_Ask_Multi(const char *title, MultiDlgSpec *spec);
 extern struct cidmap *AskUserForCIDMap(void);
 
 extern void DefineGroups(struct fontview *fv);
