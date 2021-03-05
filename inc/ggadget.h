@@ -259,7 +259,7 @@ typedef struct ggadgetcreatedata {
 enum ghvbox_expand { gb_expandglue=-4, gb_expandgluesame=-3, gb_samesize=-2,
 	gb_expandall=-1 };
 enum gflowbox_hjustify { gfbh_right=-3, gfbh_center=-2, gfbh_expand=-1, gfbh_left=0 };
-enum gflowbox_vjustify { gfbv_top=-2, gfbv_center=-1, gfbv_bottom=0 };
+enum gflowbox_vjustify { gfbv_top=-3, gfbv_center=-2, gfbv_expand=-1, gfbv_bottom=0 };
 enum editor_commands { ec_cut, ec_clear, ec_copy, ec_paste, ec_undo, ec_redo,
 	ec_selectall, ec_search, ec_backsearch, ec_backword, ec_deleteword,
 	ec_max };
