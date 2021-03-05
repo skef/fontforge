@@ -421,6 +421,15 @@ typedef struct ghvbox {
     int label_height;
 } GHVBox;
 
+typedef struct gflowbox {
+    GGadget g;
+    int vertical, count;
+    int hpad, vpad;			/* Internal padding */
+    enum gflowbox_hjustify hjust;
+    enum gflowbox_vjustify vjust;
+    GGadget **children;
+} GFlowBox;
+
 struct col_data {
     enum me_type me_type;
     char *(*func)(GGadget *,int r,int c); /* Produces a string to display if md_str==NULL */

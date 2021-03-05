@@ -25,6 +25,7 @@ add_library(gdraw STATIC
   gdrawtxtinit.c
   gfilechooser.c
   gfiledlg.c
+  gflowbox.c
   ggadgetP.h
   ggadgets.c
   ggdkcdraw.c
