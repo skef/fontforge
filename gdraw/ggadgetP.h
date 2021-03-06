@@ -423,11 +423,16 @@ typedef struct ghvbox {
 
 typedef struct gflowbox {
     GGadget g;
-    int vertical, count;
-    int hpad, vpad;			/* Internal padding */
-    enum gflowbox_hjustify hjust;
-    enum gflowbox_vjustify vjust;
+    int vertical;
+    int count;
+    int hpad, vpad, lpad;		/* Internal padding */
+    int label_size;
+    enum gflowbox_justify hjust;
+    enum gflowbox_justify vjust;
+    enum gflowbox_justify lhjust;
+    enum gflowbox_justify lvjust;
     GGadget **children;
+    GGadget *label;
 } GFlowBox;
 
 struct col_data {
