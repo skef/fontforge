@@ -505,7 +505,10 @@ void GHVBoxFitWindow(GGadget *g);
 void GHVBoxFitWindowCentered(GGadget *g);
 void GHVBoxReflow(GGadget *g);
 
-void GFlowBoxSetPadding(GGadget *g,int hpad, int vpad, int lpad);
+void GFlowBoxSetPadding(GGadget *g, int hpad, int vpad, int lpad);
+int GGadgetIsGFlowBox(GGadget *g);
+void GScroll1BoxSetPadding(GGadget *g, int hpad, int vpad);
+void GScroll1BoxFitWindow(GGadget *g);
 
 void GMatrixEditSet(GGadget *g,struct matrix_data *data, int rows, int copy_it);
 struct matrix_data *GMatrixEditGet(GGadget *g, int *rows);
@@ -597,6 +600,7 @@ GGadget *GVBoxCreate(struct gwindow *base, GGadgetData *gd,void *data);
 GGadget *GHVBoxCreate(struct gwindow *base, GGadgetData *gd,void *data);
 GGadget *GHVGroupCreate(struct gwindow *base, GGadgetData *gd,void *data);
 GGadget *GFlowBoxCreate(struct gwindow *base, GGadgetData *gd,void *data);
+GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data);
 GGadget *GMatrixEditCreate(struct gwindow *base, GGadgetData *gd,void *data);
 GGadget *GDrawableCreate(struct gwindow *base, GGadgetData *gd,void *data);
 

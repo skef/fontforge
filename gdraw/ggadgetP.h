@@ -272,6 +272,19 @@ typedef struct glist {
     void (*popup_callback)(GGadget *g,int pos);
 } GList;
 
+typedef struct gscroll1box {
+    GGadget g;
+    int32 count;
+    int32 hpad, vpad;
+    int32 scrollmin;
+    int32 curoffset;
+    GGadget **children;
+    struct gscrollbar *sb;
+    unsigned int always_show_sb: 1;	/* display scrollbar even if we don't need it */
+    unsigned int horizontal: 1;
+    GTimer *pressed;
+} GScroll1Box;
+
 typedef struct gtextfield {
     GGadget g;
     unsigned int cursor_on: 1;
@@ -423,7 +436,6 @@ typedef struct ghvbox {
 
 typedef struct gflowbox {
     GGadget g;
-    int vertical;
     int count;
     int hpad, vpad, lpad;		/* Internal padding */
     int label_size;
@@ -431,6 +443,7 @@ typedef struct gflowbox {
     enum gflowbox_justify vjust;
     enum gflowbox_justify lhjust;
     enum gflowbox_justify lvjust;
+    unsigned int vertical: 1;
     GGadget **children;
     GGadget *label;
 } GFlowBox;
@@ -589,6 +602,7 @@ extern int GTextInfoArrayCount(GTextInfo **ti);
 extern int GTextInfoCompare(GTextInfo *ti1, GTextInfo *ti2);
 extern int GMenuItemArrayMask(GMenuItem *mi);
 extern int GMenuItemArrayAnyUnmasked(GMenuItem *mi);
+extern void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashed);
 
 extern GGadget *_GGadget_Create(GGadget *g, struct gwindow *base, GGadgetData *gd,void *data, GBox *def);
 extern void _GGadget_FinalPosition(GGadget *g, struct gwindow *base, GGadgetData *gd);
@@ -610,6 +624,7 @@ extern GResInfo ggadget_ri, listmark_ri;
 extern GResInfo *_GGadgetRIHead(void), *_GButtonRIHead(void), *_GTextFieldRIHead(void);
 extern GResInfo *_GRadioRIHead(void), *_GScrollBarRIHead(void), *_GLineRIHead(void);
 extern GResInfo *_GMenuRIHead(void), *_GTabSetRIHead(void), *_GHVBoxRIHead(void);
+extern GResInfo *_GFlowBoxRIHead(void), *_GScroll1BoxRIHead(void);
 extern GResInfo *_GListRIHead(void), *_GMatrixEditRIHead(void), *_GDrawableRIHead(void);
 extern GResInfo *_GProgressRIHead(void);
 

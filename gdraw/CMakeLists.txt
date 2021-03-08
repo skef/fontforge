@@ -49,6 +49,7 @@ add_library(gdraw STATIC
   gresourceP.h
   gsavefiledlg.c
   gscrollbar.c
+  gscroll1box.c
   gspacer.c
   gtabset.c
   gtextfield.c

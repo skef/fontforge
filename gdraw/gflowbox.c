@@ -54,7 +54,7 @@ GResInfo gflowbox_ri = {
     NULL
 };
 
-static void _GFlowBox_Init(void) {
+static void GFlowBox_Init(void) {
     if ( gflowbox_inited )
 return;
     _GGadgetCopyDefaultBox(&flowbox_box);
@@ -105,7 +105,7 @@ struct fsizeinfo {
     struct childsizedata *childsize;
     int *rowcolbaseline;
     int des, oppodes;
-    int min, oppomin;
+    int min;
     int size, opposize;
     int label_width, label_height;
     int rowcols;
@@ -139,10 +139,8 @@ static void GFlowBoxGatherMinInfo(GFlowBox *fb,struct fsizeinfo *si) {
 	    }
 	}
 	si->des += cs->min;
-	si->oppomin += cs->oppomin;
-	if (c+1!=fb->count) {
+	if ( c!=0 ) {
 	    si->des += fb->vertical ? fb->vpad : fb->hpad;
-	    si->oppomin += fb->vertical ? fb->hpad : fb->vpad;
 	}
 	if (si->oppodes < cs->oppomin)
 	    si->oppodes = cs->oppomin;
@@ -256,7 +254,7 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
 	printf("    Vals: %d,%d   %d x %d\n", x, y, cw, ch);
 	if ( g->state!=gs_invisible )
 	    GGadgetResize(g,cw,ch);
-	GGadgetMove(g,fb->g.inner.x+x,fb->g.inner.y+y-20);
+	GGadgetMove(g,fb->g.inner.x+x,fb->g.inner.y+y);
     }
 
     if ( !fb->vertical && fb->label!=NULL ) {
@@ -279,16 +277,19 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
     GDrawRequestExpose(g->base,&g->r,false);
 }
 
-static void GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
+void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashed) {
     struct fsizeinfo si;
     GFlowBox *fb = (GFlowBox *) g;
     int bp = GBoxBorderWidth(g->base,g->box);
     int width, height;
 
-    printf("blah: %d, %d\n", (int)g->desired_width, (int)g->desired_height);
     GFlowBoxGatherMinInfo(fb,&si);
     if ( fb->vertical ) {
-	if ( g->desired_height>0 ) {
+	if ( squashed ) {
+	    GFlowBoxSizeTo(fb, &si, si.min);
+	    height = si.size;
+	    width = si.opposize;
+	} else if ( g->desired_height>0 ) {
 	    GFlowBoxSizeTo(fb, &si, g->desired_height);
 	    height = si.size;
 	    width = si.opposize;
@@ -297,7 +298,11 @@ static void GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
 	    width = si.oppodes;
 	}
     } else {
-	if ( g->desired_width>0 ) {
+	if ( squashed ) {
+	    GFlowBoxSizeTo(fb, &si, si.min);
+	    width = si.size;
+	    height = si.opposize;
+	} else if ( g->desired_width>0 ) {
 	    GFlowBoxSizeTo(fb, &si, g->desired_width);
 	    width = si.size;
 	    height = si.opposize;
@@ -306,7 +311,9 @@ static void GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
 	    height = si.oppodes;
 	}
     }
-    printf("Desired: %d, %d\n", width, height);
+
+    if ( fb->label!=NULL )
+	    width += si.label_width + fb->lpad;
 
     if ( inner!=NULL ) {
 	inner->x = inner->y = 0;
@@ -319,8 +326,12 @@ static void GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
     free(si.childsize); free(si.rowcolbaseline);
 }
 
+static void GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
+    _GFlowBoxGetDesiredSize(g, outer, inner, false);
+}
+
 static int GFlowBoxFillsWindow(GGadget *g) {
-return( true );
+    return true;
 }
 
 static int expose_nothing(GWindow pixmap, GGadget *g, GEvent *event) {
@@ -380,18 +391,22 @@ struct gfuncs gflowbox_funcs = {
 
 void GFlowBoxSetPadding(GGadget *g, int hpad, int vpad, int lpad) {
     GFlowBox *fb = (GFlowBox *) g;
-    if ( hpad!=-1 )
+    if ( hpad>=0 )
 	fb->hpad = hpad;
-    if ( vpad!=-1 )
+    if ( vpad>=0 )
 	fb->vpad = vpad;
-    if ( lpad!=-1 )
-	fb->lpad = vpad;
+    if ( lpad>=0 )
+	fb->lpad = lpad;
 }
 
 void GFlowBoxSetLabelSize(GGadget *g, int size) {
     GFlowBox *fb = (GFlowBox *) g;
-    if ( size!=-1 )
+    if ( size>=0 )
 	fb->label_size = size;
+}
+
+int GGadgetIsGFlowBox(GGadget *g) {
+    return g->funcs->get_desired_size == &GFlowBoxGetDesiredSize;
 }
 
 GGadget *GFlowBoxCreate(struct gwindow *base, GGadgetData *gd, void *data) {
@@ -399,7 +414,7 @@ GGadget *GFlowBoxCreate(struct gwindow *base, GGadgetData *gd, void *data) {
     GGadgetCreateData *label = (GGadgetCreateData *) (gd->label);
 
     if ( !gflowbox_inited )
-	_GFlowBox_Init();
+	GFlowBox_Init();
 
     for ( fb->count=0; gd->u.boxelements[fb->count]!=NULL; ++fb->count );
 
@@ -418,13 +433,13 @@ GGadget *GFlowBoxCreate(struct gwindow *base, GGadgetData *gd, void *data) {
     }
 
     fb->children = malloc(fb->count*sizeof(GGadget *));
-    for ( int i=0; i<fb->count; ++i ) {
-	GGadgetCreateData *gcd = gd->u.boxelements[i];
+    for ( int c=0; c<fb->count; ++c ) {
+	GGadgetCreateData *gcd = gd->u.boxelements[c];
 	if ( gcd==GCD_HPad10 )
-	    fb->children[i] = (GGadget *) gcd;
+	    fb->children[c] = (GGadget *) gcd;
 	else {
 	    gcd->gd.pos.x = gcd->gd.pos.y = 1;
-	    fb->children[i] = gcd->ret = (gcd->creator)(base,&gcd->gd,gcd->data);
+	    fb->children[c] = gcd->ret = (gcd->creator)(base,&gcd->gd,gcd->data);
 	    gcd->ret->contained = true;
 	}
     }
@@ -432,6 +447,6 @@ GGadget *GFlowBoxCreate(struct gwindow *base, GGadgetData *gd, void *data) {
 }
 
 GResInfo *_GFlowBoxRIHead(void) {
-    _GFlowBox_Init();
+    GFlowBox_Init();
     return &gflowbox_ri;
 }

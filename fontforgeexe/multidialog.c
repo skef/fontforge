@@ -30,6 +30,7 @@
 
 #include "basics.h"
 
+#include "ffglib.h"
 #include "fontforgeui.h"
 #include "multidialog.h"
 
@@ -47,9 +48,13 @@ static int md_e_h(GWindow gw, GEvent *event) {
     return true;
 }
 
+static GGadgetCreateData *LayoutMultiDlgCategory(MultiDlgCategory *category, GLib_GList **memhandle) {
+}
+
 int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     GRect pos, gsize;
     GWindow gw;
+    GLib_GList *memlist;
     GWindowAttrs wattrs;
     GGadgetCreateData gcd[12], boxes[3], *harray[3], *farray[10];
     GTextInfo label[12];
@@ -68,8 +73,8 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     wattrs.utf8_window_title = title;
     wattrs.is_dlg = true;
     pos.x = pos.y = 0;
-    pos.width = 0;
-    pos.height = 0;
+    pos.width = GDrawPointsToPixels(NULL,400);
+    pos.height = GDrawPointsToPixels(NULL,300);
     gw = GDrawCreateTopWindow(NULL,&pos,md_e_h,&done,&wattrs);
 
     memset(&label,0,sizeof(label));
@@ -168,16 +173,16 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 
     boxes[0].gd.flags = gg_enabled | gg_visible;
     boxes[0].gd.u.boxelements = harray;
-    boxes[0].creator = GHBoxCreate;
+    boxes[0].creator = GScroll1BoxCreate;
 
     GGadgetsCreate(gw,boxes);
-    GHVBoxSetExpandableCol(boxes[0].ret,1);
-    gsize.x = gsize.y = 0;
+/*    gsize.x = gsize.y = 0;
     gsize.width = GGadgetScale(GDrawPointsToPixels(NULL,200));
     gsize.height = -1;
-    GGadgetSetDesiredSize(boxes[2].ret, NULL, &gsize);
-    GFlowBoxSetPadding(boxes[2].ret, GDrawPointsToPixels(NULL,20), -1, -1);
-    GHVBoxFitWindow(boxes[0].ret);
+    GGadgetSetDesiredSize(boxes[2].ret, NULL, &gsize); */
+    //GFlowBoxSetPadding(boxes[2].ret, GDrawPointsToPixels(NULL,20), -1, -1);
+    GFlowBoxSetPadding(boxes[2].ret, 0, 0, -1);
+    GScroll1BoxFitWindow(boxes[0].ret);
 
     GDrawSetVisible(gw,true);
 
