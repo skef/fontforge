@@ -28,6 +28,7 @@
 #include <fontforge-config.h>
 
 #include "gdraw.h"
+#include "gdrawP.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
 #include "gwidget.h"
@@ -73,11 +74,14 @@ static void GScroll1BoxDestroy(GGadget *g) {
 
     if ( s1b==NULL )
 	return;
-    GDrawCancelTimer(s1b->pressed);
-    for ( int c=0; c<s1b->count; ++c )
-	GGadgetDestroy(s1b->children[c]);
+    /*for ( int c=0; c<s1b->count; ++c )
+	GGadgetDestroy(s1b->children[c]); */
     if ( s1b->sb!=NULL )
 	GGadgetDestroy((GGadget *) s1b->sb);
+    if ( s1b->nested!=NULL ) {
+	GDrawSetUserData(s1b->nested, NULL);
+	GDrawDestroyWindow(s1b->nested);
+    }
     _ggadget_destroy(g);
 }
 
@@ -85,10 +89,11 @@ static void GScroll1BoxMove(GGadget *g, int32 x, int32 y) {
     GScroll1Box *s1b = (GScroll1Box *) g;
     int offx = x-g->r.x, offy = y-g->r.y;
 
-    for ( int c=0; c<s1b->count; ++c ) {
+    /*for ( int c=0; c<s1b->count; ++c ) {
 	GGadget *g = s1b->children[c];
 	GGadgetMove(g, g->r.x+offx, g->r.y+offy);
-    }
+    } */
+    GDrawMove(s1b->nested, g->inner.x+offx, g->inner.y+offy);
     if ( s1b->sb!=NULL )
 	GGadgetMove((GGadget *)s1b->sb, s1b->sb->g.r.x+offx, s1b->sb->g.r.y+offy);
     _ggadget_move(g,x,y);
@@ -156,41 +161,6 @@ static void GScroll1BoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
     }
 }
 
-/*
-static void GScroll1Box_ScrollTo(GScroll1Box *s1b, int ival) {
-    int newoffset;
-    if ( s1b->ivals==0 || sib->curival == ival )
-	return;
-    if ( !GDrawIsVisible(gl->g.base) )
-	return;
-
-    int slide = s1b->contentsize - s1b->boxsize;
-    if ( ival+1 == s1b->ivals ) {
-	newoffset = s1b->contentsize - s1b->boxsize;
-    } else {
-	newoffset = s1b->curc * ival;
-    }
-
-    GDrawForceUpdate(gl->g.base);
-
-    int offsetdiff = newoffset-s1b->curoffset;
-    s1b->curoffset = newoffset;
-    s1b->curival = ival;
-    for ( int c=0; c<s1b->count; ++c ) {
-	GGadget *g = s1b->children[c];
-	if ( s1b->horizontal )
-	    GGadgetMove(g, g->r.x+offsetdiff, g->r.y);
-	else
-	    GGadgetMove(g, g->r.x, g->r.y+offsetdiff);
-    }
-    if ( ydiff>=gl->g.inner.height || -ydiff >= gl->g.inner.height )
-	_ggadget_redraw(&gl->g);
-    else if ( ydiff!=0 || xoff!=0 )
-	GDrawScroll(gl->g.base,&gl->g.inner,xoff,ydiff);
-    if ( loff!=0 && gl->vsb!=NULL )
-	GScrollBarSetPos(&gl->vsb->g,gl->loff);
-}*/
-
 static int GScroll1BoxExpose(GWindow pixmap, GGadget *g, GEvent *event) {
     if ( g->state!=gs_invisible )
 	GBoxDrawBorder(pixmap,&g->r,g->box,g->state,false);
@@ -202,6 +172,7 @@ static void GScroll1BoxRedraw(GGadget *g) {
     GScroll1Box *s1b = (GScroll1Box *) g;
     if ( s1b->sb!=NULL )
 	GGadgetRedraw((GGadget *) (s1b->sb));
+    GDrawRequestExpose(s1b->nested, NULL, false);
     _ggadget_redraw(g);
 }
 
@@ -211,13 +182,19 @@ static void GScroll1BoxResize(GGadget *g, int32 width, int32 height ) {
     int c;
     int old_enabled = GDrawEnableExposeRequests(g->base,false);
     int offset=s1b->curoffset;
-    GRect rect;
+    GRect rect, wsize;
 
     width -= 2*bp;
     height -= 2*bp;
 
     g->inner.x = g->r.x + bp;
     g->inner.y = g->r.y + bp;
+
+    GDrawResize(s1b->nested, width, height);
+    GDrawGetSize(s1b->nested, &wsize);
+    wsize.width = width;
+    wsize.height = height;
+    s1b->nested->pos = wsize;
 
     if (s1b->horizontal) {
 	if ( g->inner.height!=height ) {
@@ -230,7 +207,7 @@ static void GScroll1BoxResize(GGadget *g, int32 width, int32 height ) {
 		GGadgetResize(s1b->children[c], rect.width, height);
 		if ( c>0 )
 		    offset += s1b->hpad;
-		GGadgetMove(s1b->children[c], g->inner.x+offset, g->inner.y);
+		GGadgetMove(s1b->children[c], offset, 0);
 		offset += rect.width;
 	    }
 	}
@@ -245,7 +222,7 @@ static void GScroll1BoxResize(GGadget *g, int32 width, int32 height ) {
 		GGadgetResize(s1b->children[c], width, rect.height);
 		if ( c>0 )
 		    offset += s1b->vpad;
-		GGadgetMove(s1b->children[c], g->inner.x, g->inner.y+offset);
+		GGadgetMove(s1b->children[c], 0, offset);
 		offset += rect.height;
 	    }
 	}
@@ -260,10 +237,42 @@ static void GScroll1BoxSetVisible(GGadget *g, int visible) {
     GScroll1Box *s1b = (GScroll1Box *) g;
     if ( s1b->sb!=NULL )
 	GGadgetSetVisible(&s1b->sb->g,visible);
+    GDrawSetVisible(s1b->nested, visible);
     _ggadget_setvisible(g,visible);
 }
 
 static int GScroll1BoxFillsWindow(GGadget *g) {
+    return true;
+}
+
+static int gs1bsub_e_h(GWindow gw, GEvent *event) {
+    GScroll1Box *s1b = (GScroll1Box *) GDrawGetUserData(gw);
+
+    if ( (event->type==et_mouseup || event->type==et_mousedown ) &&
+         (event->u.mouse.button>=4 && event->u.mouse.button<=7) ) {
+	/* int isv = event->u.mouse.button<=5;
+	if ( event->u.mouse.state&ksm_shift )
+	    isv = !isv; */
+	if ( s1b->sb!=NULL )
+	    return GGadgetDispatchEvent((GGadget *) s1b->sb, event);
+	else
+	    return true;
+    }
+
+    switch ( event->type ) {
+	case et_expose:
+	    GDrawRequestExpose(s1b->nested, NULL, false);
+	    break;
+	case et_mousedown:
+	case et_mouseup:
+	    if ( s1b->g.state==gs_disabled )
+		return false;
+	    break;
+	case et_destroy:
+	    if ( s1b!=NULL )
+		s1b->nested = NULL;
+	    break;
+    }
     return true;
 }
 
@@ -324,6 +333,8 @@ void GScroll1BoxSetPadding(GGadget *g, int hpad, int vpad) {
 }
 
 GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
+    GWindowAttrs wattrs;
+    GRect pos;
     GScroll1Box *s1b = calloc(1, sizeof(GScroll1Box));
 
     if ( !gscroll1box_inited )
@@ -335,7 +346,16 @@ GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     _GGadget_Create(&s1b->g,base,gd,data,&scroll1box_box);
     s1b->hpad = s1b->vpad = GDrawPointsToPixels(base, 2);
     s1b->scrollmin = GDrawPointsToPixels(base, 30);
-    //s1b->curoffset = GDrawPointsToPixels(base, 40);
+
+    memset(&wattrs, 0, sizeof(wattrs));
+	wattrs.mask = wam_events|wam_cursor;
+    if ( s1b->g.box->main_background!=COLOR_TRANSPARENT )
+	wattrs.mask |= wam_backcol;
+    wattrs.event_masks = ~(1<<et_charup);
+    wattrs.cursor = ct_pointer;
+    wattrs.background_color = s1b->g.box->main_background;
+    pos = (GRect) { 0, 0, 15, 15 }; // temporary values before Resize
+    s1b->nested = GWidgetCreateSubWindow(base, &pos, gs1bsub_e_h, s1b, &wattrs);
 
     s1b->g.takes_input = false;
     s1b->g.takes_keyboard = false;
@@ -348,10 +368,12 @@ GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
             s1b->children[c] = (GGadget *) gcd;
         else {
             gcd->gd.pos.x = gcd->gd.pos.y = 1;
-            s1b->children[c] = gcd->ret = (gcd->creator)(base,&gcd->gd,gcd->data);
+            s1b->children[c] = gcd->ret = (gcd->creator)(s1b->nested,&gcd->gd,gcd->data);
             gcd->ret->contained = true;
         }
     }
+    if ( s1b->g.state!=gs_invisible )
+	GDrawSetVisible(s1b->nested, true);
     return &s1b->g;
 }
 

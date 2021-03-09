@@ -282,7 +282,7 @@ typedef struct gscroll1box {
     struct gscrollbar *sb;
     unsigned int always_show_sb: 1;	/* display scrollbar even if we don't need it */
     unsigned int horizontal: 1;
-    GTimer *pressed;
+    GWindow nested;
 } GScroll1Box;
 
 typedef struct gtextfield {
