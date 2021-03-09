@@ -48,18 +48,132 @@ static int md_e_h(GWindow gw, GEvent *event) {
     return true;
 }
 
-static GGadgetCreateData *LayoutMultiDlgCategory(MultiDlgCategory *category, GLib_GList **memhandle) {
+static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, GList_Glib **memhandle) {
+    int gcnt=1, lcnt=0, flcnt=1, g=0, l=0, fl=0, i;
+    GGadgetCreateData *gcd, **flarray, *ftop;
+    GTextInfo *label, *glistarray;
+
+    if ( elemspec->type!=mde_string && elemspec->type!=mde_choice )
+	return NULL;
+
+    if ( elemspec->question!=NULL ) {
+	lcnt++;
+	gcnt++;
+    }
+    if (elemspec->type==mde_string) {
+	lcnt++;
+	gcnt++;
+	flcnt++;
+    } else if (elemspec->type==mde_choice) {
+	if (elemspec->checks) {
+	    gcnt++;
+	    lcnt += elemspec->answer_size;
+	    gcnt += elemspec->answer_size+1;
+	    flcnt += elemspec->answer_size;
+	} else {
+	    gcnt++;
+	    flcnt++;
+	}
+    }
+    gcd = calloc(gcnt, sizeof(GGadgetCreateData));
+    *memhandle = g_list_append(*memhandle, gcd);
+    label = calloc(lcnt, sizeof(GTextInfo));
+    *memhandle = g_list_append(*memhandle, label);
+    flarray = calloc(flcnt, sizeof(GGadgetCreateData *));
+    *memhandle = g_list_append(*memhandle, flarray);
+
+    if (elemspec->type==mde_string) {
+	label[l].text = (unichar_t *) elemspec->dflt;
+	label[l++].text_is_1byte = true;
+	gcd[g].gd.label = &label[l-1];
+	gcd[g].gd.flags = gg_enabled | gg_visible;
+	gcd[g].data = &elemspec->result;
+	gcd[g].creator = GTextFieldCreate;
+	flarray[fl++] = &gcd[g++];
+    } else if (elemspec->type==mde_choice) {
+	if (elemspec->checks) {
+	    for ( i=0; i<elemspec->answer_size; ++i ) {
+		MultiDlgAnswer *ans = &elemspec->answers[i];
+		label[l].text = (unichar_t *) ans->name;
+		label[l].text_in_resource = true;
+		label[l].text_is_1byte = true;
+		gcd[g].gd.label = &label[l++];
+		gcd[g].gd.flags = gg_enabled | gg_visible;
+		if ( ans->is_default )
+		    gcd[g].gd.flags |= gg_cb_on;
+		gcd[g].data = &ans->is_checked;
+		if ( elemspec->multiple ) {
+		    gcd[g].creator = GTextFieldCreate;
+		} else {
+		    gcd[g].creator = GRadioCreate;
+		    if ( i!=0 )
+			gcd[g].gd.flags |= gg_rad_continueold;
+		}
+		flarray[fl++] = &gcd[g++];
+	    }
+	} else {
+	    glistarray = calloc(elemspec->answer_size+1, sizeof(GTextInfo));
+	    *memhandle = g_list_append(*memhandle, glistarray);
+	    for ( i=0; i<elemspec->answer_size; ++i ) {
+		MultiDlgAnswer *ans = &elemspec->answers[i];
+		glistarray[i].text = (unichar_t *) ans->name;
+		glistarray[i].text_is_1byte = true;
+		glistarray[i].selected = ans->is_default;
+		glistarray[i].userdata = &ans->is_checked;
+	    }
+	    gcd[g].gd.u.list = glistarray;
+	    gcd[g].gd.flags = gg_visible | gg_enabled;
+	    if ( elemspec->multiple )
+		gcd[g].gd.flags |= gg_list_multiplesel;
+	    else
+		gcd[g].gd.flags |= gg_list_exactlyone;
+	    gcd[g].creator = GListCreate;
+	    flarray[fl++] = &gcd[g++];
+	}
+    }
+    gcd[g].gd.flags = gg_enabled | gg_visible;
+    gcd[g].gd.u.boxelements = flarray;
+    gcd[g].creator = GFlowBoxCreate;
+    ftop = &gcd[g++];
+
+    if ( elemspec->question!=NULL ) {
+	label[l].text = (unichar_t *) elemspec->question;
+	label[l].text_is_1byte = true;
+	gcd[g].gd.label = &label[l++];
+	gcd[g].gd.flags = gg_enabled | gg_visible;
+	gcd[g].creator = GLabelCreate;
+	ftop->gd.label = (GTextInfo *) &gcd[g++];
+    }
+    return ftop;
+}
+
+static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *catspec, GList_Glib **memhandle) {
+    int gcnt=1, flcnt=1, g=0, l=0, fl=0, i;
+    GGadgetCreateData *gcd, **s1barray;
+
+    s1barray = calloc(catspec->size+1, sizeof(GGadgetCreateData *));
+    *memhandle = g_list_append(*memhandle, s1barray);
+    for ( i=0; i<catspec->size; ++i )
+	s1barray[i] = LayoutMultiDlgElem(catspec->elems+i, memhandle);
+
+    gcd = calloc(1, sizeof(GGadgetCreateData));
+    *memhandle = g_list_append(*memhandle, gcd);
+    gcd->gd.flags = gg_enabled | gg_visible;
+    gcd->gd.u.boxelements = s1barray;
+    gcd->creator = GScroll1BoxCreate;
+
+    return gcd;
 }
 
 int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     GRect pos, gsize;
     GWindow gw;
-    GLib_GList *memlist;
+    GList_Glib *memlist=NULL;
     GWindowAttrs wattrs;
-    GGadgetCreateData gcd[12], boxes[3], *harray[3], *farray[10];
-    GTextInfo label[12];
+    GGadgetCreateData gcd[4], boxes[3], *barray[9], *varray[3], **catgcd;
+    GTextInfo label[6];
     int done = false, err = false;
-    int k;
+    int b=0, g=0, l=0, i;
 
     if ( no_windowing_ui )
 	return false;
@@ -81,108 +195,62 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     memset(&gcd,0,sizeof(gcd));
     memset(&boxes,0,sizeof(boxes));
 
-    k = 0;
-    label[k].text = (unichar_t *) _("Opt _1");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GCheckBoxCreate;
-    farray[0] = &gcd[k-1];
+    catgcd = calloc(spec->size+1, sizeof(GGadgetCreateData *));
+    memlist = g_list_append(memlist, catgcd); // Why not?
+    for ( i=0; i<spec->size; ++i )
+	catgcd[i] = LayoutMultiDlgCategoryBody(spec->categories+i, &memlist);
 
-    label[k].text = (unichar_t *) _("Optoooooooooion _2");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GCheckBoxCreate;
-    farray[1] = &gcd[k-1];
+    barray[b++] = GCD_Glue;
+    label[l].text = (unichar_t *) _("_OK");
+    label[l].text_is_1byte = true;
+    label[l].text_in_resource = true;
+    gcd[g].gd.flags = gg_visible | gg_enabled | gg_but_default;
+    gcd[g].gd.label = &label[l++];
+    gcd[g].creator = GButtonCreate;
+    barray[b++] = &gcd[g++];
+    barray[b++] = GCD_Glue;
 
-    label[k].text = (unichar_t *) _("Optoooion _3");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GCheckBoxCreate;
-    farray[2] = &gcd[k-1];
+    if ( true ) {
+	label[l].text = (unichar_t *) _("_Apply");
+	label[l].text_is_1byte = true;
+	label[l].text_in_resource = true;
+	gcd[g].gd.flags = gg_visible;
+	gcd[g].gd.label = &label[l++];
+	gcd[g].creator = GButtonCreate;
+	barray[b++] = &gcd[g++];
+	barray[b++] = GCD_Glue;
+    }
 
-    label[k].text = (unichar_t *) _("n _4");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GCheckBoxCreate;
-    farray[3] = &gcd[k-1];
+    label[l].text = (unichar_t *) _("_Cancel");
+    label[l].text_is_1byte = true;
+    label[l].text_in_resource = true;
+    gcd[g].gd.flags = gg_visible | gg_enabled | gg_but_cancel;
+    gcd[g].gd.label = &label[l++];
+    gcd[g].creator = GButtonCreate;
+    barray[b++] = &gcd[g++];
+    barray[b++] = GCD_Glue;
+    barray[b++] = NULL;
 
-    label[k].text = (unichar_t *) _("tion _5");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GCheckBoxCreate;
-    farray[4] = &gcd[k-1];
-
-    label[k].text = (unichar_t *) _("xxxxxxxxOption _6");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GCheckBoxCreate;
-    farray[5] = &gcd[k-1];
-
-    label[k].text = (unichar_t *) _("Optxxxion _7");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GCheckBoxCreate;
-    farray[6] = &gcd[k-1];
-
-    label[k].text = (unichar_t *) _("n _8");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GCheckBoxCreate;
-    farray[7] = &gcd[k-1];
-
-    label[k].text = (unichar_t *) _("Option _9");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GCheckBoxCreate;
-    farray[8] = &gcd[k-1];
-    farray[9] = NULL;
-
-    label[k].text = (unichar_t *) _("_Options:");
-    label[k].text_is_1byte = true;
-    label[k].text_in_resource = true;
-    gcd[k].gd.label = &label[k];
-    gcd[k].gd.flags = gg_enabled | gg_visible;
-    gcd[k++].creator = GLabelCreate;
-
-    boxes[2].gd.label = (GTextInfo *) &gcd[k-1];
     boxes[2].gd.flags = gg_enabled | gg_visible;
-    boxes[2].gd.u.boxelements = farray;
-    boxes[2].creator = GFlowBoxCreate;
-    //boxes[2].creator = GHBoxCreate;
+    boxes[2].gd.u.boxelements = barray;
+    boxes[2].creator = GHBoxCreate;
 
-    harray[0] = &boxes[2];
-    harray[1] = NULL;
+    varray[0] = catgcd[0];
+    varray[1] = &boxes[2];
+    varray[2] = NULL;
 
     boxes[0].gd.flags = gg_enabled | gg_visible;
-    boxes[0].gd.u.boxelements = harray;
-    boxes[0].creator = GScroll1BoxCreate;
+    boxes[0].gd.u.boxelements = varray;
+    boxes[0].creator = GVBoxCreate;
 
     GGadgetsCreate(gw,boxes);
-/*    gsize.x = gsize.y = 0;
-    gsize.width = GGadgetScale(GDrawPointsToPixels(NULL,200));
-    gsize.height = -1;
-    GGadgetSetDesiredSize(boxes[2].ret, NULL, &gsize); */
-    //GFlowBoxSetPadding(boxes[2].ret, GDrawPointsToPixels(NULL,20), -1, -1);
-    GFlowBoxSetPadding(boxes[2].ret, 0, 0, -1);
-    GScroll1BoxFitWindow(boxes[0].ret);
+
+    GHVBoxSetExpandableRow(boxes[0].ret, 0);
+    GHVBoxSetExpandableCol(boxes[2].ret, gb_expandglue);
+    GHVBoxFitWindow(boxes[0].ret);
+
+    for ( GList_Glib *m = memlist; m!=NULL; m=m->next )
+	free(m->data);
 
     GDrawSetVisible(gw,true);
 
