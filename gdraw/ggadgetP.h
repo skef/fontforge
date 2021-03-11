@@ -275,13 +275,18 @@ typedef struct glist {
 typedef struct gscroll1box {
     GGadget g;
     int32 count;
-    int32 hpad, vpad;
-    int32 scrollmin;
-    int32 curoffset;
+    int32 minsize, oppoatmin;
+    int32 sbsize;
+    int32 subwidth, subheight;
+    int32 pad;
+    int32 scrollchange;
+    int32 offset;
     GGadget **children;
-    struct gscrollbar *sb;
+    GGadget *sb;
+    unsigned int vertical: 1;
     unsigned int always_show_sb: 1;	/* display scrollbar even if we don't need it */
-    unsigned int horizontal: 1;
+    unsigned int sized_for_sb: 1;
+    unsigned int align_flow_labels: 1;
     GWindow nested;
 } GScroll1Box;
 
@@ -439,10 +444,7 @@ typedef struct gflowbox {
     int count;
     int hpad, vpad, lpad;		/* Internal padding */
     int label_size;
-    enum gflowbox_justify hjust;
-    enum gflowbox_justify vjust;
-    enum gflowbox_justify lhjust;
-    enum gflowbox_justify lvjust;
+    enum gg_flags just;
     unsigned int vertical: 1;
     GGadget **children;
     GGadget *label;

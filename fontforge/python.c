@@ -1860,7 +1860,7 @@ static int multiDlgDecodeElem(MultiDlgElem *elem, PyObject *rec) {
     }
     elem->multiple = getDictItemStringBool(rec, "multiple", false);
     elem->checks = getDictItemStringBool(rec, "checks", false);
-    elem->align = getDictItemStringBool(rec, "align", false);
+    elem->align = !getDictItemStringBool(rec, "noalign", false);
     if ( elem->type==mde_choice ) {
 	PyObject *answers_rec = PyDict_GetItemString(rec, "answers");
 	if ( answers_rec==NULL || !PySequence_Check(answers_rec) ) {

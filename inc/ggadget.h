@@ -208,7 +208,19 @@ enum gg_flags { gg_visible=1, gg_enabled=2, gg_pos_in_pixels=4,
 		/* Reuse some flag values for different widgets */
 		gg_file_pulldown=gg_sb_vert, gg_file_multiple = gg_list_multiplesel,
 		gg_text_xim = gg_tabset_scroll,
-		gg_tabset_vert = gg_sb_vert
+		gg_tabset_vert = gg_sb_vert,
+		gg_s1_vert = gg_sb_vert,
+		gg_s1_flowalign = gg_list_alphabetic,
+		gg_flow_right = gg_list_alphabetic,
+		gg_flow_bottom = gg_list_exactlyone,
+		gg_flow_center = gg_list_internal,
+		gg_flow_vcenter = gg_group_prevlabel,
+		gg_flow_expand = gg_group_end,
+		gg_flow_vexpand = gg_textarea_wrap,
+		gg_flow_lright = gg_rowcol_hrules,
+		gg_flow_lbottom = gg_flow_lright,
+		gg_flow_lcenter = gg_rowcol_displayonly,
+		gg_flow_noalignlabel = gg_tabset_scroll
 };
 
 typedef struct ggadgetdata {
@@ -258,8 +270,6 @@ typedef struct ggadgetcreatedata {
 
 enum ghvbox_expand { gb_expandglue=-4, gb_expandgluesame=-3, gb_samesize=-2,
 	gb_expandall=-1 };
-enum gflowbox_justify { gfb_same=-3, gfb_right=-3, gfb_bottom=-3, gfb_center=-2,
-	gfb_expand=-1, gfb_left=0, gfb_top=0 };
 enum editor_commands { ec_cut, ec_clear, ec_copy, ec_paste, ec_undo, ec_redo,
 	ec_selectall, ec_search, ec_backsearch, ec_backword, ec_deleteword,
 	ec_max };
@@ -505,9 +515,12 @@ void GHVBoxFitWindow(GGadget *g);
 void GHVBoxFitWindowCentered(GGadget *g);
 void GHVBoxReflow(GGadget *g);
 
-void GFlowBoxSetPadding(GGadget *g, int hpad, int vpad, int lpad);
+void GFlowBoxSetPadding(GGadget *g, int vpad, int hpad, int lpad);
 int GGadgetIsGFlowBox(GGadget *g);
-void GScroll1BoxSetPadding(GGadget *g, int hpad, int vpad);
+int GFlowBoxGetLabelSize(GGadget *g);
+void GFlowBoxSetLabelSize(GGadget *g, int size);
+void GScroll1BoxSetPadding(GGadget *g, int pad);
+void GScroll1BoxSetSBAlwaysVisible(GGadget *g,int always);
 void GScroll1BoxFitWindow(GGadget *g);
 
 void GMatrixEditSet(GGadget *g,struct matrix_data *data, int rows, int copy_it);

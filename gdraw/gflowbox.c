@@ -118,7 +118,6 @@ static void GFlowBoxGatherMinInfo(GFlowBox *fb,struct fsizeinfo *si) {
     memset(si,0,sizeof(*si));
     si->childsize = calloc(fb->count,sizeof(struct childsizedata));
 
-    // desired/minimum pass
     for ( c=0; c<fb->count; ++c ) {
 	GGadget *g = fb->children[c];
 	struct childsizedata *cs = si->childsize + c;
@@ -162,7 +161,7 @@ static void GFlowBoxSizeTo(GFlowBox *fb,struct fsizeinfo *si, int size) {
     int rowcolstart=0, rowcoloffset=0, cursize=0, opposize=0;
     int pad = fb->vertical ? fb->vpad : fb->hpad;
     int oppopad = fb->vertical ? fb->hpad : fb->vpad;
-    int c, j, subsize;
+    int c, j, subsize, exp, move;
 
     si->rowcols = 0;
     if (si->rowcolbaseline!=NULL)
@@ -173,12 +172,22 @@ static void GFlowBoxSizeTo(GFlowBox *fb,struct fsizeinfo *si, int size) {
 	subsize = size - si->label_width - fb->lpad;
     else
 	subsize = size;
+    printf(" labeldim: %d\n", si->label_width + fb->lpad);
 
     for (c=0; c<fb->count; ++c) {
 	struct childsizedata *cs = si->childsize + c;
 	if (c!=rowcolstart && cursize + cs->min + pad>subsize) {
+	    move = subsize - cursize;
+	    exp = move/(c-rowcolstart);
 	    for (j=rowcolstart; j<c; ++j) {
-		;
+		if ( fb->just & gg_flow_right )
+		    si->childsize[j].offset += move;
+		else if ( fb->just & gg_flow_center )
+		    si->childsize[j].offset += move/2;
+		else if ( fb->just & gg_flow_expand ) {
+		    si->childsize[j].offset += exp*(j-rowcolstart);
+		    si->childsize[j].size += exp;
+		}
 	    }
 	    si->rowcolbaseline[si->rowcols] = rowcoloffset;
 	    si->rowcols++;
@@ -192,13 +201,22 @@ static void GFlowBoxSizeTo(GFlowBox *fb,struct fsizeinfo *si, int size) {
 	if (c!=rowcolstart)
 	    cursize += pad;
 	cs->offset = cursize;
-	cs->size = cs->min; // XXX
+	cs->size = cs->min;
 	cs->opposize = cs->oppomin; // XXX
 	cs->rowcol = si->rowcols;
 	cursize += cs->min;
     }
-    for (j=rowcolstart; j<c; ++j) {
-	;
+    move = subsize - cursize;
+    exp = move/(c-rowcolstart);
+    for (j=rowcolstart; j<fb->count; ++j) {
+	if ( fb->just & gg_flow_right )
+	    si->childsize[j].offset += move;
+	else if ( fb->just & gg_flow_center )
+	    si->childsize[j].offset += move/2;
+	else if ( fb->just & gg_flow_expand ) {
+	    si->childsize[j].offset += exp*(j-rowcolstart);
+	    si->childsize[j].size += exp;
+	}
     }
     si->rowcolbaseline[si->rowcols] = rowcoloffset;
     si->rowcols++;
@@ -214,8 +232,6 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
     int x, y, cw, ch, startoff;
     int old_enabled = GDrawEnableExposeRequests(g->base,false);
 
-    printf("Resize in %d, %d\n", (int)width, (int)height);
-
     GFlowBoxGatherMinInfo(fb,&si);
     width -= 2*bp; height -= 2*bp;
 
@@ -230,8 +246,6 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
 
     fb->g.inner.x = fb->g.r.x + bp;
     fb->g.inner.y = fb->g.r.y + bp;
-
-    printf("inners: %d, %d\n", fb->g.inner.x, fb->g.inner.y);
 
     GFlowBoxSizeTo(fb, &si, size);
 
@@ -251,7 +265,6 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
 	    cw = cs->size;
 	    ch = cs->opposize;
 	}
-	printf("    Vals: %d,%d   %d x %d\n", x, y, cw, ch);
 	if ( g->state!=gs_invisible )
 	    GGadgetResize(g,cw,ch);
 	GGadgetMove(g,fb->g.inner.x+x,fb->g.inner.y+y);
@@ -270,7 +283,6 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
 
     fb->g.inner.width = fb->vertical ? si.opposize : si.size;
     fb->g.inner.height = fb->vertical ? si.size : si.opposize;
-    printf("Resize out %d, %d\n", (int)fb->g.inner.width, (int)fb->g.inner.height);
     fb->g.r.width = fb->g.inner.width + 2*bp;
     fb->g.r.height = fb->g.inner.height + 2*bp;
     GDrawEnableExposeRequests(g->base,old_enabled);
@@ -399,10 +411,27 @@ void GFlowBoxSetPadding(GGadget *g, int hpad, int vpad, int lpad) {
 	fb->lpad = lpad;
 }
 
+int GFlowBoxGetLabelSize(GGadget *g) {
+    GFlowBox *fb = (GFlowBox *) g;
+    GRect outer;
+    if ( fb->label_size!=-1 )
+	return fb->label_size;
+
+    if ( fb->label!=NULL ) {
+	GGadgetGetDesiredSize(fb->label,&outer,NULL);
+	return outer.width;
+    }
+
+    return 0;
+}
+
 void GFlowBoxSetLabelSize(GGadget *g, int size) {
     GFlowBox *fb = (GFlowBox *) g;
-    if ( size>=0 )
+    printf("size: %d, flag: %d\n", size, (fb->just & gg_flow_noalignlabel));
+    if ( size>=0 && !(fb->just & gg_flow_noalignlabel) ) {
 	fb->label_size = size;
+	printf("here!\n");
+    }
 }
 
 int GGadgetIsGFlowBox(GGadget *g) {
@@ -420,8 +449,10 @@ GGadget *GFlowBoxCreate(struct gwindow *base, GGadgetData *gd, void *data) {
 
     fb->g.funcs = &gflowbox_funcs;
     _GGadget_Create(&fb->g,base,gd,data,&flowbox_box);
-    fb->hpad = fb->vpad = fb->lpad = GDrawPointsToPixels(base,2);
+    fb->hpad = fb->vpad = GDrawPointsToPixels(base,2);
+    fb->lpad = GDrawPointsToPixels(base,5);
     fb->label_size = -1;
+    fb->just = gd->flags;
 
     fb->g.takes_input = false;
     fb->g.takes_keyboard = false;

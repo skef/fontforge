@@ -131,7 +131,9 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, GList_Glib 
 	    flarray[fl++] = &gcd[g++];
 	}
     }
-    gcd[g].gd.flags = gg_enabled | gg_visible;
+    gcd[g].gd.flags = gg_enabled | gg_visible | gg_flow_expand;
+    if ( !elemspec->align )
+	gcd[g].gd.flags |= gg_flow_noalignlabel;
     gcd[g].gd.u.boxelements = flarray;
     gcd[g].creator = GFlowBoxCreate;
     ftop = &gcd[g++];
@@ -158,7 +160,7 @@ static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *catspec, 
 
     gcd = calloc(1, sizeof(GGadgetCreateData));
     *memhandle = g_list_append(*memhandle, gcd);
-    gcd->gd.flags = gg_enabled | gg_visible;
+    gcd->gd.flags = gg_enabled | gg_visible | gg_s1_vert | gg_s1_flowalign;
     gcd->gd.u.boxelements = s1barray;
     gcd->creator = GScroll1BoxCreate;
 
