@@ -39,15 +39,18 @@ enum multi_dlg_elem_type { mde_openpath, mde_savepath, mde_string, mde_choice };
  * value. If "tag" is present it is used to represent the answer value in place
  * of "in".
  */
+struct multi_dlg_elem;
+
 typedef struct multi_dlg_answer {
     int is_default, is_checked;
     char *tag, *name;
+    struct multi_dlg_elem *elem;
 } MultiDlgAnswer;
 
 typedef struct multi_dlg_elem {
     enum multi_dlg_elem_type type;
     int answer_size, multiple, checks, align;
-    char *tag, *question, *dflt, *result;
+    char *tag, *question, *dflt, *filter, *result;
     MultiDlgAnswer *answers;
 } MultiDlgElem;
 

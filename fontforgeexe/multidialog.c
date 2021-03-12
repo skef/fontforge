@@ -48,13 +48,21 @@ static int md_e_h(GWindow gw, GEvent *event) {
     return true;
 }
 
-static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, GList_Glib **memhandle) {
+struct multi_expand {
+    GGadgetCreateData *gcd;
+    int is_row;
+    int loc;
+};
+
+struct multi_postproc {
+    GList_Glib *memlist;
+    GList_Glib *expands;
+};
+
+static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct multi_postproc *mpp) {
     int gcnt=1, lcnt=0, flcnt=1, g=0, l=0, fl=0, i;
     GGadgetCreateData *gcd, **flarray, *ftop;
     GTextInfo *label, *glistarray;
-
-    if ( elemspec->type!=mde_string && elemspec->type!=mde_choice )
-	return NULL;
 
     if ( elemspec->question!=NULL ) {
 	lcnt++;
@@ -74,34 +82,41 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, GList_Glib 
 	    gcnt++;
 	    flcnt++;
 	}
+    } else if (elemspec->type==mde_openpath || elemspec->type==mde_savepath ) {
+	lcnt += 2;
+	gcnt += 3;
+	flcnt += 1;
+    } else {
+	ff_post_error(_("Unrecognized MultiAsk Element"), _("Cannot raise MultiAsk Dialog"));
+	return NULL;
     }
     gcd = calloc(gcnt, sizeof(GGadgetCreateData));
-    *memhandle = g_list_append(*memhandle, gcd);
+    mpp->memlist = g_list_append(mpp->memlist, gcd);
     label = calloc(lcnt, sizeof(GTextInfo));
-    *memhandle = g_list_append(*memhandle, label);
+    mpp->memlist = g_list_append(mpp->memlist, label);
     flarray = calloc(flcnt, sizeof(GGadgetCreateData *));
-    *memhandle = g_list_append(*memhandle, flarray);
+    mpp->memlist = g_list_append(mpp->memlist, flarray);
 
     if (elemspec->type==mde_string) {
-	label[l].text = (unichar_t *) elemspec->dflt;
-	label[l++].text_is_1byte = true;
-	gcd[g].gd.label = &label[l-1];
+	label[l].text = (unichar_t *) copy(elemspec->dflt);
+	label[l].text_is_1byte = true;
+	gcd[g].gd.label = &label[l++];
 	gcd[g].gd.flags = gg_enabled | gg_visible;
-	gcd[g].data = &elemspec->result;
+	gcd[g].data = elemspec;
 	gcd[g].creator = GTextFieldCreate;
 	flarray[fl++] = &gcd[g++];
     } else if (elemspec->type==mde_choice) {
 	if (elemspec->checks) {
 	    for ( i=0; i<elemspec->answer_size; ++i ) {
 		MultiDlgAnswer *ans = &elemspec->answers[i];
-		label[l].text = (unichar_t *) ans->name;
+		label[l].text = (unichar_t *) copy(ans->name);
 		label[l].text_in_resource = true;
 		label[l].text_is_1byte = true;
 		gcd[g].gd.label = &label[l++];
 		gcd[g].gd.flags = gg_enabled | gg_visible;
 		if ( ans->is_default )
 		    gcd[g].gd.flags |= gg_cb_on;
-		gcd[g].data = &ans->is_checked;
+		gcd[g].data = ans;
 		if ( elemspec->multiple ) {
 		    gcd[g].creator = GTextFieldCreate;
 		} else {
@@ -113,13 +128,13 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, GList_Glib 
 	    }
 	} else {
 	    glistarray = calloc(elemspec->answer_size+1, sizeof(GTextInfo));
-	    *memhandle = g_list_append(*memhandle, glistarray);
+	    mpp->memlist = g_list_append(mpp->memlist, glistarray);
 	    for ( i=0; i<elemspec->answer_size; ++i ) {
 		MultiDlgAnswer *ans = &elemspec->answers[i];
-		glistarray[i].text = (unichar_t *) ans->name;
+		glistarray[i].text = (unichar_t *) copy(ans->name);
 		glistarray[i].text_is_1byte = true;
 		glistarray[i].selected = ans->is_default;
-		glistarray[i].userdata = &ans->is_checked;
+		glistarray[i].userdata = ans;
 	    }
 	    gcd[g].gd.u.list = glistarray;
 	    gcd[g].gd.flags = gg_visible | gg_enabled;
@@ -130,8 +145,36 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, GList_Glib 
 	    gcd[g].creator = GListCreate;
 	    flarray[fl++] = &gcd[g++];
 	}
+    } else if (elemspec->type==mde_openpath || elemspec->type==mde_savepath ) {
+	int fb=0;
+        GGadgetCreateData **fbox = calloc(3, sizeof(GGadgetCreateData *));
+	mpp->memlist = g_list_append(mpp->memlist, fbox);
+	label[l].text = (unichar_t *) copy(elemspec->dflt);
+	label[l].text_is_1byte = true;
+	gcd[g].gd.label = &label[l++];
+	gcd[g].gd.flags = gg_enabled | gg_visible;
+	gcd[g].data = elemspec;
+	gcd[g].creator = GTextFieldCreate;
+	fbox[fb++] = &gcd[g++];
+	label[l].text = (unichar_t *) "...";
+	label[l++].text_is_1byte = true;
+	gcd[g].gd.label = &label[l-1];
+	gcd[g].gd.flags = gg_enabled | gg_visible;
+	gcd[g].data = elemspec;
+	gcd[g].creator = GButtonCreate;
+	fbox[fb++] = &gcd[g++];
+	gcd[g].gd.flags = gg_enabled | gg_visible;
+	gcd[g].gd.u.boxelements = fbox;
+	gcd[g].creator = GHBoxCreate;
+	struct multi_expand *me = calloc(1, sizeof (struct multi_expand));
+	mpp->expands = g_list_append(mpp->expands, me);
+	me->gcd = &gcd[g];
+	me->is_row = false;
+	me->loc = 0;
+	flarray[fl++] = &gcd[g++];
     }
-    gcd[g].gd.flags = gg_enabled | gg_visible | gg_flow_expand;
+    //gcd[g].gd.flags = gg_enabled | gg_visible | gg_flow_expand;
+    gcd[g].gd.flags = gg_enabled | gg_visible | gg_flow_expand | gg_flow_ocenter | gg_flow_lvcenter;
     if ( !elemspec->align )
 	gcd[g].gd.flags |= gg_flow_noalignlabel;
     gcd[g].gd.u.boxelements = flarray;
@@ -149,18 +192,21 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, GList_Glib 
     return ftop;
 }
 
-static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *catspec, GList_Glib **memhandle) {
+static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *catspec, struct multi_postproc *mpp) {
     int gcnt=1, flcnt=1, g=0, l=0, fl=0, i;
     GGadgetCreateData *gcd, **s1barray;
 
     s1barray = calloc(catspec->size+1, sizeof(GGadgetCreateData *));
-    *memhandle = g_list_append(*memhandle, s1barray);
-    for ( i=0; i<catspec->size; ++i )
-	s1barray[i] = LayoutMultiDlgElem(catspec->elems+i, memhandle);
+    mpp->memlist = g_list_append(mpp->memlist, s1barray);
+    for ( i=0; i<catspec->size; ++i ) {
+	s1barray[i] = LayoutMultiDlgElem(catspec->elems+i, mpp);
+	if ( s1barray[i]==NULL )
+	    return false;
+    }
 
     gcd = calloc(1, sizeof(GGadgetCreateData));
-    *memhandle = g_list_append(*memhandle, gcd);
-    gcd->gd.flags = gg_enabled | gg_visible | gg_s1_vert | gg_s1_flowalign;
+    mpp->memlist = g_list_append(mpp->memlist, gcd);
+    gcd->gd.flags = gg_enabled | gg_visible | gg_s1_vert | gg_s1_flowalign | gg_s1_expand;
     gcd->gd.u.boxelements = s1barray;
     gcd->creator = GScroll1BoxCreate;
 
@@ -170,7 +216,7 @@ static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *catspec, 
 int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     GRect pos, gsize;
     GWindow gw;
-    GList_Glib *memlist=NULL;
+    struct multi_postproc mpp;
     GWindowAttrs wattrs;
     GGadgetCreateData gcd[4], boxes[3], *barray[9], *varray[3], **catgcd;
     GTextInfo label[6];
@@ -179,6 +225,22 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 
     if ( no_windowing_ui )
 	return false;
+
+    memset(&mpp,0,sizeof(mpp));
+    catgcd = calloc(spec->size+1, sizeof(GGadgetCreateData *));
+    mpp.memlist = g_list_append(mpp.memlist, catgcd);
+    for ( i=0; i<spec->size; ++i ) {
+	catgcd[i] = LayoutMultiDlgCategoryBody(spec->categories+i, &mpp);
+	if ( catgcd[i]==NULL ) {
+	    for ( GList_Glib *e = mpp.expands; e!=NULL; e=e->next )
+		free(e->data);
+	    g_list_free(mpp.expands);
+	    for ( GList_Glib *m = mpp.memlist; m!=NULL; m=m->next )
+		free(m->data);
+	    g_list_free(mpp.memlist);
+	   return false;
+	}
+    }
 
     memset(&wattrs,0,sizeof(wattrs));
     wattrs.mask = wam_events|wam_cursor|wam_utf8_wtitle|wam_undercursor|wam_isdlg|wam_restrict;
@@ -196,11 +258,6 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     memset(&label,0,sizeof(label));
     memset(&gcd,0,sizeof(gcd));
     memset(&boxes,0,sizeof(boxes));
-
-    catgcd = calloc(spec->size+1, sizeof(GGadgetCreateData *));
-    memlist = g_list_append(memlist, catgcd); // Why not?
-    for ( i=0; i<spec->size; ++i )
-	catgcd[i] = LayoutMultiDlgCategoryBody(spec->categories+i, &memlist);
 
     barray[b++] = GCD_Glue;
     label[l].text = (unichar_t *) _("_OK");
@@ -249,10 +306,22 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 
     GHVBoxSetExpandableRow(boxes[0].ret, 0);
     GHVBoxSetExpandableCol(boxes[2].ret, gb_expandglue);
+    for ( GList_Glib *e = mpp.expands; e!=NULL; e=e->next ) {
+	struct multi_expand *me = (struct multi_expand *) e->data;
+	if ( me->is_row )
+	    GHVBoxSetExpandableRow(me->gcd->ret, me->loc);
+	else
+	    GHVBoxSetExpandableCol(me->gcd->ret, me->loc);
+	free(me);
+
+    }
+    g_list_free(mpp.expands);
+
     GHVBoxFitWindow(boxes[0].ret);
 
-    for ( GList_Glib *m = memlist; m!=NULL; m=m->next )
+    for ( GList_Glib *m = mpp.memlist; m!=NULL; m=m->next )
 	free(m->data);
+    g_list_free(mpp.memlist);
 
     GDrawSetVisible(gw,true);
 

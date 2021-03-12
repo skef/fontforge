@@ -287,6 +287,7 @@ typedef struct gscroll1box {
     unsigned int always_show_sb: 1;	/* display scrollbar even if we don't need it */
     unsigned int sized_for_sb: 1;
     unsigned int align_flow_labels: 1;
+    enum gg_flags just;
     GWindow nested;
 } GScroll1Box;
 

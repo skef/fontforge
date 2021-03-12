@@ -1813,7 +1813,7 @@ void multiDlgPrint(MultiDlgSpec *dlg) {
 	    printf("Category: %s\n", category->label);
 	for (int j=0; j<category->size; ++j) {
 	    MultiDlgElem *elem = category->elems + j;
-            printf("  Elem: tag='%s', question='%s', default='%s', multiple=%d, checks=%d, align=%d\n", elem->tag, elem->question, elem->dflt, elem->multiple, elem->checks, elem->align);
+            printf("  Elem: tag='%s', question='%s', default='%s', filter='%s', multiple=%d, checks=%d, align=%d\n", elem->tag, elem->question, elem->dflt, elem->filter, elem->multiple, elem->checks, elem->align);
 	    for (int k=0; k<elem->answer_size; ++k) {
 		MultiDlgAnswer *answer = elem->answers + k;
 		printf("      Answer: tag='%s', name='%s', is_default='%d', is_checked=%d\n", answer->tag, answer->name, answer->is_default, answer->is_checked);
@@ -1847,13 +1847,14 @@ static int multiDlgDecodeElem(MultiDlgElem *elem, PyObject *rec) {
 	PyErr_Format(PyExc_TypeError, "askMulti: Missing 'category' key in Category specification.");
 	return false;
     }
-    if ( ( elem->type = FlagsFromString(t, multielemtype, "askMulti Element type") ) == -1) {
+    if ( ( elem->type = FlagsFromString(t, multielemtype, "askMulti Element type") ) == FLAG_UNKNOWN) {
         free(t);
 	return false;
     }
     free(t);
     elem->tag = getDictItemStringString(rec, "tag");
     elem->question = getDictItemStringString(rec, "question");
+    elem->filter = getDictItemStringString(rec, "filter");
     if ( elem->tag==NULL && elem->question==NULL ) {
 	PyErr_Format(PyExc_TypeError, "askMulti: Element specification must include either `question` or `tag`.");
 	return false;
@@ -1870,8 +1871,9 @@ static int multiDlgDecodeElem(MultiDlgElem *elem, PyObject *rec) {
 	elem->answer_size = PySequence_Size(answers_rec);
 	elem->answers = calloc(elem->answer_size, sizeof(MultiDlgAnswer));
 	for (int i = 0; i<elem->answer_size; ++i) {
-	    PyObject *answer_rec = PySequence_GetItem(answers_rec, i);
 	    MultiDlgAnswer *answer = &elem->answers[i];
+	    answer->elem = elem;
+	    PyObject *answer_rec = PySequence_GetItem(answers_rec, i);
 	    if ( !PyDict_Check(answer_rec) ) {
 		PyErr_Format(PyExc_TypeError, "askMulti: Answer for element '%s' not a dictionary", elem->tag==NULL ? elem->tag : elem->question );
 		Py_DECREF(answer_rec);

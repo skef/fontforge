@@ -107,7 +107,7 @@ struct fsizeinfo {
     int des, oppodes;
     int min;
     int size, opposize;
-    int label_width, label_height;
+    int label_width, label_height, label_size;
     int rowcols;
 };
 
@@ -149,10 +149,11 @@ static void GFlowBoxGatherMinInfo(GFlowBox *fb,struct fsizeinfo *si) {
 
     if ( fb->label!=NULL ) {
 	GGadgetGetDesiredSize(fb->label,&outer,NULL);
+	si->label_width = outer.width;
 	if ( fb->label_size!=-1 )
-	    si->label_width = fb->label_size;
+	    si->label_size = fb->label_size;
 	else
-	    si->label_width = outer.width;
+	    si->label_size = si->label_width;
 	si->label_height = outer.height;
     }
 }
@@ -169,10 +170,9 @@ static void GFlowBoxSizeTo(GFlowBox *fb,struct fsizeinfo *si, int size) {
     si->rowcolbaseline = calloc(fb->count,sizeof(int));
 
     if ( !fb->vertical && fb->label!=NULL )
-	subsize = size - si->label_width - fb->lpad;
+	subsize = size - si->label_size - fb->lpad;
     else
 	subsize = size;
-    printf(" labeldim: %d\n", si->label_width + fb->lpad);
 
     for (c=0; c<fb->count; ++c) {
 	struct childsizedata *cs = si->childsize + c;
@@ -228,19 +228,21 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
     struct fsizeinfo si;
     GFlowBox *fb = (GFlowBox *) g;
     int bp = GBoxBorderWidth(g->base,g->box);
-    int c, size;
+    int c, size, opposize, move;
     int x, y, cw, ch, startoff;
     int old_enabled = GDrawEnableExposeRequests(g->base,false);
+    int has_ojust = fb->just & ( gg_flow_oright | gg_flow_ocenter );
 
     GFlowBoxGatherMinInfo(fb,&si);
     width -= 2*bp; height -= 2*bp;
 
     if ( !fb->vertical && fb->label!=NULL )
-	startoff = si.label_width + fb->lpad;
+	startoff = si.label_size + fb->lpad;
     else
 	startoff = 0;
 
     size = fb->vertical ? height : width;
+    opposize = fb->vertical ? width : height;
     if (size < si.min)
 	size = si.min;
 
@@ -248,6 +250,16 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
     fb->g.inner.y = fb->g.r.y + bp;
 
     GFlowBoxSizeTo(fb, &si, size);
+
+    move = opposize - si.opposize;
+    if (has_ojust && move > 0) {
+	for (int rc=0; rc<si.rowcols; ++rc) {
+	    if ( fb->just & gg_flow_oright ) // oright is also obottom
+		si.rowcolbaseline[rc] += move;
+	    else if ( fb->just & gg_flow_ocenter )
+		si.rowcolbaseline[rc] += move/2;
+	}
+    }
 
     for ( c=0; c<fb->count; ++c ) {
 	GGadget *g = fb->children[c];
@@ -272,10 +284,24 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
 
     if ( !fb->vertical && fb->label!=NULL ) {
 	x = 0;
-	y = 0;
 	cw = si.label_width;
+	move = si.label_size - si.label_width;
+	if ( move > 0 ) {
+	    if (fb->just & gg_flow_lright)
+		x += move;
+	    else if ( fb->just & gg_flow_lhcenter )
+		x += move/2;
+	}
+	y = 0;
 	ch = si.label_height;
-	    GGadgetResize(fb->label,cw,ch);
+	move = height - si.label_height;
+	if ( move > 0 ) {
+	    if (fb->just & gg_flow_lbottom)
+		y += move;
+	    else if ( fb->just & gg_flow_lvcenter )
+		y += move/2;
+	}
+	GGadgetResize(fb->label,cw,ch);
 	GGadgetMove(fb->label,fb->g.inner.x+x,fb->g.inner.y+y);
     }
 
@@ -342,8 +368,11 @@ static void GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
     _GFlowBoxGetDesiredSize(g, outer, inner, false);
 }
 
+/* A GScroll1Box will size a GFlowBox larger than it requests when appropriate.
+ * If we return true here the GHVBox/GContainer code will confuse things.
+ */
 static int GFlowBoxFillsWindow(GGadget *g) {
-    return true;
+    return false;
 }
 
 static int expose_nothing(GWindow pixmap, GGadget *g, GEvent *event) {
@@ -427,10 +456,8 @@ int GFlowBoxGetLabelSize(GGadget *g) {
 
 void GFlowBoxSetLabelSize(GGadget *g, int size) {
     GFlowBox *fb = (GFlowBox *) g;
-    printf("size: %d, flag: %d\n", size, (fb->just & gg_flow_noalignlabel));
     if ( size>=0 && !(fb->just & gg_flow_noalignlabel) ) {
 	fb->label_size = size;
-	printf("here!\n");
     }
 }
 
@@ -452,6 +479,7 @@ GGadget *GFlowBoxCreate(struct gwindow *base, GGadgetData *gd, void *data) {
     fb->hpad = fb->vpad = GDrawPointsToPixels(base,2);
     fb->lpad = GDrawPointsToPixels(base,5);
     fb->label_size = -1;
+    fb->vertical = (gd->flags & gg_flow_vert) ? true : false;
     fb->just = gd->flags;
 
     fb->g.takes_input = false;
