@@ -441,10 +441,6 @@ static int gs1bsub_e_h(GWindow gw, GEvent *event) {
     }
 
     switch ( event->type ) {
-	case et_expose:
-	    if ( s1b->nested!=NULL )
-		GDrawRequestExpose(s1b->nested, NULL, false);
-	    break;
 	case et_mousedown:
 	case et_mouseup:
 	    if ( s1b->g.state==gs_disabled )

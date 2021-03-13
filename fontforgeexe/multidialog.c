@@ -40,11 +40,37 @@
     return( true );
 } */
 
+#define CID_BF_PAIR_START 0x800
+
 static int md_e_h(GWindow gw, GEvent *event) {
     if ( event->type==et_close )
 	*(int *) GDrawGetUserData(gw) = true;
     else
 	return false;
+    return true;
+}
+
+static int Multi_BrowseFile(GGadget *g, GEvent *e) {
+    if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
+        GWindow gw = GGadgetGetWindow(g);
+        GGadget *tf = GWidgetGetControl(gw,GGadgetGetCid(g)-1);
+        char *ret, *cur = GGadgetGetTitle8(tf);
+        MultiDlgElem *elemspec = GGadgetGetUserData(tf);
+
+	if ( elemspec->type == mde_openpath )
+            ret = gwwv_open_filename(elemspec->question,
+	                             *cur=='\0' ? NULL : cur,
+	                             elemspec->filter, NULL);
+	else
+            ret = gwwv_save_filename(elemspec->question,
+	                             *cur=='\0' ? NULL : cur,
+	                             elemspec->filter);
+        free(cur);
+        if ( ret==NULL )
+	    return true;
+        GGadgetSetTitle8(tf,ret);
+        free(ret);
+    }
     return true;
 }
 
@@ -57,6 +83,7 @@ struct multi_expand {
 struct multi_postproc {
     GList_Glib *memlist;
     GList_Glib *expands;
+    int fbpair;
 };
 
 static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct multi_postproc *mpp) {
@@ -153,6 +180,8 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	label[l].text_is_1byte = true;
 	gcd[g].gd.label = &label[l++];
 	gcd[g].gd.flags = gg_enabled | gg_visible;
+	gcd[g].gd.cid = mpp->fbpair + CID_BF_PAIR_START;
+	mpp->fbpair++;
 	gcd[g].data = elemspec;
 	gcd[g].creator = GTextFieldCreate;
 	fbox[fb++] = &gcd[g++];
@@ -160,7 +189,10 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	label[l++].text_is_1byte = true;
 	gcd[g].gd.label = &label[l-1];
 	gcd[g].gd.flags = gg_enabled | gg_visible;
-	gcd[g].data = elemspec;
+	gcd[g].gd.cid = mpp->fbpair + CID_BF_PAIR_START;
+	gcd[g].gd.handle_controlevent = Multi_BrowseFile;
+	gcd[g].data = elemspec->filter;
+	mpp->fbpair++;
 	gcd[g].creator = GButtonCreate;
 	fbox[fb++] = &gcd[g++];
 	gcd[g].gd.flags = gg_enabled | gg_visible;
