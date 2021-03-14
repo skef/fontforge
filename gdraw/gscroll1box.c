@@ -63,8 +63,9 @@ static void GScroll1Box_Init() {
 	return;
     _GGadgetCopyDefaultBox(&scroll1box_box);
     scroll1box_box.border_type = bt_none;
-    scroll1box_box.border_width = 0;
-    scroll1box_box.padding = 5;
+    //scroll1box_box.border_width = 0;
+    scroll1box_box.border_width = 10;
+    scroll1box_box.padding = 0;
     _GGadgetInitDefaultBox("GScroll1Box",&scroll1box_box, NULL);
     gscroll1box_inited = true;
 }
@@ -121,7 +122,7 @@ static void GScroll1BoxMove(GGadget *g, int32 x, int32 y) {
     int offx = x-g->r.x, offy = y-g->r.y;
 
     GDrawMove(s1b->nested, g->inner.x+offx, g->inner.y+offy);
-    GGadgetMove(s1b->sb, s1b->sb->r.x+offx, s1b->sb->r.y+offy);
+    GGadgetMove(s1b->sb, s1b->sb->inner.x+offx, s1b->sb->inner.y+offy);
     _ggadget_move(g,x,y);
 }
 
@@ -268,7 +269,7 @@ static void GScroll1BoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
     }
 
     if ( inner!=NULL ) {
-	inner->x = inner->y = 0;
+	inner->x = inner->y = bp;
 	inner->width = width;
 	inner->height = height;
     }
@@ -524,6 +525,7 @@ GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
 
     s1b->g.funcs = &gscroll1box_funcs;
     _GGadget_Create(&s1b->g,base,gd,data,&scroll1box_box);
+    int bp = GBoxBorderWidth(base, s1b->g.box);
     s1b->pad = GDrawPointsToPixels(base, 2);
     s1b->scrollchange = GDrawPointsToPixels(base, 20);
     s1b->offset = 0;
@@ -574,11 +576,17 @@ GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
             gcd->ret->contained = true;
         }
     }
+
+    // In case we're in a subwindow and Move is never called.
+    s1b->g.inner.x = s1b->g.inner.y = bp;
+    GScroll1BoxMove(&s1b->g, 0, 0);
     if ( s1b->g.state!=gs_invisible )
 	GDrawSetVisible(s1b->nested, true);
+
     return &s1b->g;
 }
 
+/*
 void GScroll1BoxFitWindow(GGadget *g) {
     GRect outer, cur, screen;
 
@@ -591,8 +599,8 @@ void GScroll1BoxFitWindow(GGadget *g) {
     outer.height += 2*g->r.y;
     if ( cur.width!=outer.width || cur.height!=outer.height ) {
 	GDrawResize(g->base, outer.width, outer.height );
-        /* We want to get the resize before we set the window visible */
-        /*  and window managers make synchronizing an issue... */
+        // We want to get the resize before we set the window visible
+        //  and window managers make synchronizing an issue...
 	GDrawSync(GDrawGetDisplayOfWindow(g->base));
 	GDrawProcessPendingEvents(GDrawGetDisplayOfWindow(g->base));
 	GDrawSync(GDrawGetDisplayOfWindow(g->base));
@@ -600,6 +608,7 @@ void GScroll1BoxFitWindow(GGadget *g) {
     } else
 	GGadgetResize(g, outer.width-2*g->r.x, outer.height-2*g->r.y );
 }
+*/
 
 GResInfo *_GScroll1BoxRIHead(void) {
     GScroll1Box_Init();

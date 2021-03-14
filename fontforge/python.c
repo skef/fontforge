@@ -1813,7 +1813,7 @@ void multiDlgPrint(MultiDlgSpec *dlg) {
 	    printf("Category: %s\n", category->label);
 	for (int j=0; j<category->size; ++j) {
 	    MultiDlgElem *elem = category->elems + j;
-            printf("  Elem: tag='%s', question='%s', default='%s', filter='%s', multiple=%d, checks=%d, align=%d\n", elem->tag, elem->question, elem->dflt, elem->filter, elem->multiple, elem->checks, elem->align);
+            printf("  Elem: tag='%s', question='%s', default='%s', filter='%s', multiple=%d, checks=%d, align=%d, result='%s'\n", elem->tag, elem->question, elem->dflt, elem->filter, elem->multiple, elem->checks, elem->align, elem->result);
 	    for (int k=0; k<elem->answer_size; ++k) {
 		MultiDlgAnswer *answer = elem->answers + k;
 		printf("      Answer: tag='%s', name='%s', is_default='%d', is_checked=%d\n", answer->tag, answer->name, answer->is_default, answer->is_checked);
