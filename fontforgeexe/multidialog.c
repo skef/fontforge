@@ -37,7 +37,8 @@
 #include <assert.h>
 
 #define CID_BF_PAIR_START 0x10
-#define CID_STR_START 0x1000
+#define CID_LIST_START 0x1000
+#define CID_STR_START 0x2000
 
 enum multi_done_state { mds_not=0, mds_ok=1, mds_cancel=2, mds_apply=3 };
 
@@ -99,6 +100,39 @@ static int Multi_DoRC(GGadget *g, GEvent *e) {
     return true;
 }
 
+static int Multi_DoL(GGadget *g, GEvent *e) {
+    if ( e->type==et_controlevent && e->u.control.subtype == et_listselected ) {
+        MultiDlgElem *elemspec = GGadgetGetUserData(g);
+	if ( elemspec==NULL )
+	    return false;
+	assert( elemspec->type == mde_choice && !elemspec->checks );
+	for ( int i=0; i<elemspec->answer_size; ++i )
+	    elemspec->answers[i].is_checked = GGadgetIsListItemSelected(g, i);
+    }
+    return true;
+}
+
+static int Multi_MLSelect(GGadget *g, GEvent *e, int sel) {
+    if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
+	GWindow gw = GGadgetGetWindow(g);
+	long cid = (long) GGadgetGetUserData(g);
+	GGadget *l = GWidgetGetControl(gw, cid);
+	GGadgetSelectListItem(l, -1, sel);
+	e->u.control.subtype = et_listselected;
+	Multi_DoL(l, e);
+	e->u.control.subtype = et_buttonactivate;
+    }
+    return true;
+}
+
+static int Multi_MLSelectAll(GGadget *g, GEvent *e) {
+    return Multi_MLSelect(g, e, true);
+}
+
+static int Multi_MLSelectNone(GGadget *g, GEvent *e) {
+    return Multi_MLSelect(g, e, false);
+}
+
 struct multi_expand {
     GGadgetCreateData *gcd;
     int is_row;
@@ -110,6 +144,7 @@ struct multi_postproc {
     GList_Glib *textlist;
     GList_Glib *expands;
     int strcid;
+    int listcid;
     int fbpair;
 };
 
@@ -136,6 +171,10 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	} else {
 	    gcnt++;
 	    flcnt++;
+	    if ( elemspec->multiple ) {
+		lcnt += 2;
+		gcnt += 3;
+	    }
 	}
     } else if (elemspec->type==mde_openpath || elemspec->type==mde_savepath ) {
 	lcnt += 2;
@@ -210,11 +249,48 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	    }
 	    gcd[g].gd.u.list = glistarray;
 	    gcd[g].gd.flags = gg_visible | gg_enabled;
-	    if ( elemspec->multiple )
-		gcd[g].gd.flags |= gg_list_multiplesel;
-	    else
-		gcd[g].gd.flags |= gg_list_exactlyone;
+	    gcd[g].gd.mnemonic = qmne;
+	    gcd[g].gd.cid = mpp->listcid + CID_LIST_START;
 	    gcd[g].creator = GListCreate;
+	    gcd[g].data = elemspec;
+	    gcd[g].gd.handle_controlevent = Multi_DoL;
+	    if ( elemspec->multiple ) {
+		gcd[g].gd.flags |= gg_list_multiplesel;
+		GGadgetCreateData *(*lbox)[3] = calloc(1, sizeof(GGadgetCreateData *[3][3]));
+		mpp->memlist = g_list_append(mpp->memlist, lbox);
+		lbox[0][0] = &gcd[g++];
+		lbox[1][0] = GCD_RowSpan;
+
+		label[l].text = (unichar_t *) "All";
+		label[l].text_is_1byte = true;
+		gcd[g].gd.label = &label[l++];
+		gcd[g].gd.flags = gg_enabled | gg_visible;
+		gcd[g].creator = GButtonCreate;
+	        gcd[g].gd.handle_controlevent = Multi_MLSelectAll;
+		gcd[g].data = (void *)(long) mpp->listcid + CID_LIST_START;
+		lbox[0][1] = &gcd[g++];
+
+		label[l].text = (unichar_t *) "None";
+		label[l].text_is_1byte = true;
+		gcd[g].gd.label = &label[l++];
+		gcd[g].gd.flags = gg_enabled | gg_visible;
+		gcd[g].creator = GButtonCreate;
+	        gcd[g].gd.handle_controlevent = Multi_MLSelectNone;
+		gcd[g].data = (void *)(long) mpp->listcid + CID_LIST_START;
+		lbox[1][1] = &gcd[g++];
+
+		gcd[g].gd.flags = gg_enabled | gg_visible;
+		gcd[g].gd.u.boxelements = lbox[0];
+		gcd[g].creator = GHVBoxCreate;
+		struct multi_expand *me = calloc(1, sizeof (struct multi_expand));
+		mpp->expands = g_list_append(mpp->expands, me);
+		me->gcd = &gcd[g];
+		me->is_row = false;
+		me->loc = 0;
+	    } else {
+		gcd[g].gd.flags |= gg_list_exactlyone;
+	    }
+	    mpp->listcid++;
 	    flarray[fl++] = &gcd[g++];
 	}
     } else if (elemspec->type==mde_openpath || elemspec->type==mde_savepath ) {
@@ -280,18 +356,19 @@ static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *catspec, 
     gcd = calloc(2, sizeof(GGadgetCreateData));
     mpp->memlist = g_list_append(mpp->memlist, gcd);
     gcd[0].gd.flags = gg_enabled | gg_visible | gg_s1_vert | gg_s1_flowalign | gg_s1_expand;
+    // gcd[0].gd.flags = gg_enabled | gg_visible | gg_s1_expand;
     gcd[0].gd.u.boxelements = s1barray;
     gcd[0].creator = GScroll1BoxCreate;
 
     return gcd;
 }
 
-static void MultiSyncChecks(MultiDlgSpec *spec) {
+static void MultiSyncChoices(MultiDlgSpec *spec) {
     for ( int c=0; c<spec->size; ++c ) {
 	MultiDlgCategory *catspec = spec->categories + c;
 	for ( int e=0; e<catspec->size; ++e ) {
 	    MultiDlgElem *elemspec = catspec->elems + e;
-	    if ( elemspec->type==mde_choice && elemspec->checks ) {
+	    if ( elemspec->type==mde_choice ) {
 		for ( int a=0; a<elemspec->answer_size; ++a ) {
 		    elemspec->answers[a].is_checked = elemspec->answers[a].is_default;
 		}
@@ -471,7 +548,7 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 	free(m->data);
     g_list_free(mpp.memlist);
 
-    MultiSyncChecks(spec);
+    MultiSyncChoices(spec);
 
     GDrawSetVisible(gw,true);
 
@@ -479,7 +556,7 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 	GDrawProcessOneEvent(NULL);
 
     if ( mds==mds_cancel ) {
-	MultiSyncChecks(spec);
+	MultiSyncChoices(spec);
     } else {
 	assert( mds==mds_ok );
 	MultiCopyStrings(gw, spec, mpp.strcid, mpp.fbpair);

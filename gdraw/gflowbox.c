@@ -25,6 +25,15 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* XXX NOTE:
+ *
+ * Although the GFlowBox has code for vertical layout with the
+ * gg_flow_vert flag it is not debugged. Labels are also always
+ * laid out horizontally before the elements. The first person
+ * who wants to use a GFlowBox vertically will have to work through
+ * the relevant issues.
+ */
+
 #include <fontforge-config.h>
 
 #include "gdraw.h"
@@ -95,8 +104,7 @@ static void GFlowBoxMove(GGadget *g, int32 x, int32 y) {
 struct childsizedata {
     int extra_space;		/* a default button has "extra_space" */
     int min, size, offset;
-    int oppomin;
-    int opposize;
+    int oppomin, opposize;
     int oppooffset; // Relative to rowcol
     int rowcol;
 };
@@ -118,6 +126,16 @@ static void GFlowBoxGatherMinInfo(GFlowBox *fb,struct fsizeinfo *si) {
     memset(si,0,sizeof(*si));
     si->childsize = calloc(fb->count,sizeof(struct childsizedata));
 
+    if ( fb->label!=NULL ) {
+	GGadgetGetDesiredSize(fb->label,&outer,NULL);
+	si->label_width = outer.width;
+	if ( fb->label_size!=-1 )
+	    si->label_size = fb->label_size;
+	else
+	    si->label_size = si->label_width;
+	si->label_height = outer.height;
+    }
+
     for ( c=0; c<fb->count; ++c ) {
 	GGadget *g = fb->children[c];
 	struct childsizedata *cs = si->childsize + c;
@@ -138,23 +156,12 @@ static void GFlowBoxGatherMinInfo(GFlowBox *fb,struct fsizeinfo *si) {
 	    }
 	}
 	si->des += cs->min;
-	if ( c!=0 ) {
+	if ( c!=0 )
 	    si->des += fb->vertical ? fb->vpad : fb->hpad;
-	}
 	if (si->oppodes < cs->oppomin)
 	    si->oppodes = cs->oppomin;
 	if (si->min < cs->min)
 	    si->min = cs->min;
-    }
-
-    if ( fb->label!=NULL ) {
-	GGadgetGetDesiredSize(fb->label,&outer,NULL);
-	si->label_width = outer.width;
-	if ( fb->label_size!=-1 )
-	    si->label_size = fb->label_size;
-	else
-	    si->label_size = si->label_width;
-	si->label_height = outer.height;
     }
 }
 
@@ -202,7 +209,7 @@ static void GFlowBoxSizeTo(GFlowBox *fb,struct fsizeinfo *si, int size) {
 	    cursize += pad;
 	cs->offset = cursize;
 	cs->size = cs->min;
-	cs->opposize = cs->oppomin; // XXX
+	cs->opposize = cs->oppomin;
 	cs->rowcol = si->rowcols;
 	cursize += cs->min;
     }
@@ -348,10 +355,12 @@ void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashe
 	    width = si.des;
 	    height = si.oppodes;
 	}
+	if ( height < si.label_height )
+	    height = si.label_height;
     }
 
     if ( fb->label!=NULL )
-	    width += si.label_width + fb->lpad;
+	width += si.label_width + fb->lpad;
 
     if ( inner!=NULL ) {
 	inner->x = inner->y = 0;
