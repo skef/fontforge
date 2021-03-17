@@ -63,9 +63,8 @@ static void GScroll1Box_Init() {
 	return;
     _GGadgetCopyDefaultBox(&scroll1box_box);
     scroll1box_box.border_type = bt_none;
-    //scroll1box_box.border_width = 0;
-    scroll1box_box.border_width = 10;
-    scroll1box_box.padding = 0;
+    scroll1box_box.border_width = 1;
+    scroll1box_box.padding = 3;
     _GGadgetInitDefaultBox("GScroll1Box",&scroll1box_box, NULL);
     gscroll1box_inited = true;
 }
@@ -87,34 +86,29 @@ static void GScroll1BoxDestroy(GGadget *g) {
 
 static void GScroll1Box_SetScroll(GScroll1Box *s1b) {
     int need_sb, pagewidth = s1b->g.inner.width, pageheight = s1b->g.inner.height;
-    GRect wsize;
 
     if ( s1b->vertical ) {
-	if ( s1b->sized_for_sb )
-	    pagewidth -= s1b->sbsize;
 	need_sb = pageheight < s1b->subheight;
 	GGadgetMove(s1b->sb, s1b->g.inner.x + s1b->g.inner.width - s1b->sbsize, s1b->g.inner.y);
 	GGadgetResize(s1b->sb, s1b->sbsize, s1b->g.inner.height);
-	if ( need_sb )
+	if ( need_sb || s1b->always_show_sb ) {
+	    pagewidth -= s1b->sbsize;
 	    GScrollBarSetBounds(s1b->sb, 0, s1b->subheight, pageheight);
+	}
     } else {
 	if ( s1b->sized_for_sb )
-	    pageheight -= s1b->sbsize;
 	need_sb = pagewidth < s1b->subwidth;
 	GGadgetMove(s1b->sb, s1b->g.inner.x, s1b->g.inner.y + s1b->g.inner.height - s1b->sbsize);
 	GGadgetResize(s1b->sb, s1b->g.inner.width, s1b->sbsize);
-	if ( need_sb )
+	if ( need_sb || s1b->always_show_sb ) {
+	    pageheight -= s1b->sbsize;
 	    GScrollBarSetBounds(s1b->sb, 0, s1b->subwidth, pagewidth);
+	}
     }
     GGadgetSetVisible(s1b->sb, s1b->always_show_sb || need_sb);
     GGadgetSetEnabled(s1b->sb, need_sb);
-
     // Subwindow 
     GDrawResize(s1b->nested, pagewidth, pageheight);
-    GDrawGetSize(s1b->nested, &wsize);
-    wsize.width = pagewidth;
-    wsize.height = pageheight;
-    s1b->nested->pos = wsize;
 }
 
 static void GScroll1BoxMove(GGadget *g, int32 x, int32 y) {
@@ -122,7 +116,7 @@ static void GScroll1BoxMove(GGadget *g, int32 x, int32 y) {
     int offx = x-g->r.x, offy = y-g->r.y;
 
     GDrawMove(s1b->nested, g->inner.x+offx, g->inner.y+offy);
-    GGadgetMove(s1b->sb, s1b->sb->inner.x+offx, s1b->sb->inner.y+offy);
+    GGadgetMove(s1b->sb, s1b->sb->r.x+offx, s1b->sb->r.y+offy);
     _ggadget_move(g,x,y);
 }
 
@@ -210,20 +204,16 @@ static int GScroll1Box_Scroll(GGadget *g, GEvent *e) {
  * smaller.
  */
 
-static void GScroll1BoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
+void _GScroll1BoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int big) {
     GScroll1Box *s1b = (GScroll1Box *) g;
     int bp = GBoxBorderWidth(g->base, g->box);
     int sbwidth, sbheight;
-    int width=0, height=0, c, minopposize, flowlabelsize=0, t;
+    int width=0, height=0, c, flowlabelsize=0, t;
     GRect rect;
-
-    GGadgetGetDesiredSize(s1b->sb, &rect, NULL);
-    sbwidth = rect.width;
-    sbheight = rect.height;
 
     for ( c=0; c<s1b->count; ++c ) {
 	if (GGadgetIsGFlowBox(s1b->children[c])) {
-	    _GFlowBoxGetDesiredSize(s1b->children[c], &rect, NULL, true);
+	    _GFlowBoxGetDesiredSize(s1b->children[c], &rect, NULL, !big, true);
 	    t = GFlowBoxGetLabelSize(s1b->children[c]);
 	    if ( flowlabelsize < t )
 		flowlabelsize = t;
@@ -248,23 +238,32 @@ static void GScroll1BoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
 	    if (GGadgetIsGFlowBox(s1b->children[c]))
 		GFlowBoxSetLabelSize(s1b->children[c], flowlabelsize);
 
+    if ( !big ) {
+	GGadgetGetDesiredSize(s1b->sb, &rect, NULL);
+	sbwidth = rect.width;
+	sbheight = rect.height;
+	s1b->sbsize = s1b->vertical ? sbwidth : sbheight;
+    }
+
     if ( s1b->vertical ) {
-	s1b->sbsize = sbwidth;
-	s1b->minsize = width;
-	s1b->oppoatmin = height;
+	if ( !big ) {
+	    s1b->minsize = width;
+	    s1b->oppoatmin = height;
+	}
 	width += s1b->sbsize;
 	if ( height < g->desired_height )
 	    height = g->desired_height;
-	else if ( height > sbheight )
+	else if ( !big && height > sbheight )
 	    height = sbheight;
     } else {
-	s1b->sbsize = sbheight;
-	s1b->minsize = height;
-	s1b->oppoatmin = width;
+	if ( !big ) {
+	    s1b->minsize = height;
+	    s1b->oppoatmin = width;
+	}
 	height += s1b->sbsize;
 	if ( width < g->desired_width )
 	    width = g->desired_width;
-	else if ( width > sbwidth )
+	else if ( !big && width > sbwidth )
 	    width = sbwidth;
     }
 
@@ -278,6 +277,10 @@ static void GScroll1BoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
 	outer->width = width+2*bp;
 	outer->height = height+2*bp;
     }
+}
+
+static void GScroll1BoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
+    _GScroll1BoxGetDesiredSize(g, outer, inner, false);
 }
 
 static int GScroll1BoxExpose(GWindow pixmap, GGadget *g, GEvent *event) {
@@ -307,39 +310,45 @@ static void GScroll1BoxResize(GGadget *g, int32 width, int32 height ) {
     struct childdata *cd = calloc(s1b->count, sizeof(struct childdata));
     GRect rect, wsize;
 
-    width -= 2*bp;
-    height -= 2*bp;
-
-    g->inner.x = g->r.x + bp;
-    g->inner.y = g->r.y + bp;
-
     // This gadget
     _ggadget_resize(g,width,height);
+
+    width = g->inner.width;
+    height = g->inner.height;
 
     has_just = s1b->just & ( gg_s1_right | gg_s1_bottom | gg_s1_center | gg_s1_expand );
 
     // Children
     if ( s1b->vertical ) {
-	if ( height<s1b->oppoatmin || s1b->always_show_sb ) {
-	    width -= s1b->sbsize;
-	    s1b->sized_for_sb = true;
-	}
-	if ( width < s1b->minsize )
-	    width = s1b->minsize;
-	if ( s1b->subwidth!=width || (has_just && s1b->subheight!=height)) {
-	    s1b->subwidth = width;
-	    s1b->subheight = 0;
-	    for ( c=0; c<s1b->count; ++c ) {
-		rect.height = -1;
-		rect.width = width;
-		if (GGadgetIsGFlowBox(s1b->children[c]))
-		    GGadgetSetDesiredSize(s1b->children[c], &rect, NULL);
-		GGadgetGetDesiredSize(s1b->children[c], &rect, NULL);
-		if ( c>0 )
-		    s1b->subheight += s1b->pad;
-		cd[c].size = rect.height;
-		cd[c].offset = s1b->subheight;
-		s1b->subheight += rect.height;
+	if ( width < s1b->minsize+s1b->sbsize )
+	    width = s1b->minsize+s1b->sbsize;
+	if (   (   !( s1b->subwidth==width             && !s1b->sized_for_sb )
+	        && !( s1b->subwidth==width-s1b->sbsize && s1b->sized_for_sb ) )
+	    || s1b->subheight!=height ) {
+	    s1b->sized_for_sb = false;
+	    for ( int i=0; i<2; ++i ) {
+		s1b->subwidth = width;
+		s1b->subheight = 0;
+		for ( c=0; c<s1b->count; ++c ) {
+		    rect.height = -1;
+		    rect.width = width;
+		    if (GGadgetIsGFlowBox(s1b->children[c]))
+			GGadgetSetDesiredSize(s1b->children[c], &rect, NULL);
+		    GGadgetGetDesiredSize(s1b->children[c], &rect, NULL);
+		    if ( c>0 )
+			s1b->subheight += s1b->pad;
+		    cd[c].size = rect.height;
+		    cd[c].offset = s1b->subheight;
+		    s1b->subheight += rect.height;
+	        }
+		if ( i==0 )
+		    s1b->curminopposize = s1b->subheight;
+		if ( s1b->subheight <= height )
+		    break;
+		if ( i==0 ) {
+		    width -= s1b->sbsize;
+		    s1b->sized_for_sb = true;
+		}
 	    }
 	    move = height - s1b->subheight;
 	    exp = move/s1b->count;
@@ -363,26 +372,35 @@ static void GScroll1BoxResize(GGadget *g, int32 width, int32 height ) {
 		s1b->subheight += move;
 	}
     } else {
-	if ( width<s1b->oppoatmin || s1b->always_show_sb ) {
-	    height -= s1b->sbsize;
-	    s1b->sized_for_sb = true;
-	}
 	if ( height<s1b->minsize )
 	    height = s1b->minsize;
-	if ( s1b->subheight!=height || (has_just && s1b->subwidth!=width)) {
-	    s1b->subheight = height;
-	    s1b->subwidth = 0;
-	    for ( c=0; c<s1b->count; ++c ) {
-		rect.width = -1;
-		rect.height = height;
-		if (GGadgetIsGFlowBox(s1b->children[c]))
-		    GGadgetSetDesiredSize(s1b->children[c], &rect, NULL);
-		GGadgetGetDesiredSize(s1b->children[c], &rect, NULL);
-		if ( c>0 )
-		    s1b->subwidth += s1b->pad;
-		cd[c].size = rect.width;
-		cd[c].offset = s1b->subwidth;
-		s1b->subwidth += rect.width;
+	if (   (   !( s1b->subheight==height             && !s1b->sized_for_sb )
+	        && !( s1b->subheight==height-s1b->sbsize && s1b->sized_for_sb ) )
+	    || s1b->subwidth!=width ) {
+	    s1b->sized_for_sb = false;
+	    for ( int i=0; i<2; ++i ) {
+		s1b->subheight = height;
+		s1b->subwidth = 0;
+		for ( c=0; c<s1b->count; ++c ) {
+		    rect.width = -1;
+		    rect.height = height;
+		    if (GGadgetIsGFlowBox(s1b->children[c]))
+			GGadgetSetDesiredSize(s1b->children[c], &rect, NULL);
+		    GGadgetGetDesiredSize(s1b->children[c], &rect, NULL);
+		    if ( c>0 )
+			s1b->subwidth += s1b->pad;
+		    cd[c].size = rect.width;
+		    cd[c].offset = s1b->subwidth;
+		    s1b->subwidth += rect.width;
+		}
+		if ( i==0 )
+		    s1b->curminopposize = s1b->subwidth;
+		if ( s1b->subwidth <= width )
+		    break;
+		if ( i==0 ) {
+		    height -= s1b->sbsize;
+		    s1b->sized_for_sb = true;
+		}
 	    }
 	    move = width - s1b->subwidth;
 	    exp = move/s1b->count;
@@ -413,6 +431,17 @@ static void GScroll1BoxResize(GGadget *g, int32 width, int32 height ) {
 
     GDrawEnableExposeRequests(g->base,old_enabled);
     GDrawRequestExpose(g->base,&g->r,false);
+}
+
+int GScroll1BoxMinOppoSize(GGadget *g) {
+    GScroll1Box *s1b = (GScroll1Box *) g;
+
+    return s1b->curminopposize + g->r.height - g->inner.height;
+}
+
+int GScroll1BoxSBSize(GGadget *g) {
+    GScroll1Box *s1b = (GScroll1Box *) g;
+    return s1b->sbsize;
 }
 
 static void GScroll1BoxSetVisible(GGadget *g, int visible) {
@@ -528,9 +557,13 @@ GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     s1b->g.funcs = &gscroll1box_funcs;
     _GGadget_Create(&s1b->g,base,gd,data,&scroll1box_box);
     int bp = GBoxBorderWidth(base, s1b->g.box);
-    s1b->pad = GDrawPointsToPixels(base, 2);
+    s1b->pad = GDrawPointsToPixels(base, 4);
     s1b->scrollchange = GDrawPointsToPixels(base, 20);
     s1b->offset = 0;
+
+    // temporary values before Resize
+    s1b->g.r = (GRect) { 0, 0, 100, 100 };
+    s1b->g.inner = (GRect) { bp, bp, 100-2*bp, 100-2*bp };
 
     if ( gd->flags & gg_s1_vert )
 	s1b->vertical = true;
@@ -545,8 +578,7 @@ GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     wattrs.event_masks = ~(1<<et_charup);
     wattrs.cursor = ct_pointer;
     wattrs.background_color = s1b->g.box->main_background;
-    // temporary values before Resize
-    pos = (GRect) { 0, 0, 100, 100 };
+    pos = s1b->g.inner;
     s1b->nested = GWidgetCreateSubWindow(base, &pos, gs1bsub_e_h, s1b, &wattrs);
 
     s1b->g.takes_input = false;
@@ -557,10 +589,10 @@ GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     // Will redo in GetDesiredSize
     s1b->sbsize = GDrawPointsToPixels(base,_GScrollBar_Width);
     if ( s1b->vertical ) {
-	sub_gd.pos = (GRect) { 100-s1b->sbsize, 0, s1b->sbsize, 100 };
+	sub_gd.pos = (GRect) { 100-bp-s1b->sbsize, bp, s1b->sbsize, 100-2*bp };
 	sub_gd.flags = gg_enabled | gg_visible | gg_sb_vert | gg_pos_in_pixels;
     } else {
-	sub_gd.pos = (GRect) { 0, 100-s1b->sbsize, 100, s1b->sbsize };
+	sub_gd.pos = (GRect) { bp, 100-bp-s1b->sbsize, 100-2*bp, s1b->sbsize };
 	sub_gd.flags = gg_enabled | gg_visible | gg_pos_in_pixels;
     }
     sub_gd.handle_controlevent = GScroll1Box_Scroll;
@@ -579,9 +611,6 @@ GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
         }
     }
 
-    // In case we're in a subwindow and Move is never called.
-    s1b->g.inner.x = s1b->g.inner.y = bp;
-    GScroll1BoxMove(&s1b->g, 0, 0);
     if ( s1b->g.state!=gs_invisible )
 	GDrawSetVisible(s1b->nested, true);
 

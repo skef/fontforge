@@ -37,8 +37,8 @@
 #include <assert.h>
 
 #define CID_BF_PAIR_START 0x10
-#define CID_LIST_START 0x1000
-#define CID_STR_START 0x2000
+#define CID_STR_START 0x1000
+#define CID_LIST_START 0x4000
 
 enum multi_done_state { mds_not=0, mds_ok=1, mds_cancel=2, mds_apply=3 };
 
@@ -115,7 +115,7 @@ static int Multi_DoL(GGadget *g, GEvent *e) {
 static int Multi_MLSelect(GGadget *g, GEvent *e, int sel) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	GWindow gw = GGadgetGetWindow(g);
-	long cid = (long) GGadgetGetUserData(g);
+	size_t cid = (size_t) GGadgetGetUserData(g);
 	GGadget *l = GWidgetGetControl(gw, cid);
 	GGadgetSelectListItem(l, -1, sel);
 	e->u.control.subtype = et_listselected;
@@ -267,7 +267,7 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 		gcd[g].gd.flags = gg_enabled | gg_visible;
 		gcd[g].creator = GButtonCreate;
 	        gcd[g].gd.handle_controlevent = Multi_MLSelectAll;
-		gcd[g].data = (void *)(long) mpp->listcid + CID_LIST_START;
+		gcd[g].data = (void *)(size_t) mpp->listcid + CID_LIST_START;
 		lbox[0][1] = &gcd[g++];
 
 		label[l].text = (unichar_t *) "None";
@@ -276,7 +276,7 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 		gcd[g].gd.flags = gg_enabled | gg_visible;
 		gcd[g].creator = GButtonCreate;
 	        gcd[g].gd.handle_controlevent = Multi_MLSelectNone;
-		gcd[g].data = (void *)(long) mpp->listcid + CID_LIST_START;
+		gcd[g].data = (void *)(size_t) mpp->listcid + CID_LIST_START;
 		lbox[1][1] = &gcd[g++];
 
 		gcd[g].gd.flags = gg_enabled | gg_visible;
@@ -329,7 +329,9 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	me->loc = 0;
 	flarray[fl++] = &gcd[g++];
     }
-    gcd[g].gd.flags = gg_enabled | gg_visible | gg_flow_expand | gg_flow_ocenter | gg_flow_lvcenter;
+    gcd[g].gd.flags = gg_enabled | gg_visible | gg_flow_ocenter | gg_flow_lvcenter;
+    if ( !( elemspec->type==mde_choice && elemspec->checks ) )
+	gcd[g].gd.flags |= gg_flow_expand;
     if ( !elemspec->align )
 	gcd[g].gd.flags |= gg_flow_noalignlabel;
     gcd[g].gd.u.boxelements = flarray;
@@ -351,12 +353,11 @@ static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *catspec, 
 	    return false;
     }
 
-    // 2 elements in case this is created at the top of a tabset,
-    // which uses GGadgetsCreate()
+    // Allocate 2 elements in case this is created at the top of a tabset,
+    // which calls GGadgetsCreate()
     gcd = calloc(2, sizeof(GGadgetCreateData));
     mpp->memlist = g_list_append(mpp->memlist, gcd);
     gcd[0].gd.flags = gg_enabled | gg_visible | gg_s1_vert | gg_s1_flowalign | gg_s1_expand;
-    // gcd[0].gd.flags = gg_enabled | gg_visible | gg_s1_expand;
     gcd[0].gd.u.boxelements = s1barray;
     gcd[0].creator = GScroll1BoxCreate;
 
@@ -405,7 +406,7 @@ static void MultiCopyStrings(GWindow gw, MultiDlgSpec *spec, int strcid, int fbp
 }
 
 int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
-    GRect pos, gsize;
+    GRect pos, wsize, scsize, s1bsize, s1bt;
     GWindow gw;
     struct multi_postproc mpp;
     GWindowAttrs wattrs;
@@ -414,6 +415,8 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     GTextInfo label[6];
     enum multi_done_state mds = mds_not;
     int b=0, g=0, l=0, i, err=false;
+    int maxwidth=0, targetwidth, widthdiff;
+    int maxheight=0, targetheight, heightdiff;
 
     if ( no_windowing_ui )
 	return false;
@@ -433,6 +436,7 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 		break;
 	    }
 	}
+	cat1 = categories[0].gcd;
     } else if ( spec->size==1 ) {
 	cat1 = LayoutMultiDlgCategoryBody(spec->categories, &mpp);
 	err = cat1==NULL;
@@ -482,7 +486,7 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     barray[b++] = &gcd[g++];
     barray[b++] = GCD_Glue;
 
-    if ( true ) {
+    if ( false ) {
 	label[l].text = (unichar_t *) _("_Apply");
 	label[l].text_is_1byte = true;
 	label[l].text_in_resource = true;
@@ -543,6 +547,59 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     g_list_free(mpp.textlist);
 
     GHVBoxFitWindow(boxes[0].ret);
+
+    // Find and set more appropriate window dimensions
+ 
+    GDrawGetSize(gw, &wsize);
+    GDrawGetSize(GDrawGetRoot(NULL),&scsize);
+
+    // Outer size of the just-fit GScroll1Box 
+    if ( spec->size > 1 )
+	GGadgetGetInnerSize(boxes[3].ret, &s1bsize);
+    else
+	GGadgetGetSize(cat1->ret, &s1bsize);
+
+    // Appropriate width
+    _GScroll1BoxGetDesiredSize(cat1->ret, &s1bt, NULL, true);
+    maxwidth = s1bt.width;
+    for ( i=1; i<spec->size; ++i ) {
+	_GScroll1BoxGetDesiredSize(categories[i].gcd->ret, &s1bt, NULL, true);
+	if ( s1bt.width > maxwidth )
+	    maxwidth = s1bt.width;
+    }
+    targetwidth = GDrawPointsToPixels(gw,400);
+    if ( targetwidth > (int) (.666 * scsize.width) )
+	targetwidth = (int) (.666 * scsize.width);
+    // From window width to gadget width
+    targetwidth -= wsize.width-s1bsize.width;
+    if ( targetwidth > maxwidth )
+	targetwidth = maxwidth;
+    widthdiff = targetwidth - s1bsize.width;
+    if ( widthdiff>0 ) {
+	// Need this to calculate the "min oppo size" (roughly the height 
+	// of the scrolling window corresponding to the resize width).
+	GGadgetResize(cat1->ret, targetwidth, s1bsize.height);
+	for ( i=1; i<spec->size; ++i )
+	    GGadgetResize(categories[i].gcd->ret, targetwidth, s1bsize.height);
+    } else
+	widthdiff = 0;
+
+    // Appropriate height
+    maxheight = GScroll1BoxMinOppoSize(cat1->ret);
+    for ( i=1; i<spec->size; ++i ) {
+	s1bt.height = GScroll1BoxMinOppoSize(categories[i].gcd->ret);
+	if ( s1bt.height > maxheight )
+	    maxheight = s1bt.height;
+    }
+    targetheight = (int) (.9 * scsize.height);
+    targetheight -= wsize.height - s1bsize.height;
+    if ( targetheight > maxheight )
+	targetheight = maxheight;
+    heightdiff = targetheight - s1bsize.height;
+    if ( widthdiff>0 || heightdiff>0 ) {
+	GDrawMove(gw, wsize.x-widthdiff/2, wsize.y-heightdiff/2);
+	GDrawResize(gw, wsize.width+widthdiff, wsize.height+heightdiff);
+    }
 
     for ( GList_Glib *m = mpp.memlist; m!=NULL; m=m->next )
 	free(m->data);

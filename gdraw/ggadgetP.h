@@ -278,6 +278,7 @@ typedef struct gscroll1box {
     int32 minsize, oppoatmin;
     int32 sbsize;
     int32 subwidth, subheight;
+    int32 curminopposize;
     int32 pad;
     int32 scrollchange;
     int32 offset;
@@ -605,7 +606,7 @@ extern int GTextInfoArrayCount(GTextInfo **ti);
 extern int GTextInfoCompare(GTextInfo *ti1, GTextInfo *ti2);
 extern int GMenuItemArrayMask(GMenuItem *mi);
 extern int GMenuItemArrayAnyUnmasked(GMenuItem *mi);
-extern void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashed);
+extern void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashed, int ignore_des);
 
 extern GGadget *_GGadget_Create(GGadget *g, struct gwindow *base, GGadgetData *gd,void *data, GBox *def);
 extern void _GGadget_FinalPosition(GGadget *g, struct gwindow *base, GGadgetData *gd);

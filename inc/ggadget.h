@@ -528,6 +528,8 @@ int GFlowBoxGetLabelSize(GGadget *g);
 void GFlowBoxSetLabelSize(GGadget *g, int size);
 void GScroll1BoxSetPadding(GGadget *g, int pad);
 void GScroll1BoxSetSBAlwaysVisible(GGadget *g,int always);
+void _GScroll1BoxGetDesiredSize(GGadget *g,GRect *outer, GRect *inner, int big);
+int GScroll1BoxMinOppoSize(GGadget *g);
 //void GScroll1BoxFitWindow(GGadget *g);
 
 void GMatrixEditSet(GGadget *g,struct matrix_data *data, int rows, int copy_it);

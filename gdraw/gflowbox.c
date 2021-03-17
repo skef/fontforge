@@ -126,16 +126,6 @@ static void GFlowBoxGatherMinInfo(GFlowBox *fb,struct fsizeinfo *si) {
     memset(si,0,sizeof(*si));
     si->childsize = calloc(fb->count,sizeof(struct childsizedata));
 
-    if ( fb->label!=NULL ) {
-	GGadgetGetDesiredSize(fb->label,&outer,NULL);
-	si->label_width = outer.width;
-	if ( fb->label_size!=-1 )
-	    si->label_size = fb->label_size;
-	else
-	    si->label_size = si->label_width;
-	si->label_height = outer.height;
-    }
-
     for ( c=0; c<fb->count; ++c ) {
 	GGadget *g = fb->children[c];
 	struct childsizedata *cs = si->childsize + c;
@@ -163,6 +153,21 @@ static void GFlowBoxGatherMinInfo(GFlowBox *fb,struct fsizeinfo *si) {
 	if (si->min < cs->min)
 	    si->min = cs->min;
     }
+
+    if ( fb->label!=NULL ) {
+	GGadgetGetDesiredSize(fb->label,&outer,NULL);
+	si->label_width = outer.width;
+	if ( fb->label_size!=-1 )
+	    si->label_size = fb->label_size;
+	else
+	    si->label_size = si->label_width;
+	si->label_height = outer.height;
+	if ( !fb->vertical ) {
+	    si->min += si->label_size + fb->lpad;
+	    si->des += si->label_size + fb->lpad;
+	}
+    }
+
 }
 
 static void GFlowBoxSizeTo(GFlowBox *fb,struct fsizeinfo *si, int size) {
@@ -318,11 +323,12 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
     fb->g.inner.height = fb->vertical ? si.size : si.opposize;
     fb->g.r.width = fb->g.inner.width + 2*bp;
     fb->g.r.height = fb->g.inner.height + 2*bp;
+
     GDrawEnableExposeRequests(g->base,old_enabled);
     GDrawRequestExpose(g->base,&g->r,false);
 }
 
-void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashed) {
+void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashed, int ignore_des) {
     struct fsizeinfo si;
     GFlowBox *fb = (GFlowBox *) g;
     int bp = GBoxBorderWidth(g->base,g->box);
@@ -334,10 +340,16 @@ void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashe
 	    GFlowBoxSizeTo(fb, &si, si.min);
 	    height = si.size;
 	    width = si.opposize;
-	} else if ( g->desired_height>0 ) {
-	    GFlowBoxSizeTo(fb, &si, g->desired_height);
-	    height = si.size;
-	    width = si.opposize;
+	} else if ( g->desired_height>0 && !ignore_des ) {
+	    int dh = g->desired_height-2*bp;
+	    if ( dh >= si.des ) {
+		height = dh;
+		width = si.oppodes;
+	    } else {
+		GFlowBoxSizeTo(fb, &si, dh);
+		height = si.size;
+		width = si.opposize;
+	    }
 	} else {
 	    height = si.des;
 	    width = si.oppodes;
@@ -347,10 +359,16 @@ void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashe
 	    GFlowBoxSizeTo(fb, &si, si.min);
 	    width = si.size;
 	    height = si.opposize;
-	} else if ( g->desired_width>0 ) {
-	    GFlowBoxSizeTo(fb, &si, g->desired_width);
-	    width = si.size;
-	    height = si.opposize;
+	} else if ( g->desired_width>0 && !ignore_des ) {
+	    int dw = g->desired_width-2*bp;
+	    if ( dw >= si.des ) {
+		width = dw;
+		height = si.oppodes;
+	    } else {
+		GFlowBoxSizeTo(fb, &si, dw);
+		width = si.size;
+		height = si.opposize;
+	    }
 	} else {
 	    width = si.des;
 	    height = si.oppodes;
@@ -359,22 +377,21 @@ void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashe
 	    height = si.label_height;
     }
 
-    if ( fb->label!=NULL )
-	width += si.label_width + fb->lpad;
-
     if ( inner!=NULL ) {
 	inner->x = inner->y = 0;
-	inner->width = width; inner->height = height;
+	inner->width = width;
+	inner->height = height;
     }
     if ( outer!=NULL ) {
 	outer->x = outer->y = 0;
-	outer->width = width+2*bp; outer->height = height+2*bp;
+	outer->width = width+2*bp;
+	outer->height = height+2*bp;
     }
     free(si.childsize); free(si.rowcolbaseline);
 }
 
 static void GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner) {
-    _GFlowBoxGetDesiredSize(g, outer, inner, false);
+    _GFlowBoxGetDesiredSize(g, outer, inner, false, false);
 }
 
 /* A GScroll1Box will size a GFlowBox larger than it requests when appropriate.
@@ -485,7 +502,7 @@ GGadget *GFlowBoxCreate(struct gwindow *base, GGadgetData *gd, void *data) {
 
     fb->g.funcs = &gflowbox_funcs;
     _GGadget_Create(&fb->g,base,gd,data,&flowbox_box);
-    fb->hpad = fb->vpad = GDrawPointsToPixels(base,2);
+    fb->hpad = fb->vpad = GDrawPointsToPixels(base,10);
     fb->lpad = GDrawPointsToPixels(base,5);
     fb->label_size = -1;
     fb->vertical = (gd->flags & gg_flow_vert) ? true : false;
