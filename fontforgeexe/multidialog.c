@@ -620,5 +620,6 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     }
 
     GDrawDestroyWindow(gw);
-    return true;
+
+    return mds==mds_ok;
 }

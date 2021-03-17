@@ -42,15 +42,21 @@ enum multi_dlg_elem_type { mde_openpath, mde_savepath, mde_string, mde_choice };
 struct multi_dlg_elem;
 
 typedef struct multi_dlg_answer {
-    int is_default, is_checked;
-    char *tag, *name;
+    void *tag;
+    int is_default:1;
+    int is_checked:1;
+    char *name;
     struct multi_dlg_elem *elem;
 } MultiDlgAnswer;
 
 typedef struct multi_dlg_elem {
+    void *tag;
     enum multi_dlg_elem_type type;
-    int answer_size, multiple, checks, align;
-    char *tag, *question, *dflt, *filter, *result;
+    int answer_size;
+    int multiple:1;
+    int checks:1;
+    int align:1;
+    char *question, *dflt, *filter, *result;
     MultiDlgAnswer *answers;
 } MultiDlgElem;
 
