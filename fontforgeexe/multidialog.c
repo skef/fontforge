@@ -65,16 +65,16 @@ static int Multi_BrowseFile(GGadget *g, GEvent *e) {
         GWindow gw = GGadgetGetWindow(g);
         GGadget *tf = GWidgetGetControl(gw,GGadgetGetCid(g)-1);
         char *ret, *cur = GGadgetGetTitle8(tf);
-        MultiDlgElem *elemspec = GGadgetGetUserData(tf);
+        MultiDlgQuestion *qstn = GGadgetGetUserData(tf);
 
-	if ( elemspec->type == mde_openpath )
-            ret = gwwv_open_filename(elemspec->question,
+	if ( qstn->type == mdq_openpath )
+            ret = gwwv_open_filename(qstn->label,
 	                             *cur=='\0' ? NULL : cur,
-	                             elemspec->filter, NULL);
+	                             qstn->filter, NULL);
 	else
-            ret = gwwv_save_filename(elemspec->question,
+            ret = gwwv_save_filename(qstn->label,
 	                             *cur=='\0' ? NULL : cur,
-	                             elemspec->filter);
+	                             qstn->filter);
         free(cur);
         if ( ret==NULL )
 	    return true;
@@ -89,12 +89,12 @@ static int Multi_DoRC(GGadget *g, GEvent *e) {
         MultiDlgAnswer *ans = GGadgetGetUserData(g);
 	if ( ans==NULL )
 	    return false;
-	assert( ans->elem->type == mde_choice && ans->elem->checks );
+	assert( ans->question->type == mdq_choice && ans->question->checks );
 	ans->is_checked = GGadgetIsChecked(g);
-	if ( ans->is_checked && !ans->elem->multiple )
-	    for ( int i=0; i<ans->elem->answer_size; ++i ) {
-		if ( ans != ans->elem->answers + i )
-		    ans->elem->answers[i].is_checked = false;
+	if ( ans->is_checked && !ans->question->multiple )
+	    for ( int i=0; i<ans->question->answer_len; ++i ) {
+		if ( ans != ans->question->answers + i )
+		    ans->question->answers[i].is_checked = false;
 	    }
     }
     return true;
@@ -102,12 +102,12 @@ static int Multi_DoRC(GGadget *g, GEvent *e) {
 
 static int Multi_DoL(GGadget *g, GEvent *e) {
     if ( e->type==et_controlevent && e->u.control.subtype == et_listselected ) {
-        MultiDlgElem *elemspec = GGadgetGetUserData(g);
-	if ( elemspec==NULL )
+        MultiDlgQuestion *qstn = GGadgetGetUserData(g);
+	if ( qstn==NULL )
 	    return false;
-	assert( elemspec->type == mde_choice && !elemspec->checks );
-	for ( int i=0; i<elemspec->answer_size; ++i )
-	    elemspec->answers[i].is_checked = GGadgetIsListItemSelected(g, i);
+	assert( qstn->type == mdq_choice && !qstn->checks );
+	for ( int i=0; i<qstn->answer_len; ++i )
+	    qstn->answers[i].is_checked = GGadgetIsListItemSelected(g, i);
     }
     return true;
 }
@@ -141,47 +141,46 @@ struct multi_expand {
 
 struct multi_postproc {
     GList_Glib *memlist;
-    GList_Glib *textlist;
     GList_Glib *expands;
     int strcid;
     int listcid;
     int fbpair;
 };
 
-static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct multi_postproc *mpp) {
+static GGadgetCreateData *LayoutMultiDlgQuestion(MultiDlgQuestion *qstn, struct multi_postproc *mpp) {
     int gcnt=1, lcnt=0, flcnt=1, g=0, l=0, fl=0, i;
     GGadgetCreateData *gcd, **flarray, *qgcd = NULL;
     GTextInfo *label, *glistarray;
     unichar_t qmne;
 
-    if ( elemspec->question!=NULL ) {
+    if ( qstn->label!=NULL ) {
 	lcnt++;
 	gcnt++;
     }
-    if (elemspec->type==mde_string) {
+    if (qstn->type==mdq_string) {
 	lcnt++;
 	gcnt++;
 	flcnt++;
-    } else if (elemspec->type==mde_choice) {
-	if (elemspec->checks) {
+    } else if (qstn->type==mdq_choice) {
+	if (qstn->checks) {
 	    gcnt++;
-	    lcnt += elemspec->answer_size;
-	    gcnt += elemspec->answer_size+1;
-	    flcnt += elemspec->answer_size;
+	    lcnt += qstn->answer_len;
+	    gcnt += qstn->answer_len+1;
+	    flcnt += qstn->answer_len;
 	} else {
 	    gcnt++;
 	    flcnt++;
-	    if ( elemspec->multiple ) {
+	    if ( qstn->multiple ) {
 		lcnt += 2;
 		gcnt += 3;
 	    }
 	}
-    } else if (elemspec->type==mde_openpath || elemspec->type==mde_savepath ) {
+    } else if (qstn->type==mdq_openpath || qstn->type==mdq_savepath ) {
 	lcnt += 2;
 	gcnt += 3;
 	flcnt += 1;
     } else {
-	ff_post_error(_("Unrecognized MultiAsk Element"), _("Cannot raise MultiAsk Dialog"));
+	ff_post_error(_("Unrecognized MultiAsk Question"), _("Cannot raise MultiAsk Dialog: Unrecognized type."));
 	return NULL;
     }
     gcd = calloc(gcnt, sizeof(GGadgetCreateData));
@@ -191,9 +190,9 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
     flarray = calloc(flcnt, sizeof(GGadgetCreateData *));
     mpp->memlist = g_list_append(mpp->memlist, flarray);
 
-    if ( elemspec->question!=NULL ) {
-	label[l].text = (unichar_t *) utf82u_mncopy(elemspec->question, &qmne);
-	mpp->textlist = g_list_append(mpp->textlist, label[l].text);
+    if ( qstn->label!=NULL ) {
+	label[l].text = (unichar_t *) utf82u_mncopy(qstn->label, &qmne);
+	mpp->memlist = g_list_append(mpp->memlist, label[l].text);
 	gcd[g].gd.label = &label[l++];
 	gcd[g].gd.mnemonic = qmne;
 	gcd[g].gd.flags = gg_enabled | gg_visible;
@@ -201,24 +200,22 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	qgcd = &gcd[g++];
     }
 
-    if (elemspec->type==mde_string) {
-	label[l].text = (unichar_t *) copy(elemspec->dflt);
-	mpp->textlist = g_list_append(mpp->textlist, label[l].text);
+    if (qstn->type==mdq_string) {
+	label[l].text = (unichar_t *) qstn->dflt;
 	label[l].text_is_1byte = true;
 	gcd[g].gd.label = &label[l++];
 	gcd[g].gd.mnemonic = qmne;
 	gcd[g].gd.flags = gg_enabled | gg_visible;
 	gcd[g].gd.cid = mpp->strcid + CID_STR_START;
 	mpp->strcid++;
-	gcd[g].data = elemspec;
+	gcd[g].data = qstn;
 	gcd[g].creator = GTextFieldCreate;
 	flarray[fl++] = &gcd[g++];
-    } else if (elemspec->type==mde_choice) {
-	if (elemspec->checks) {
-	    for ( i=0; i<elemspec->answer_size; ++i ) {
-		MultiDlgAnswer *ans = &elemspec->answers[i];
-		label[l].text = (unichar_t *) copy(ans->name);
-		mpp->textlist = g_list_append(mpp->textlist, label[l].text);
+    } else if (qstn->type==mdq_choice) {
+	if (qstn->checks) {
+	    for ( i=0; i<qstn->answer_len; ++i ) {
+		MultiDlgAnswer *ans = &qstn->answers[i];
+		label[l].text = (unichar_t *) ans->name;
 		label[l].text_in_resource = true;
 		label[l].text_is_1byte = true;
 		gcd[g].gd.label = &label[l++];
@@ -226,7 +223,7 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 		if ( ans->is_default )
 		    gcd[g].gd.flags |= gg_cb_on;
 		gcd[g].data = ans;
-		if ( elemspec->multiple ) {
+		if ( qstn->multiple ) {
 		    gcd[g].creator = GCheckBoxCreate;
 		} else {
 		    gcd[g].creator = GRadioCreate;
@@ -237,12 +234,11 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 		flarray[fl++] = &gcd[g++];
 	    }
 	} else {
-	    glistarray = calloc(elemspec->answer_size+1, sizeof(GTextInfo));
+	    glistarray = calloc(qstn->answer_len+1, sizeof(GTextInfo));
 	    mpp->memlist = g_list_append(mpp->memlist, glistarray);
-	    for ( i=0; i<elemspec->answer_size; ++i ) {
-		MultiDlgAnswer *ans = &elemspec->answers[i];
-		glistarray[i].text = (unichar_t *) copy(ans->name);
-		mpp->textlist = g_list_append(mpp->textlist, glistarray[i].text);
+	    for ( i=0; i<qstn->answer_len; ++i ) {
+		MultiDlgAnswer *ans = &qstn->answers[i];
+		glistarray[i].text = (unichar_t *) ans->name;
 		glistarray[i].text_is_1byte = true;
 		glistarray[i].selected = ans->is_default;
 		glistarray[i].userdata = ans;
@@ -252,9 +248,9 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	    gcd[g].gd.mnemonic = qmne;
 	    gcd[g].gd.cid = mpp->listcid + CID_LIST_START;
 	    gcd[g].creator = GListCreate;
-	    gcd[g].data = elemspec;
+	    gcd[g].data = qstn;
 	    gcd[g].gd.handle_controlevent = Multi_DoL;
-	    if ( elemspec->multiple ) {
+	    if ( qstn->multiple ) {
 		gcd[g].gd.flags |= gg_list_multiplesel;
 		GGadgetCreateData *(*lbox)[3] = calloc(1, sizeof(GGadgetCreateData *[3][3]));
 		mpp->memlist = g_list_append(mpp->memlist, lbox);
@@ -293,18 +289,17 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	    mpp->listcid++;
 	    flarray[fl++] = &gcd[g++];
 	}
-    } else if (elemspec->type==mde_openpath || elemspec->type==mde_savepath ) {
+    } else if (qstn->type==mdq_openpath || qstn->type==mdq_savepath ) {
 	int fb=0;
         GGadgetCreateData **fbox = calloc(3, sizeof(GGadgetCreateData *));
 	mpp->memlist = g_list_append(mpp->memlist, fbox);
-	label[l].text = (unichar_t *) copy(elemspec->dflt);
-	mpp->textlist = g_list_append(mpp->textlist, label[l].text);
+	label[l].text = (unichar_t *) qstn->dflt;
 	label[l].text_is_1byte = true;
 	gcd[g].gd.label = &label[l++];
 	gcd[g].gd.mnemonic = qmne;
 	gcd[g].gd.flags = gg_enabled | gg_visible;
 	gcd[g].gd.cid = mpp->fbpair + CID_BF_PAIR_START;
-	gcd[g].data = elemspec;
+	gcd[g].data = qstn;
 	gcd[g].creator = GTextFieldCreate;
 	fbox[fb++] = &gcd[g++];
 
@@ -314,7 +309,7 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	gcd[g].gd.flags = gg_enabled | gg_visible;
 	gcd[g].gd.cid = mpp->fbpair + 1 + CID_BF_PAIR_START;
 	gcd[g].gd.handle_controlevent = Multi_BrowseFile;
-	gcd[g].data = elemspec->filter;
+	gcd[g].data = qstn->filter;
 	mpp->fbpair += 2;
 	gcd[g].creator = GButtonCreate;
 	fbox[fb++] = &gcd[g++];
@@ -330,9 +325,9 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
 	flarray[fl++] = &gcd[g++];
     }
     gcd[g].gd.flags = gg_enabled | gg_visible | gg_flow_ocenter | gg_flow_lvcenter;
-    if ( !( elemspec->type==mde_choice && elemspec->checks ) )
+    if ( !( qstn->type==mdq_choice && qstn->checks ) )
 	gcd[g].gd.flags |= gg_flow_expand;
-    if ( !elemspec->align )
+    if ( !qstn->align )
 	gcd[g].gd.flags |= gg_flow_noalignlabel;
     gcd[g].gd.u.boxelements = flarray;
     gcd[g].creator = GFlowBoxCreate;
@@ -341,14 +336,14 @@ static GGadgetCreateData *LayoutMultiDlgElem(MultiDlgElem *elemspec, struct mult
     return &gcd[g];
 }
 
-static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *catspec, struct multi_postproc *mpp) {
+static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *cat, struct multi_postproc *mpp) {
     int gcnt=1, flcnt=1, g=0, l=0, fl=0, i;
     GGadgetCreateData *gcd, **s1barray;
 
-    s1barray = calloc(catspec->size+1, sizeof(GGadgetCreateData *));
+    s1barray = calloc(cat->len+1, sizeof(GGadgetCreateData *));
     mpp->memlist = g_list_append(mpp->memlist, s1barray);
-    for ( i=0; i<catspec->size; ++i ) {
-	s1barray[i] = LayoutMultiDlgElem(catspec->elems+i, mpp);
+    for ( i=0; i<cat->len; ++i ) {
+	s1barray[i] = LayoutMultiDlgQuestion(cat->questions+i, mpp);
 	if ( s1barray[i]==NULL )
 	    return false;
     }
@@ -365,47 +360,47 @@ static GGadgetCreateData *LayoutMultiDlgCategoryBody(MultiDlgCategory *catspec, 
 }
 
 static void MultiSyncChoices(MultiDlgSpec *spec) {
-    for ( int c=0; c<spec->size; ++c ) {
+    for ( int c=0; c<spec->len; ++c ) {
 	MultiDlgCategory *catspec = spec->categories + c;
-	for ( int e=0; e<catspec->size; ++e ) {
-	    MultiDlgElem *elemspec = catspec->elems + e;
-	    if ( elemspec->type==mde_choice ) {
-		for ( int a=0; a<elemspec->answer_size; ++a ) {
-		    elemspec->answers[a].is_checked = elemspec->answers[a].is_default;
+	for ( int q=0; q<catspec->len; ++q ) {
+	    MultiDlgQuestion *qstn = catspec->questions + q;
+	    if ( qstn->type==mdq_choice ) {
+		for ( int a=0; a<qstn->answer_len; ++a ) {
+		    qstn->answers[a].is_checked = qstn->answers[a].is_default;
 		}
 	    }
 	}
     }
 }
 
-static void MultiCopyStrings(GWindow gw, MultiDlgSpec *spec, int strcid, int fbpair) {
+static void MultiCopyStrings(GWindow gw, int strcid, int fbpair) {
     int i;
     GGadget *g;
-    MultiDlgElem *elemspec;
+    MultiDlgQuestion *qstn;
 
     for ( i=0; i<strcid; ++i ) {
 	g = GWidgetGetControl(gw,i+CID_STR_START);
-	elemspec = (MultiDlgElem *) GGadgetGetUserData(g);
-	free(elemspec->result);
-	elemspec->result = GGadgetGetTitle8(g);
-	if ( *elemspec->result == '\0' ) {
-	    free(elemspec->result);
-	    elemspec->result = NULL;
+	qstn = (MultiDlgQuestion *) GGadgetGetUserData(g);
+	free(qstn->str_answer);
+	qstn->str_answer = GGadgetGetTitle8(g);
+	if ( *qstn->str_answer == '\0' ) {
+	    free(qstn->str_answer);
+	    qstn->str_answer = NULL;
 	}
     }
     for ( i=0; i<fbpair; i+=2 ) {
 	g = GWidgetGetControl(gw,i+CID_BF_PAIR_START);
-	elemspec = (MultiDlgElem *) GGadgetGetUserData(g);
-	free(elemspec->result);
-	elemspec->result = GGadgetGetTitle8(g);
-	if ( *elemspec->result == '\0' ) {
-	    free(elemspec->result);
-	    elemspec->result = NULL;
+	qstn = (MultiDlgQuestion *) GGadgetGetUserData(g);
+	free(qstn->str_answer);
+	qstn->str_answer = GGadgetGetTitle8(g);
+	if ( *qstn->str_answer == '\0' ) {
+	    free(qstn->str_answer);
+	    qstn->str_answer = NULL;
 	}
     }
 }
 
-int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
+int UI_Ask_Multi(const char *title, MultiDlgSpec *dlg) {
     GRect pos, wsize, scsize, s1bsize, s1bt;
     GWindow gw;
     struct multi_postproc mpp;
@@ -422,23 +417,22 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 	return false;
 
     memset(&mpp,0,sizeof(mpp));
-    if ( spec->size>1 ) {
-	categories = calloc(spec->size+1, sizeof(GTabInfo));
+    if ( dlg->len>1 ) {
+	categories = calloc(dlg->len+1, sizeof(GTabInfo));
 	mpp.memlist = g_list_append(mpp.memlist, categories);
-	for ( i=0; i<spec->size; ++i ) {
-	    categories[i].gcd = LayoutMultiDlgCategoryBody(spec->categories+i, &mpp);
-	    categories[i].text = (unichar_t *) copy(spec->categories[i].label);
+	for ( i=0; i<dlg->len; ++i ) {
+	    categories[i].text = (unichar_t *) dlg->categories[i].label;
 	    categories[i].text_in_resource = true;
-	    mpp.textlist = g_list_append(mpp.textlist, categories[i].text);
 	    categories[i].text_is_1byte = true;
+	    categories[i].gcd = LayoutMultiDlgCategoryBody(dlg->categories+i, &mpp);
 	    if ( categories[i].gcd==NULL ) {
 		err = true;
 		break;
 	    }
 	}
 	cat1 = categories[0].gcd;
-    } else if ( spec->size==1 ) {
-	cat1 = LayoutMultiDlgCategoryBody(spec->categories, &mpp);
+    } else if ( dlg->len==1 ) {
+	cat1 = LayoutMultiDlgCategoryBody(dlg->categories, &mpp);
 	err = cat1==NULL;
     } else {
 	err = true;
@@ -448,9 +442,6 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 	for ( GList_Glib *e = mpp.expands; e!=NULL; e=e->next )
 	    free(e->data);
 	g_list_free(mpp.expands);
-	for ( GList_Glib *t = mpp.textlist; t!=NULL; t=t->next )
-	    free(t->data);
-	g_list_free(mpp.textlist);
 	for ( GList_Glib *m = mpp.memlist; m!=NULL; m=m->next )
 	    free(m->data);
 	g_list_free(mpp.memlist);
@@ -515,7 +506,7 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     boxes[2].gd.u.boxelements = barray;
     boxes[2].creator = GHBoxCreate;
 
-    if ( spec->size==1 )
+    if ( dlg->len==1 )
 	varray[0] = cat1;
     else {
 	boxes[3].gd.flags = gg_enabled | gg_visible | gg_tabset_vert | gg_tabset_scroll;
@@ -544,7 +535,6 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 
     }
     g_list_free(mpp.expands);
-    g_list_free(mpp.textlist);
 
     GHVBoxFitWindow(boxes[0].ret);
 
@@ -554,7 +544,7 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     GDrawGetSize(GDrawGetRoot(NULL),&scsize);
 
     // Outer size of the just-fit GScroll1Box 
-    if ( spec->size > 1 )
+    if ( dlg->len > 1 )
 	GGadgetGetInnerSize(boxes[3].ret, &s1bsize);
     else
 	GGadgetGetSize(cat1->ret, &s1bsize);
@@ -562,7 +552,7 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
     // Appropriate width
     _GScroll1BoxGetDesiredSize(cat1->ret, &s1bt, NULL, true);
     maxwidth = s1bt.width;
-    for ( i=1; i<spec->size; ++i ) {
+    for ( i=1; i<dlg->len; ++i ) {
 	_GScroll1BoxGetDesiredSize(categories[i].gcd->ret, &s1bt, NULL, true);
 	if ( s1bt.width > maxwidth )
 	    maxwidth = s1bt.width;
@@ -579,14 +569,14 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 	// Need this to calculate the "min oppo size" (roughly the height 
 	// of the scrolling window corresponding to the resize width).
 	GGadgetResize(cat1->ret, targetwidth, s1bsize.height);
-	for ( i=1; i<spec->size; ++i )
+	for ( i=1; i<dlg->len; ++i )
 	    GGadgetResize(categories[i].gcd->ret, targetwidth, s1bsize.height);
     } else
 	widthdiff = 0;
 
     // Appropriate height
     maxheight = GScroll1BoxMinOppoSize(cat1->ret);
-    for ( i=1; i<spec->size; ++i ) {
+    for ( i=1; i<dlg->len; ++i ) {
 	s1bt.height = GScroll1BoxMinOppoSize(categories[i].gcd->ret);
 	if ( s1bt.height > maxheight )
 	    maxheight = s1bt.height;
@@ -605,7 +595,7 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 	free(m->data);
     g_list_free(mpp.memlist);
 
-    MultiSyncChoices(spec);
+    MultiSyncChoices(dlg);
 
     GDrawSetVisible(gw,true);
 
@@ -613,10 +603,10 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *spec) {
 	GDrawProcessOneEvent(NULL);
 
     if ( mds==mds_cancel ) {
-	MultiSyncChoices(spec);
+	MultiSyncChoices(dlg);
     } else {
 	assert( mds==mds_ok );
-	MultiCopyStrings(gw, spec, mpp.strcid, mpp.fbpair);
+	MultiCopyStrings(gw, mpp.strcid, mpp.fbpair);
     }
 
     GDrawDestroyWindow(gw);

@@ -30,7 +30,7 @@
 
 #include <fontforge-config.h>
 
-enum multi_dlg_elem_type { mde_openpath, mde_savepath, mde_string, mde_choice };
+enum multi_dlg_question_type { mdq_openpath, mdq_savepath, mdq_string, mdq_choice };
 
 /* For _open, _save, and _askstr "in" is the default value (if any) and 
  * out is the user-supplied value.
@@ -39,35 +39,35 @@ enum multi_dlg_elem_type { mde_openpath, mde_savepath, mde_string, mde_choice };
  * value. If "tag" is present it is used to represent the answer value in place
  * of "in".
  */
-struct multi_dlg_elem;
+struct multi_dlg_question;
 
 typedef struct multi_dlg_answer {
     void *tag;
     int is_default:1;
     int is_checked:1;
     char *name;
-    struct multi_dlg_elem *elem;
+    struct multi_dlg_question *question;
 } MultiDlgAnswer;
 
-typedef struct multi_dlg_elem {
+typedef struct multi_dlg_question {
     void *tag;
-    enum multi_dlg_elem_type type;
-    int answer_size;
+    enum multi_dlg_question_type type;
+    int answer_len;
     int multiple:1;
     int checks:1;
     int align:1;
-    char *question, *dflt, *filter, *result;
+    char *label, *dflt, *filter, *str_answer;
     MultiDlgAnswer *answers;
-} MultiDlgElem;
+} MultiDlgQuestion;
 
 typedef struct multi_dlg_category {
-    int size;
+    int len;
     char *label;
-    MultiDlgElem *elems;
+    MultiDlgQuestion *questions;
 } MultiDlgCategory;
 
 typedef struct multi_dlg_spec {
-    int size;
+    int len;
     MultiDlgCategory *categories;
 } MultiDlgSpec;
 

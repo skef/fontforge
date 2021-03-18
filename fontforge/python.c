@@ -1749,9 +1749,7 @@ static PyObject *PyFF_askChoices(PyObject *UNUSED(self), PyObject *args, PyObjec
     return( Py_BuildValue("i", ret) );
 }
 
-static const char *askString_keywords[] = { "title", "question", "default", NULL };
-
-static PyObject *PyFF_askString(PyObject *UNUSED(self), PyObject *args, PyObject *kwargs) {
+static PyObject *PyFF_askString(PyObject *UNUSED(self), PyObject *args) {
     char *title,*quest, *def = NULL;
     char *ret;
     PyObject *reto;
@@ -1761,11 +1759,8 @@ static PyObject *PyFF_askString(PyObject *UNUSED(self), PyObject *args, PyObject
 return( NULL );
     }
 
-    if ( !PyArg_ParseTupleAndKeywords(args, kwargs, "ss|s", (char**) askString_keywords,
-                                      &title, &quest, &def) ) {
-        PyErr_Format(PyExc_TypeError, "Failed to parse arguments");
-        return( NULL );
-    }
+    if ( !PyArg_ParseTuple(args,"ss|s", &title, &quest, &def) )
+return( NULL );
 
     ret = ff_ask_string(title,def,quest);
     if ( ret==NULL )
@@ -1775,30 +1770,30 @@ Py_RETURN_NONE;
 return( reto );
 }
 
-struct flaglist multielemtype[] = {
-    { "savepath", mde_savepath },
-    { "openpath", mde_openpath },
-    { "string", mde_string },
-    { "choice", mde_choice },
+struct flaglist multiqstntype[] = {
+    { "savepath", mdq_savepath },
+    { "openpath", mdq_openpath },
+    { "string", mdq_string },
+    { "choice", mdq_choice },
     FLAGLIST_EMPTY /* Sentinel */
 };
 
 void multiDlgFree(MultiDlgSpec *dlg, int do_top) {
-    for (int i=0; i<dlg->size; ++i) {
+    for (int i=0; i<dlg->len; ++i) {
 	MultiDlgCategory *category = &dlg->categories[i];
-	for (int j=0; j<category->size; ++j) {
-	    MultiDlgElem *elem = &category->elems[j];
-	    for (int k=0; k<elem->answer_size; ++k) {
-		Py_DECREF((PyObject *) elem->answers[k].tag);
-		free(elem->answers[k].name);
+	for (int j=0; j<category->len; ++j) {
+	    MultiDlgQuestion *qstn = &category->questions[j];
+	    for (int k=0; k<qstn->answer_len; ++k) {
+		Py_DECREF((PyObject *) qstn->answers[k].tag);
+		free(qstn->answers[k].name);
 	    }
-	    free(elem->answers);
-	    free(elem->question);
-	    free(elem->dflt);
-	    free(elem->result);
-	    // elem->tag refernces are held by tagdict;
+	    // elem->tag reference is held by tagdict;
+	    free(qstn->answers);
+	    free(qstn->label);
+	    free(qstn->dflt);
+	    free(qstn->str_answer);
 	}
-	free(category->elems);
+	free(category->questions);
 	free(category->label);
     }
     free(dlg->categories);
@@ -1806,16 +1801,17 @@ void multiDlgFree(MultiDlgSpec *dlg, int do_top) {
 	free(dlg);
 } 
 
+
 void multiDlgPrint(MultiDlgSpec *dlg) {
-    for (int i=0; i<dlg->size; ++i) {
+    for (int i=0; i<dlg->len; ++i) {
 	MultiDlgCategory *category = dlg->categories + i;
-	if (dlg->size>1)
+	if (dlg->len>1)
 	    printf("Category: %s\n", category->label);
-	for (int j=0; j<category->size; ++j) {
-	    MultiDlgElem *elem = category->elems + j;
-            printf("  Elem: tag='%p', question='%s', default='%s', filter='%s', multiple=%d, checks=%d, align=%d, result='%s'\n", elem->tag, elem->question, elem->dflt, elem->filter, elem->multiple, elem->checks, elem->align, elem->result);
-	    for (int k=0; k<elem->answer_size; ++k) {
-		MultiDlgAnswer *answer = elem->answers + k;
+	for (int j=0; j<category->len; ++j) {
+	    MultiDlgQuestion *qstn = category->questions + j;
+            printf("  Question: tag='%p', label='%s', default='%s', filter='%s', multiple=%d, checks=%d, align=%d, str_answer='%s'\n", qstn->tag, qstn->label, qstn->dflt, qstn->filter, qstn->multiple, qstn->checks, qstn->align, qstn->str_answer);
+	    for (int k=0; k<qstn->answer_len; ++k) {
+		MultiDlgAnswer *answer = qstn->answers + k;
 		printf("      Answer: tag='%p', name='%s', is_default='%d', is_checked=%d\n", answer->tag, answer->name, answer->is_default, answer->is_checked);
 	    }
 	}
@@ -1844,144 +1840,144 @@ static int getDictItemStringBool(PyObject *dict, const char *key, int do_err) {
     return do_err && r==-1 ? -1 : r;
 }
 
-static int multiDlgDecodeElem(MultiDlgElem *elem, PyObject *rec, PyObject *tagdict) {
+static int multiDlgDecodeQuestion(MultiDlgQuestion *qstn, PyObject *spec, PyObject *tagdict) {
     char *t;
 
-    if ( (t = getDictItemStringString(rec, "type")) == NULL ) {
-	PyErr_Format(PyExc_TypeError, "askMulti: Missing 'category' key in Category specification.");
+    if ( (t = getDictItemStringString(spec, "type")) == NULL ) {
+	PyErr_Format(PyExc_TypeError, "askMulti: Missing 'type' key in Element specification.");
 	return false;
     }
-    if ( ( elem->type = FlagsFromString(t, multielemtype, "askMulti Element type") ) == FLAG_UNKNOWN) {
+    if ( ( qstn->type = FlagsFromString(t, multiqstntype, "askMulti Element type") ) == FLAG_UNKNOWN) {
         free(t);
 	return false;
     }
     free(t);
-    elem->question = getDictItemStringString(rec, "question");
-    PyObject *tag = PyDict_GetItemString(rec, "tag");
+    qstn->label = getDictItemStringString(spec, "question");
+    PyObject *tag = PyDict_GetItemString(spec, "tag");
     if ( tag==NULL )
-	    tag = PyDict_GetItemString(rec, "question");
+	    tag = PyDict_GetItemString(spec, "question");
     if ( tag==NULL ) {
-	PyErr_Format(PyExc_TypeError, "askMulti: Element specification must include either `question` or `tag`.");
+	PyErr_Format(PyExc_TypeError, "askMulti: Question specification must include either `question` or `tag` key.");
 	return false;
     }
     if ( PyObject_Hash(tag)==-1 ) {
-	PyErr_Format(PyExc_TypeError, "askMulti: tag for element '%s' is not hashable.", elem->question );
+	PyErr_Format(PyExc_ValueError, "askMulti: Tag for question '%s' is not hashable.", qstn->label );
 	return false;
     }
     if ( PyDict_Contains(tagdict, tag) ) {
-	PyErr_Format(PyExc_TypeError, "askMulti: tag for element '%s' already used for different element.", elem->question );
+	PyErr_Format(PyExc_ValueError, "askMulti: tag for question '%s' already used for different question.", qstn->label );
 	return false;
     }
     PyDict_SetItem(tagdict, tag, Py_None);
     Py_INCREF(tag);
-    elem->tag = tag;
-    elem->filter = getDictItemStringString(rec, "filter");
-    elem->multiple = getDictItemStringBool(rec, "multiple", false);
-    elem->checks = getDictItemStringBool(rec, "checks", false);
-    elem->align = !getDictItemStringBool(rec, "noalign", false);
-    if ( elem->type==mde_choice ) {
-	PyObject *answers_rec = PyDict_GetItemString(rec, "answers");
-	if ( answers_rec==NULL || !PySequence_Check(answers_rec) ) {
-	    PyErr_Format(PyExc_TypeError, "askMulti: Element 'answers' key for '%s' is missing or is not a list.", elem->question );
+    qstn->tag = tag;
+    qstn->filter = getDictItemStringString(spec, "filter");
+    qstn->multiple = getDictItemStringBool(spec, "multiple", false);
+    qstn->checks = getDictItemStringBool(spec, "checks", false);
+    qstn->align = !getDictItemStringBool(spec, "noalign", false);
+    if ( qstn->type==mdq_choice ) {
+	PyObject *answers_spec = PyDict_GetItemString(spec, "answers");
+	if ( answers_spec==NULL || !PySequence_Check(answers_spec) ) {
+	    PyErr_Format(PyExc_TypeError, "askMulti: Answers for choice-type question '%s' are missing or not in a list.", qstn->label );
 	    return false;
 	}
-	elem->answer_size = PySequence_Size(answers_rec);
-	elem->answers = calloc(elem->answer_size, sizeof(MultiDlgAnswer));
+	qstn->answer_len = PySequence_Size(answers_spec);
+	qstn->answers = calloc(qstn->answer_len, sizeof(MultiDlgAnswer));
 	int defcnt = 0;
-	for (int i = 0; i<elem->answer_size; ++i) {
-	    MultiDlgAnswer *answer = &elem->answers[i];
-	    answer->elem = elem;
-	    PyObject *answer_rec = PySequence_GetItem(answers_rec, i);
-	    if ( !PyDict_Check(answer_rec) ) {
-		PyErr_Format(PyExc_TypeError, "askMulti: Answer for element '%s' not a dictionary", elem->question );
-		Py_DECREF(answer_rec);
+	for (int i = 0; i<qstn->answer_len; ++i) {
+	    MultiDlgAnswer *answer = qstn->answers + i;
+	    answer->question = qstn;
+	    PyObject *answer_spec = PySequence_GetItem(answers_spec, i);
+	    if ( !PyDict_Check(answer_spec) ) {
+		PyErr_Format(PyExc_TypeError, "askMulti: Answer for choice-type question '%s' not a dictionary", qstn->label );
+		Py_DECREF(answer_spec);
 		return false;
 	    }
-	    answer->is_default = getDictItemStringBool(answer_rec, "default", false);
+	    answer->is_default = getDictItemStringBool(answer_spec, "default", false);
 	    if ( answer->is_default )
 		defcnt++;
-	    answer->name = getDictItemStringString(answer_rec, "name");
-	    tag = PyDict_GetItemString(answer_rec, "tag");
+	    answer->name = getDictItemStringString(answer_spec, "name");
+	    tag = PyDict_GetItemString(answer_spec, "tag");
 	    if ( tag==NULL )
-		tag = PyDict_GetItemString(answer_rec, "name");
+		tag = PyDict_GetItemString(answer_spec, "name");
 	    if ( tag==NULL ) {
-		PyErr_Format(PyExc_TypeError, "askMulti: 'choice' answer specification must include either `name` or `tag`.");
-		Py_DECREF(answer_rec);
+		PyErr_Format(PyExc_TypeError, "askMulti: Answer for choice-type question '%s' must include either `name` or `tag`.");
+		Py_DECREF(answer_spec);
 		return false;
 	    }
 	    Py_INCREF(tag);
 	    answer->tag = tag;
-	    Py_DECREF(answer_rec);
+	    Py_DECREF(answer_spec);
 	}
-	if ( !elem->multiple && defcnt>1 ) {
-	    PyErr_Format(PyExc_TypeError, "askMulti: Too many default answers for single-choice question '%s'.", elem->question );
+	if ( !qstn->multiple && defcnt>1 ) {
+	    PyErr_Format(PyExc_TypeError, "askMulti: Too many default answers for single-choice question '%s'.", qstn->label );
 	    return false;
 	}
     } else {
-	elem->dflt = getDictItemStringString(rec, "default");
+	qstn->dflt = getDictItemStringString(spec, "default");
     }
     return true;
 }
 
-static int multiDlgDecodeCategory(MultiDlgCategory *category, PyObject *rec, PyObject *tagdict) {
-    if ( (category->label = getDictItemStringString(rec, "category")) == NULL) {
+static int multiDlgDecodeCategory(MultiDlgCategory *category, PyObject *spec, PyObject *tagdict) {
+    if ( (category->label = getDictItemStringString(spec, "category")) == NULL) {
 	PyErr_Format(PyExc_TypeError, "askMulti: Missing 'category' key in Category specification.");
 	return false;
     }
-    PyObject *elems_rec = PyDict_GetItemString(rec, "elements");
-    if ( elems_rec==NULL || !PySequence_Check(elems_rec) ) {
-	PyErr_Format(PyExc_TypeError, "askMulti: Category 'elements' key for '%s' is missing or is not a list.", category->label);
+    PyObject *qstns_spec = PyDict_GetItemString(spec, "questions");
+    if ( qstns_spec==NULL || !PySequence_Check(qstns_spec) ) {
+	PyErr_Format(PyExc_TypeError, "askMulti: Category 'questions' key for '%s' is missing or is not a list.", category->label);
 	return false;
     }
-    category->size = PySequence_Size(elems_rec);
-    category->elems = calloc(category->size, sizeof(MultiDlgElem));
-    for (int i = 0; i<category->size; ++i) {
-        PyObject *elem = PySequence_GetItem(elems_rec, i);
-        if ( !multiDlgDecodeElem(&category->elems[i], elem, tagdict) ) {
+    category->len = PySequence_Size(qstns_spec);
+    category->questions = calloc(category->len, sizeof(MultiDlgQuestion));
+    for (int i = 0; i<category->len; ++i) {
+        PyObject *qstn_spec = PySequence_GetItem(qstns_spec, i);
+        if ( !multiDlgDecodeQuestion(category->questions + i, qstn_spec, tagdict) ) {
             return false;
         }
-        Py_DECREF(elem);
+        Py_DECREF(qstn_spec);
     }
     return true;
 }
 
 PyObject *multiDlgExtractAnswers(MultiDlgSpec *dspec) {
     PyObject *r = PyDict_New(), *k, *v, *vtuple;
-    int c, e, a, acnt, ai;
+    int c, q, a, acnt, ai;
 
-    for ( c=0; c<dspec->size; ++c ) {
+    for ( c=0; c<dspec->len; ++c ) {
 	MultiDlgCategory *cspec = dspec->categories + c;
-	for ( e=0; e<cspec->size; ++e ) {
-	    MultiDlgElem *espec = cspec->elems + e;
-	    if ( espec->type==mde_choice ) {
+	for ( q=0; q<cspec->len; ++q ) {
+	    MultiDlgQuestion *qspec = cspec->questions + q;
+	    if ( qspec->type==mdq_choice ) {
 		int acnt = 0;
-		for ( a=0; a<espec->answer_size; ++a )
-		    if ( espec->answers[a].is_checked )
+		for ( a=0; a<qspec->answer_len; ++a )
+		    if ( qspec->answers[a].is_checked )
 			acnt++;
-		if ( espec->multiple )
+		if ( qspec->multiple )
 		    vtuple = PyTuple_New(acnt);
 		else
 		    assert( acnt<=1 );
 		ai = 0;
-		for ( a=0; a<espec->answer_size; ++a )
-		    if ( espec->answers[a].is_checked ) {
-			v = espec->answers[a].tag;
+		for ( a=0; a<qspec->answer_len; ++a )
+		    if ( qspec->answers[a].is_checked ) {
+			v = qspec->answers[a].tag;
 			Py_INCREF(v);
-			if ( espec->multiple ) {
+			if ( qspec->multiple ) {
 			    PyTuple_SetItem(vtuple, ai, v);
 			    ai++;
 			} else
 			    break;
 		    }
-		if ( espec->multiple )
+		if ( qspec->multiple )
 		    v = vtuple;
 	    } else {
-		if ( espec->result==NULL )
+		if ( qspec->str_answer==NULL )
 		    v = Py_None;
 		else
-		    v = PyUnicode_FromString(espec->result);
+		    v = PyUnicode_FromString(qspec->str_answer);
 	    }
-	    k = espec->tag;
+	    k = qspec->tag;
 	    assert( !PyDict_Contains(r, k) );
 	    PyDict_SetItem(r, k, v);
 	    Py_DECREF(v);
@@ -2015,40 +2011,58 @@ static PyObject *PyFF_askMulti(PyObject *UNUSED(self), PyObject *args, PyObject 
 	    return NULL;
 	}
 	if ( PyDict_GetItemString(test, "category") ) {
-	    dlg.size = PySequence_Size(spec);
-	    dlg.categories = calloc(dlg.size, sizeof(MultiDlgCategory));
-	    for (int i = 0; i<dlg.size; ++i) {
-		PyObject *cat = PySequence_GetItem(spec, i);
-		if ( !multiDlgDecodeCategory(&dlg.categories[i], cat, tagdict) ) {
+	    dlg.len = PySequence_Size(spec);
+	    dlg.categories = calloc(dlg.len, sizeof(MultiDlgCategory));
+	    for (int i = 0; i<dlg.len; ++i) {
+		PyObject *cat_spec = PySequence_GetItem(spec, i);
+		if ( !multiDlgDecodeCategory(dlg.categories + i, cat_spec, tagdict) ) {
 		    multiDlgFree(&dlg, false);
 		    Py_DECREF(tagdict);
 		    return NULL;
 		}
-		Py_DECREF(cat);
+		Py_DECREF(cat_spec);
+	    }
+	} else if ( PyDict_GetItemString(test, "question") ) {
+	    dlg.len = 1;
+	    dlg.categories = calloc(1, sizeof(MultiDlgCategory));
+	    dlg.categories[0].len = PySequence_Size(spec);
+	    dlg.categories[0].questions = calloc(dlg.categories[0].len, sizeof(MultiDlgQuestion));
+	    for (int i = 0; i<dlg.categories[0].len; ++i) {
+		PyObject *qstn_spec = PySequence_GetItem(spec, i);
+		if ( !multiDlgDecodeQuestion(dlg.categories[0].questions + i, qstn_spec, tagdict) ) {
+		    multiDlgFree(&dlg, false);
+		    Py_DECREF(tagdict);
+		    return NULL;
+		}
+		Py_DECREF(qstn_spec);
 	    }
 	} else {
-	    dlg.size = 1;
-	    dlg.categories = calloc(1, sizeof(MultiDlgCategory));
-	    dlg.categories[0].size = PySequence_Size(spec);
-	    dlg.categories[0].elems = calloc(dlg.categories[0].size, sizeof(MultiDlgElem));
-	    for (int i = 0; i<dlg.categories[0].size; ++i) {
-		PyObject *elem = PySequence_GetItem(spec, i);
-		if ( !multiDlgDecodeElem(&dlg.categories[0].elems[i], elem, tagdict) ) {
-		    multiDlgFree(&dlg, false);
-		    Py_DECREF(tagdict);
-		    return NULL;
-		}
-		Py_DECREF(elem);
-	    }
+	    PyErr_Format(PyExc_TypeError, "askMulti: Failed to parse arguments");
+	    Py_DECREF(tagdict);
+	    return NULL;
 	}
 	Py_DECREF(test);
     } else if ( PyDict_Check(spec) ) {
-	dlg.size = 1;
-	dlg.categories = calloc(1, sizeof(MultiDlgCategory));
-	dlg.categories[0].size = 1;
-	dlg.categories[0].elems = calloc(1, sizeof(MultiDlgElem));
-	if ( !multiDlgDecodeElem(&dlg.categories[0].elems[0], spec, tagdict) ) {
-	    multiDlgFree(&dlg, false);
+	if ( PyDict_GetItemString(spec, "category") ) {
+	    dlg.len = 1;
+	    dlg.categories = calloc(1, sizeof(MultiDlgCategory));
+	    if ( !multiDlgDecodeCategory(dlg.categories, spec, tagdict) ) {
+		multiDlgFree(&dlg, false);
+		Py_DECREF(tagdict);
+		return NULL;
+	    }
+	} else if ( PyDict_GetItemString(spec, "question") ) {
+	    dlg.len = 1;
+	    dlg.categories = calloc(1, sizeof(MultiDlgCategory));
+	    dlg.categories[0].len = 1;
+	    dlg.categories[0].questions = calloc(1, sizeof(MultiDlgQuestion));
+	    if ( !multiDlgDecodeQuestion(dlg.categories[0].questions, spec, tagdict) ) {
+		multiDlgFree(&dlg, false);
+		Py_DECREF(tagdict);
+		return NULL;
+	    }
+	} else {
+	    PyErr_Format(PyExc_TypeError, "askMulti: Failed to parse arguments");
 	    Py_DECREF(tagdict);
 	    return NULL;
 	}
@@ -19130,7 +19144,7 @@ PyMethodDef module_fontforge_methods[] = {
     { "saveFilename", PyFF_saveFilename, METH_VARARGS, "Pops up a file picker dialog asking the user for a filename to use for saving" },
     { "ask", PyFF_ask, METH_VARARGS, "Pops up a dialog asking the user a question and providing a set of buttons for the user to reply with" },
     { "askChoices", (PyCFunction)PyFF_askChoices, METH_VARARGS | METH_KEYWORDS, "Pops up a dialog asking the user a question and providing a scrolling list for the user to reply with" },
-    { "askString", (PyCFunction)PyFF_askString, METH_VARARGS | METH_KEYWORDS, "Pops up a dialog asking the user a question and providing a textfield for the user to reply with" },
+    { "askString", PyFF_askString, METH_VARARGS, "Pops up a dialog asking the user a question and providing a textfield for the user to reply with" },
     { "askMulti", (PyCFunction)PyFF_askMulti, METH_VARARGS | METH_KEYWORDS, "Pops up a dialog asking the user a question and providing a textfield for the user to reply with" },
     // Leave some sentinel slots here so that the UI
     // code can add it's methods to the end of the object declaration.
