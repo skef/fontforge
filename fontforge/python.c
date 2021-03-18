@@ -1868,7 +1868,7 @@ static int multiDlgDecodeQuestion(MultiDlgQuestion *qstn, PyObject *spec, PyObje
 	PyErr_Format(PyExc_ValueError, "askMulti: tag for question '%s' already used for different question.", qstn->label );
 	return false;
     }
-    PyDict_SetItem(tagdict, tag, Py_None);
+    PyDict_SetItem(tagdict, tag, Py_True);
     Py_INCREF(tag);
     qstn->tag = tag;
     qstn->filter = getDictItemStringString(spec, "filter");

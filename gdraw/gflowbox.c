@@ -103,16 +103,17 @@ static void GFlowBoxMove(GGadget *g, int32 x, int32 y) {
 
 struct childsizedata {
     int extra_space;		/* a default button has "extra_space" */
-    int min, size, offset;
-    int oppomin, opposize;
-    int oppooffset; // Relative to rowcol
+    int min, oppomin;
+    int size, opposize;
+    int offset;
     int rowcol;
+    int oppooffset; // Relative to rowcol
 };
 
 struct fsizeinfo {
     struct childsizedata *childsize;
     int *rowcolbaseline;
-    int des, oppodes;
+    int max, oppomax;
     int min;
     int size, opposize;
     int label_width, label_height, label_size;
@@ -145,11 +146,11 @@ static void GFlowBoxGatherMinInfo(GFlowBox *fb,struct fsizeinfo *si) {
 		cs->oppomin = outer.height;
 	    }
 	}
-	si->des += cs->min;
+	si->max += cs->min;
 	if ( c!=0 )
-	    si->des += fb->vertical ? fb->vpad : fb->hpad;
-	if (si->oppodes < cs->oppomin)
-	    si->oppodes = cs->oppomin;
+	    si->max += fb->vertical ? fb->vpad : fb->hpad;
+	if (si->oppomax < cs->oppomin)
+	    si->oppomax = cs->oppomin;
 	if (si->min < cs->min)
 	    si->min = cs->min;
     }
@@ -164,14 +165,14 @@ static void GFlowBoxGatherMinInfo(GFlowBox *fb,struct fsizeinfo *si) {
 	si->label_height = outer.height;
 	if ( !fb->vertical ) {
 	    si->min += si->label_size + fb->lpad;
-	    si->des += si->label_size + fb->lpad;
+	    si->max += si->label_size + fb->lpad;
 	}
     }
 
 }
 
 static void GFlowBoxSizeTo(GFlowBox *fb,struct fsizeinfo *si, int size) {
-    int rowcolstart=0, rowcoloffset=0, cursize=0, opposize=0;
+    int rowcolstart=0, rowcoloffset=0, cursize=0, currowcolsize=0;
     int pad = fb->vertical ? fb->vpad : fb->hpad;
     int oppopad = fb->vertical ? fb->hpad : fb->vpad;
     int c, j, subsize, exp, move;
@@ -203,13 +204,13 @@ static void GFlowBoxSizeTo(GFlowBox *fb,struct fsizeinfo *si, int size) {
 	    }
 	    si->rowcolbaseline[si->rowcols] = rowcoloffset;
 	    si->rowcols++;
-	    rowcoloffset += opposize + oppopad;
-	    opposize = 0;
+	    rowcoloffset += currowcolsize + oppopad;
+	    currowcolsize = 0;
 	    rowcolstart = c;
 	    cursize = 0;
 	}
-	if (opposize < cs->oppomin)
-	    opposize = cs->oppomin;
+	if (currowcolsize < cs->oppomin)
+	    currowcolsize = cs->oppomin;
 	if (c!=rowcolstart)
 	    cursize += pad;
 	cs->offset = cursize;
@@ -233,7 +234,7 @@ static void GFlowBoxSizeTo(GFlowBox *fb,struct fsizeinfo *si, int size) {
     si->rowcolbaseline[si->rowcols] = rowcoloffset;
     si->rowcols++;
     si->size = size;
-    si->opposize = rowcoloffset + opposize;
+    si->opposize = rowcoloffset + currowcolsize;
 }
 
 static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
@@ -328,7 +329,7 @@ static void GFlowBoxResize(GGadget *g, int32 width, int32 height) {
     GDrawRequestExpose(g->base,&g->r,false);
 }
 
-void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashed, int ignore_des) {
+void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashed, int ignore_desired) {
     struct fsizeinfo si;
     GFlowBox *fb = (GFlowBox *) g;
     int bp = GBoxBorderWidth(g->base,g->box);
@@ -340,38 +341,38 @@ void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashe
 	    GFlowBoxSizeTo(fb, &si, si.min);
 	    height = si.size;
 	    width = si.opposize;
-	} else if ( g->desired_height>0 && !ignore_des ) {
+	} else if ( g->desired_height>0 && !ignore_desired ) {
 	    int dh = g->desired_height-2*bp;
-	    if ( dh >= si.des ) {
+	    if ( dh >= si.max ) {
 		height = dh;
-		width = si.oppodes;
+		width = si.oppomax;
 	    } else {
 		GFlowBoxSizeTo(fb, &si, dh);
 		height = si.size;
 		width = si.opposize;
 	    }
 	} else {
-	    height = si.des;
-	    width = si.oppodes;
+	    height = si.max;
+	    width = si.oppomax;
 	}
     } else {
 	if ( squashed ) {
 	    GFlowBoxSizeTo(fb, &si, si.min);
 	    width = si.size;
 	    height = si.opposize;
-	} else if ( g->desired_width>0 && !ignore_des ) {
+	} else if ( g->desired_width>0 && !ignore_desired ) {
 	    int dw = g->desired_width-2*bp;
-	    if ( dw >= si.des ) {
+	    if ( dw >= si.max ) {
 		width = dw;
-		height = si.oppodes;
+		height = si.oppomax;
 	    } else {
 		GFlowBoxSizeTo(fb, &si, dw);
 		width = si.size;
 		height = si.opposize;
 	    }
 	} else {
-	    width = si.des;
-	    height = si.oppodes;
+	    width = si.max;
+	    height = si.oppomax;
 	}
 	if ( height < si.label_height )
 	    height = si.label_height;
