@@ -1105,7 +1105,7 @@ struct flaglist openflaglist[] = {
     FLAGLIST_EMPTY
 };
 
-static PyObject *PyFF_OpenFont(PyObject *UNUSED(self), PyObject *args) { 
+static PyObject *PyFF_OpenFont(PyObject *UNUSED(self), PyObject *args) {
     char *filename, *locfilename;
     int openflags = 0;
     SplineFont *sf;
@@ -1800,8 +1800,7 @@ void multiDlgFree(MultiDlgSpec *dlg, int do_top) {
     free(dlg->categories);
     if (do_top)
 	free(dlg);
-} 
-
+}
 
 void multiDlgPrint(MultiDlgSpec *dlg) {
     for (int i=0; i<dlg->len; ++i) {

@@ -32,7 +32,7 @@
 
 enum multi_dlg_question_type { mdq_openpath, mdq_savepath, mdq_string, mdq_choice };
 
-/* For _open, _save, and _askstr "in" is the default value (if any) and 
+/* For _open, _save, and _askstr "in" is the default value (if any) and
  * out is the user-supplied value.
  *
  * For _choice "out" is kept NULL and is_checked indicates the user-supplied
@@ -43,8 +43,8 @@ struct multi_dlg_question;
 
 typedef struct multi_dlg_answer {
     void *tag;
-    int is_default:1;
-    int is_checked:1;
+    int is_default: 1;
+    int is_checked: 1;
     char *name;
     struct multi_dlg_question *question;
 } MultiDlgAnswer;
@@ -53,9 +53,9 @@ typedef struct multi_dlg_question {
     void *tag;
     enum multi_dlg_question_type type;
     int answer_len;
-    int multiple:1;
-    int checks:1;
-    int align:1;
+    int multiple: 1;
+    int checks: 1;
+    int align: 1;
     char *label, *dflt, *filter, *str_answer;
     MultiDlgAnswer *answers;
 } MultiDlgQuestion;
