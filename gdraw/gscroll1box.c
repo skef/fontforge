@@ -342,7 +342,7 @@ static void GScroll1BoxResize(GGadget *g, int32 width, int32 height ) {
 		    s1b->subheight += rect.height;
 	        }
 		if ( i==0 )
-		    s1b->curminopposize = s1b->subheight;
+		    s1b->oppoatcur = s1b->subheight;
 		if ( s1b->subheight <= height )
 		    break;
 		if ( i==0 ) {
@@ -394,7 +394,7 @@ static void GScroll1BoxResize(GGadget *g, int32 width, int32 height ) {
 		    s1b->subwidth += rect.width;
 		}
 		if ( i==0 )
-		    s1b->curminopposize = s1b->subwidth;
+		    s1b->oppoatcur = s1b->subwidth;
 		if ( s1b->subwidth <= width )
 		    break;
 		if ( i==0 ) {
@@ -436,7 +436,7 @@ static void GScroll1BoxResize(GGadget *g, int32 width, int32 height ) {
 int GScroll1BoxMinOppoSize(GGadget *g) {
     GScroll1Box *s1b = (GScroll1Box *) g;
 
-    return s1b->curminopposize + g->r.height - g->inner.height;
+    return s1b->oppoatcur + g->r.height - g->inner.height;
 }
 
 int GScroll1BoxSBSize(GGadget *g) {
