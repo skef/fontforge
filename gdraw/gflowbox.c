@@ -379,7 +379,7 @@ void _GFlowBoxGetDesiredSize(GGadget *g, GRect *outer, GRect *inner, int squashe
     }
 
     if ( inner!=NULL ) {
-	inner->x = inner->y = 0;
+	inner->x = inner->y = bp;
 	inner->width = width;
 	inner->height = height;
     }

@@ -33,6 +33,7 @@
 #include "ffglib.h"
 #include "fontforgeui.h"
 #include "multidialog.h"
+#include "../gdraw/ggadgetP.h"
 
 #include <assert.h>
 
@@ -257,7 +258,7 @@ static GGadgetCreateData *LayoutMultiDlgQuestion(MultiDlgQuestion *qstn, struct 
 		lbox[0][0] = &gcd[g++];
 		lbox[1][0] = GCD_RowSpan;
 
-		label[l].text = (unichar_t *) "All";
+		label[l].text = (unichar_t *) _("All");
 		label[l].text_is_1byte = true;
 		gcd[g].gd.label = &label[l++];
 		gcd[g].gd.flags = gg_enabled | gg_visible;
@@ -266,7 +267,7 @@ static GGadgetCreateData *LayoutMultiDlgQuestion(MultiDlgQuestion *qstn, struct 
 		gcd[g].data = (void *)(size_t) mpp->listcid + CID_LIST_START;
 		lbox[0][1] = &gcd[g++];
 
-		label[l].text = (unichar_t *) "None";
+		label[l].text = (unichar_t *) _("None");
 		label[l].text_is_1byte = true;
 		gcd[g].gd.label = &label[l++];
 		gcd[g].gd.flags = gg_enabled | gg_visible;
@@ -303,7 +304,7 @@ static GGadgetCreateData *LayoutMultiDlgQuestion(MultiDlgQuestion *qstn, struct 
 	gcd[g].creator = GTextFieldCreate;
 	fbox[fb++] = &gcd[g++];
 
-	label[l].text = (unichar_t *) "...";
+	label[l].text = (unichar_t *) _("...");
 	label[l++].text_is_1byte = true;
 	gcd[g].gd.label = &label[l-1];
 	gcd[g].gd.flags = gg_enabled | gg_visible;
@@ -410,8 +411,9 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *dlg) {
     GTextInfo label[6];
     enum multi_done_state mds = mds_not;
     int b=0, g=0, l=0, i, err=false;
-    int maxwidth=0, targetwidth, widthdiff;
-    int maxheight=0, targetheight, heightdiff;
+    int maxwidth=0, targetwidth;
+    int maxheight=0, targetheight;
+    int hvborder;
 
     if ( no_windowing_ui )
 	return false;
@@ -536,18 +538,22 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *dlg) {
     }
     g_list_free(mpp.expands);
 
-    GHVBoxFitWindow(boxes[0].ret);
+    // GHVBoxFitWindow(boxes[0].ret);
 
     // Find and set more appropriate window dimensions
- 
-    GDrawGetSize(gw, &wsize);
+
+    GGadgetGetDesiredSize(boxes[0].ret, &wsize, NULL);
+    hvborder = GGadgetGetX(boxes[0].ret);
+    wsize.width += 2*hvborder;
+    wsize.height += 2*hvborder;
+
     GDrawGetSize(GDrawGetRoot(NULL),&scsize);
 
     // Outer size of the just-fit GScroll1Box 
     if ( dlg->len > 1 )
-	GGadgetGetInnerSize(boxes[3].ret, &s1bsize);
+	GGadgetGetDesiredSize(boxes[3].ret, NULL, &s1bsize);
     else
-	GGadgetGetSize(cat1->ret, &s1bsize);
+	GGadgetGetDesiredSize(cat1->ret, &s1bsize, NULL);
 
     // Appropriate width
     _GScroll1BoxGetDesiredSize(cat1->ret, &s1bt, NULL, true);
@@ -564,15 +570,14 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *dlg) {
     targetwidth -= wsize.width-s1bsize.width;
     if ( targetwidth > maxwidth )
 	targetwidth = maxwidth;
-    widthdiff = targetwidth - s1bsize.width;
-    if ( widthdiff>0 ) {
-	// Need this to calculate the "min oppo size" (roughly the height 
-	// of the scrolling window corresponding to the resize width).
-	GGadgetResize(cat1->ret, targetwidth, s1bsize.height);
-	for ( i=1; i<dlg->len; ++i )
-	    GGadgetResize(categories[i].gcd->ret, targetwidth, s1bsize.height);
-    } else
-	widthdiff = 0;
+    targetwidth += wsize.width-s1bsize.width;
+    // Need this to calculate the "min oppo size" (roughly the height 
+    // of the scrolling window corresponding to the resize width).
+    GGadgetResize(cat1->ret, targetwidth, s1bsize.height);
+    for ( i=1; i<dlg->len; ++i )
+	GGadgetResize(categories[i].gcd->ret, targetwidth, s1bsize.height);
+    // From gadget width back to window width
+    targetwidth += wsize.width-s1bsize.width;
 
     // Appropriate height
     maxheight = GScroll1BoxMinOppoSize(cat1->ret);
@@ -585,11 +590,9 @@ int UI_Ask_Multi(const char *title, MultiDlgSpec *dlg) {
     targetheight -= wsize.height - s1bsize.height;
     if ( targetheight > maxheight )
 	targetheight = maxheight;
-    heightdiff = targetheight - s1bsize.height;
-    if ( widthdiff>0 || heightdiff>0 ) {
-	GDrawMove(gw, wsize.x-widthdiff/2, wsize.y-heightdiff/2);
-	GDrawResize(gw, wsize.width+widthdiff, wsize.height+heightdiff);
-    }
+    targetheight += wsize.height - s1bsize.height;
+    GDrawResize(gw, targetwidth, targetheight);
+    GDrawMove(gw, (scsize.width-targetwidth)/2, (scsize.height-targetheight)/2);
 
     for ( GList_Glib *m = mpp.memlist; m!=NULL; m=m->next )
 	free(m->data);

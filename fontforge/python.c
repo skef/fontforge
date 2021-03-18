@@ -1790,6 +1790,7 @@ void multiDlgFree(MultiDlgSpec *dlg, int do_top) {
 	    // elem->tag reference is held by tagdict;
 	    free(qstn->answers);
 	    free(qstn->label);
+	    free(qstn->filter);
 	    free(qstn->dflt);
 	    free(qstn->str_answer);
 	}
@@ -1869,7 +1870,6 @@ static int multiDlgDecodeQuestion(MultiDlgQuestion *qstn, PyObject *spec, PyObje
 	return false;
     }
     PyDict_SetItem(tagdict, tag, Py_True);
-    Py_INCREF(tag);
     qstn->tag = tag;
     qstn->filter = getDictItemStringString(spec, "filter");
     qstn->multiple = getDictItemStringBool(spec, "multiple", false);
@@ -1979,8 +1979,9 @@ PyObject *multiDlgExtractAnswers(MultiDlgSpec *dspec) {
 	    }
 	    k = qspec->tag;
 	    assert( !PyDict_Contains(r, k) );
+	    // XXX seems like v should have an extra reference at this point,
+	    // (because _SetItem() doesn't steal) but DECREFing v causes crashes
 	    PyDict_SetItem(r, k, v);
-	    Py_DECREF(v);
 	}
     }
     return r;

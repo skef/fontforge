@@ -626,6 +626,8 @@ return;
 /*	if ( gts->tabs[i].w!=NULL ) */
 /*	    GDrawDestroyWindow(gts->tabs[i].w); */
     }
+    if ( gts->vsb!=NULL )
+	GGadgetDestroy(gts->vsb);
     free(gts->tabs);
     _ggadget_destroy(g);
 }

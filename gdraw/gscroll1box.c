@@ -81,6 +81,7 @@ static void GScroll1BoxDestroy(GGadget *g) {
 	GDrawSetUserData(s1b->nested, NULL);
 	GDrawDestroyWindow(s1b->nested);
     }
+    free(s1b->children);
     _ggadget_destroy(g);
 }
 
@@ -109,6 +110,7 @@ static void GScroll1Box_SetScroll(GScroll1Box *s1b) {
     GGadgetSetEnabled(s1b->sb, need_sb);
     // Subwindow 
     GDrawResize(s1b->nested, pagewidth, pageheight);
+    GDrawRequestExpose(s1b->nested, NULL, false);
 }
 
 static void GScroll1BoxMove(GGadget *g, int32 x, int32 y) {
@@ -181,12 +183,10 @@ static int GScroll1Box_Scroll(GGadget *g, GEvent *e) {
 	int diff = newpos - s1b->offset;
 	s1b->offset = newpos;
 	GScrollBarSetPos(s1b->sb, newpos);
-	GRect clip;
-	clip.x = clip.y = 1;
-	clip.width = rect.width-1;
-	clip.height = rect.height-1;
+	GRect clip = rect;
+	clip.x = clip.y = 0;
 	GScroll1BoxMoveChildren(s1b, diff);
-	GDrawRequestExpose(s1b->nested, &rect, false);
+	GDrawRequestExpose(s1b->nested, &clip, false);
     }
     return true;
 }
@@ -607,7 +607,6 @@ GGadget *GScroll1BoxCreate(struct gwindow *base, GGadgetData *gd,void *data) {
         else {
             gcd->gd.pos.x = gcd->gd.pos.y = 0;
             s1b->children[c] = gcd->ret = (gcd->creator)(s1b->nested,&gcd->gd,gcd->data);
-            gcd->ret->contained = true;
         }
     }
 
