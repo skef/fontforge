@@ -2454,12 +2454,12 @@ static void change_res_filename(const char *newname) {
 }
 
 void DoXRes(void) {
-    extern GResInfo fontview_ri;
+    extern GResInfo view_ri;
 
     MVColInit();
     CVColInit();
     BVColInit();
-    GResEdit(&fontview_ri,xdefs_filename,change_res_filename);
+    GResEdit(&view_ri,xdefs_filename,change_res_filename);
 }
 
 struct prefs_list pointer_dialog_list[] = {

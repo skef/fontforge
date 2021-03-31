@@ -5470,9 +5470,8 @@ static struct resed metricsview_re[] = {
     {N_("Selected Glyph Col"), "SelectedGlyphColor", rt_color, &selglyphcol, N_("Color used to mark the selected glyph"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
-extern GResInfo view_ri;
 GResInfo metricsview_ri = {
-    &view_ri, NULL,NULL, NULL,
+    NULL, NULL,NULL, NULL,
     NULL,
     NULL,
     NULL,

@@ -7356,8 +7356,9 @@ static struct resed view_re[] = {
     {N_("Color|Background"), "Background", rt_color, &view_bgcol, N_("Background color for the drawing area of all views"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
+GResInfo fontview_ri;
 GResInfo view_ri = {
-    NULL, NULL,NULL, NULL,
+    &fontview_ri, NULL,NULL, NULL,
     NULL,
     NULL,
     NULL,

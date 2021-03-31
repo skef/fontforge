@@ -123,7 +123,7 @@ static void GRE_Reflow(GRE *gre,GResInfo *res) {
 }
 
 static void GRE_FigureInheritance( GRE *gre, GResInfo *parent, int cid_off_inh,
-	int cid_off_data, int is_font, void *whatever,
+	int cid_off_data, void *whatever,
 	void (*do_something)(GRE *gre, int child_index, int cid_off_data, void *whatever)) {
     /* Look through the gadget tree for gadgets which inherit from parent */
     /*  (which just changed) then check if this child ggadget actually does */
@@ -133,15 +133,10 @@ static void GRE_FigureInheritance( GRE *gre, GResInfo *parent, int cid_off_inh,
     int i;
 
     for ( i=0; (child = gre->tofree[i].res)!=NULL; ++i ) {
-	if ( child->inherits_from==parent &&
-		(( is_font && child->font!=NULL ) ||
-		 ( !is_font && child->boxdata!=NULL)) ) {
-	     /* Fonts may have a different cid offset depending on wether */
-	     /* The ResInfo has a box or not */
-	    if (( is_font && GGadgetIsChecked(GWidgetGetControl(gre->gw,gre->tofree[i].fontcid-2)) ) ||
-		    ( !is_font && GGadgetIsChecked(GWidgetGetControl(gre->gw,gre->tofree[i].startcid+cid_off_inh)) )) {
+	if ( child->inherits_from==parent && child->boxdata!=NULL ) {
+	    if ( GGadgetIsChecked(GWidgetGetControl(gre->gw,gre->tofree[i].startcid+cid_off_inh)) ) {
 		(do_something)(gre,i,cid_off_data,whatever);
-		GRE_FigureInheritance(gre,child,cid_off_inh,cid_off_data,is_font,whatever,do_something);
+		GRE_FigureInheritance(gre,child,cid_off_inh,cid_off_data,whatever,do_something);
 	    }
 	}
     }
@@ -188,18 +183,6 @@ static void inherit_flag_change(GRE *gre, int childindex, int cid_off,
     else
 	res->boxdata->flags &= ~flag;
     GGadgetSetChecked(g,on);
-}
-
-struct inherit_font_data { char *spec; GFont *font; };
-
-static void inherit_font_change(GRE *gre, int childindex, int cid_off,
-	void *whatever) {
-    GGadget *g = GWidgetGetControl(gre->gw,gre->tofree[childindex].fontcid);
-    struct inherit_font_data *ifd = (struct inherit_font_data *) whatever;
-
-    if ( ifd->font!=NULL )
-	*(gre->tofree[childindex].res->font) = ifd->font;
-    GGadgetSetTitle8(g,ifd->spec);
 }
 
 static int GRE_InheritColChange(GGadget *g, GEvent *e) {
@@ -304,37 +287,6 @@ static int GRE_InheritFlagChange(GGadget *g, GEvent *e) {
 		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,false,
 			(void *) (intpt) on, inherit_flag_change);
 		GRE_Reflow(gre,res);
-	    }
-	}
-    }
-return( true );
-}
-
-static int GRE_InheritFontChange(GGadget *g, GEvent *e) {
-
-    if ( e->type==et_controlevent && e->u.control.subtype == et_radiochanged ) {
-	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
-	int cid = GGadgetGetCid(g), on = GGadgetIsChecked(g);
-	GGadgetSetEnabled(GWidgetGetControl(gre->gw,cid+1),!on);
-	g = GWidgetGetControl(gre->gw,cid+2);
-	GGadgetSetEnabled(g,!on);
-	if ( on ) {
-	    int index = GTabSetGetSel(gre->tabset);
-	    GResInfo *res = gre->tofree[index].res;
-	    int pi;
-	    for ( pi=0; gre->tofree[pi].res!=NULL && gre->tofree[pi].res!=res->inherits_from; ++pi );
-	    if ( gre->tofree[pi].res!=NULL ) {
-		struct inherit_font_data ifd;
-		int cid_off = cid - gre->tofree[index].startcid;
-
-		ifd.spec = GGadgetGetTitle8(GWidgetGetControl(gre->gw,gre->tofree[pi].fontcid));
-		ifd.font = *gre->tofree[pi].res->font;
-		*res->font = ifd.font;
- 
-		GGadgetSetTitle8(g,ifd.spec);
-		GRE_FigureInheritance(gre,res,cid_off,cid_off+2,true,
-			(void *) &ifd, inherit_font_change);
-		free( ifd.spec );
 	    }
 	}
     }
@@ -461,48 +413,6 @@ static int GRE_ExtraColorChanged(GGadget *g, GEvent *e) {
 return( true );
 }
 
-static int GRE_FontChanged(GGadget *g, GEvent *e) {
-    struct inherit_font_data ifd;
-
-    if ( e->type==et_controlevent && e->u.control.subtype == et_textchanged ) {
-	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
-	int index = GTabSetGetSel(gre->tabset);
-	GResInfo *res = gre->tofree[index].res;
-	int cid_off = GGadgetGetCid(g) - gre->tofree[index].startcid;
-	char *fontdesc = GGadgetGetTitle8(g);
-	ifd.spec = fontdesc;
-	ifd.font = NULL;
-
-	GRE_FigureInheritance(gre,res,cid_off-2,cid_off,true,
-		(void *) &ifd, inherit_font_change);
-	free(fontdesc);
-    } else if ( e->type==et_controlevent && e->u.control.subtype == et_textfocuschanged &&
-	    !e->u.control.u.tf_focus.gained_focus ) {
-	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
-	if ( gre->tabset!=NULL ) {
-	    int index = GTabSetGetSel(gre->tabset);
-	    GResInfo *res = gre->tofree[index].res;
-	    int cid_off = GGadgetGetCid(g) - gre->tofree[index].startcid;
-	    char *fontdesc = GGadgetGetTitle8(g);
-	    GFont *new = GResource_font_cvt(fontdesc,NULL);
-
-	    if ( new==NULL )
-		gwwv_post_error(_("Bad font"),_("Bad font specification"));
-	    else {
-		ifd.spec = fontdesc;
-		ifd.font = new;
-
-		*((GFont **) GGadgetGetUserData(g)) = new;
-		GRE_FigureInheritance(gre,res,cid_off-2,cid_off,true,
-			(void *) &ifd, inherit_font_change);
-		GRE_Reflow(gre,res);
-	    }
-	    free(fontdesc);
-	}
-    }
-return( true );
-}
-
 static void GRE_ParseFont(GGadget *g) {
     char *fontdesc = GGadgetGetTitle8(g);
     GFont *new = GResource_font_cvt(fontdesc,NULL);
@@ -515,7 +425,7 @@ static void GRE_ParseFont(GGadget *g) {
     free(fontdesc);
 }
 
-static int GRE_ExtraFontChanged(GGadget *g, GEvent *e) {
+static int GRE_FontChanged(GGadget *g, GEvent *e) {
 
     if ( e->type==et_controlevent && e->u.control.subtype == et_textfocuschanged &&
 	    !e->u.control.u.tf_focus.gained_focus ) {
@@ -1988,23 +1898,13 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	if ( res->font!=NULL ) {
 	    tofree[i].fontname = GFontSpec2String( *res->font );
 
-	    lab[k].text = (unichar_t *) _("I.");
-	    lab[k].text_is_1byte = true;
-	    gcd[k].gd.label = &lab[k];
-	    gcd[k].gd.flags = gg_visible|gg_enabled;
-	    gcd[k].gd.popup_msg = _("Inherits for same field in parent");
-	    gcd[k].gd.cid = ++cid;
-	    gcd[k].gd.handle_controlevent = GRE_InheritFontChange;
-	    gcd[k++].creator = GCheckBoxCreate;
-	    tofree[i].fontarray[0] = &gcd[k-1];
-
 	    lab[k].text = (unichar_t *) _("Font:");
 	    lab[k].text_is_1byte = true;
 	    gcd[k].gd.label = &lab[k];
 	    gcd[k].gd.flags = gg_visible|gg_enabled;
 	    gcd[k].gd.cid = ++cid;
 	    gcd[k++].creator = GLabelCreate;
-	    tofree[i].fontarray[1] = &gcd[k-1];
+	    tofree[i].fontarray[0] = &gcd[k-1];
 
 	    lab[k].text = (unichar_t *) tofree[i].fontname;
 	    lab[k].text_is_1byte = true;
@@ -2014,7 +1914,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    gcd[k].gd.handle_controlevent = GRE_FontChanged;
 	    gcd[k].data = res->font;
 	    gcd[k++].creator = GTextFieldCreate;
-	    tofree[i].fontarray[2] = &gcd[k-1];
+	    tofree[i].fontarray[1] = &gcd[k-1];
 	    if ( res->inherits_from==NULL )
 		gcd[k-3].gd.flags &= ~gg_enabled;
 	    else if ( *res->inherits_from->font == *res->font ) {
@@ -2022,8 +1922,8 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		gcd[k-2].gd.flags &= ~gg_enabled;
 		gcd[k-1].gd.flags &= ~gg_enabled;
 	    }
-	    tofree[i].fontarray[3] = GCD_Glue;
-	    tofree[i].fontarray[4] = NULL;
+	    tofree[i].fontarray[2] = GCD_Glue;
+	    tofree[i].fontarray[3] = NULL;
 
 	    tofree[i].fontbox.gd.flags = gg_enabled | gg_visible;
 	    tofree[i].fontbox.gd.u.boxelements = tofree[i].fontarray;
@@ -2250,7 +2150,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 			gcd[k].gd.popup_msg = _(extras->popup);
 		    gcd[k].data = extras->val;
 		    gcd[k].gd.cid = extras->cid = ++cid;
-		    gcd[k].gd.handle_controlevent = GRE_ExtraFontChanged;
+		    gcd[k].gd.handle_controlevent = GRE_FontChanged;
 		    gcd[k++].creator = GTextFieldCreate;
 		    tofree[i].earray[hl][base+1] = &gcd[k-1];
 		    tofree[i].earray[hl][base+2] = GCD_ColSpan;
