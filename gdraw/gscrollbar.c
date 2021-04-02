@@ -51,7 +51,7 @@ static GResInfo gthumb_ri;
 static GResInfo gscrollbar_ri = {
     &gthumb_ri, &ggadget_ri,&gthumb_ri, NULL,
     &scrollbar_box,
-    NULL,
+    { NULL, NULL },
     &scrollbarbox,
     NULL,
     N_("ScrollBar"),
@@ -70,7 +70,7 @@ static GResInfo gscrollbar_ri = {
 static GResInfo gthumb_ri = {
     NULL, &ggadget_ri,&gscrollbar_ri, NULL,
     &thumb_box,
-    NULL,
+    { NULL, NULL },
     &scrollbarbox,
     NULL,
     N_("SB Thumb"),

@@ -39,7 +39,8 @@
 
 static GBox menubar_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox menu_box = GBOX_EMPTY; /* Don't initialize here */
-static FontInstance *menu_font = NULL, *menubar_font = NULL;
+static GResFont menu_font = { NULL, NULL };
+static GResFont menubar_font = { NULL, NULL };
 static int gmenubar_inited = false;
 #ifdef __Mac
 static int mac_menu_icons = true;
@@ -120,10 +121,8 @@ static void GMenuInit() {
     char *keystr, *end;
 
     GGadgetInit();
-    memset(&rq,0,sizeof(rq));
-    GDrawDecomposeFont(_ggadget_default_font,&rq);
-    rq.weight = 400;
-    menu_font = menubar_font = GDrawInstanciateFont(NULL,&rq);
+    menu_font.rstr = copy("400 10pt sans");
+    menubar_font.rstr = copy(menu_font.rstr);
     _GGadgetCopyDefaultBox(&menubar_box);
     _GGadgetCopyDefaultBox(&menu_box);
     menubar_box.border_shape = menu_box.border_shape = bs_rect;
@@ -131,8 +130,8 @@ static void GMenuInit() {
     menu_box.padding = 1;
     menubar_box.flags |= box_foreground_border_outer;
     menu_box.flags |= box_foreground_border_outer;
-    menubar_font = _GGadgetInitDefaultBox("GMenuBar.",&menubar_box,menubar_font);
-    menu_font = _GGadgetInitDefaultBox("GMenu.",&menu_box,menubar_font);
+    _GGadgetInitDefaultBox("GMenuBar.",&menubar_box,&menubar_font);
+    _GGadgetInitDefaultBox("GMenu.",&menu_box,&menu_font);
     keystr = GResourceFindString("Keyboard");
     if ( keystr!=NULL ) {
 	if ( strmatch(keystr,"mac")==0 ) keyboard = kb_mac;
@@ -1672,7 +1671,7 @@ GWindow _GMenuCreatePopupMenuWithName( GWindow owner,GEvent *event, GMenuItem *m
     p.y = event->u.mouse.y;
     GDrawTranslateCoordinates(owner,GDrawGetRoot(GDrawGetDisplayOfWindow(owner)),&p);
     m = _GMenu_Create( 0, owner, GMenuItemArrayCopy(mi,NULL), &p,
-		       0, 0, menu_font,false, subMenuName );
+		       0, 0, menu_font.fi,false, subMenuName );
     m->any_unmasked_shortcuts = GMenuItemArrayAnyUnmasked(m->mi);
     GDrawPointerUngrab(GDrawGetDisplayOfWindow(owner));
     GDrawPointerGrab(m->w);
@@ -2306,7 +2305,7 @@ GGadget *GMenuBarCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     mb->mi = GMenuItemArrayCopy(gd->u.menu,&mb->mtot);
     mb->xs = malloc((mb->mtot+1)*sizeof(uint16));
     mb->entry_with_mouse = -1;
-    mb->font = menubar_font;
+    mb->font = menubar_font.fi;
 
     GMenuBarFit(mb,gd);
     GMenuBarFindXs(mb);
@@ -2333,7 +2332,7 @@ GGadget *GMenu2BarCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     mb->mi = GMenuItem2ArrayCopy(gd->u.menu2,&mb->mtot);
     mb->xs = malloc((mb->mtot+1)*sizeof(uint16));
     mb->entry_with_mouse = -1;
-    mb->font = menubar_font;
+    mb->font = menubar_font.fi;
 
     GMenuBarFit(mb,gd);
     GMenuBarFindXs(mb);

@@ -51,7 +51,7 @@ static GResInfo gcancel_ri, gdefault_ri, gbutton_ri, gdroplist_ri, gcolor_ri;
 static GResInfo glabel_ri = {
     &gbutton_ri, &ggadget_ri,NULL, NULL,
     &label_box,
-    &label_font,
+    { NULL, &label_font },
     NULL,
     NULL,
     N_("Label"),
@@ -85,7 +85,7 @@ static struct resed gbutton_re[] = {
 static GResInfo gbutton_ri = {
     &gdefault_ri, &ggadget_ri,&gdefault_ri, &gcancel_ri,
     &_GGadget_button_box,
-    &button_font,
+    { NULL, &button_font },
     &buttonbox,
     gbutton_re,
     N_("Button"),
@@ -117,7 +117,7 @@ static GGadgetCreateData defbox =
 static GResInfo gdefault_ri = {
     &gcancel_ri, &gbutton_ri,&gcancel_ri,NULL,
     &_GGadget_defaultbutton_box,
-    NULL,
+    { NULL, NULL },
     &defbox,
     NULL,
     N_("Default Button"),
@@ -146,7 +146,7 @@ static GGadgetCreateData cancelbox =
 static GResInfo gcancel_ri = {
     &gcolor_ri, &gbutton_ri,&gdefault_ri,NULL,
     &_GGadget_cancelbutton_box,
-    NULL,
+    { NULL, NULL },
     &cancelbox,
     NULL,
     N_("Cancel Button"),
@@ -175,7 +175,7 @@ static GGadgetCreateData colorbox =
 static GResInfo gcolor_ri = {
     &gdroplist_ri, &gbutton_ri,NULL,NULL,
     &_GGadget_colorbutton_box,
-    NULL,
+    { NULL, NULL },
     &colorbox,
     NULL,
     N_("Color Button"),
@@ -207,7 +207,7 @@ static GGadgetCreateData droplistbox =
 static GResInfo gdroplist_ri = {
     NULL, &gbutton_ri,&listmark_ri,NULL,
     &_GGadget_droplist_box,
-    NULL,
+    { NULL, NULL },
     &droplistbox,
     NULL,
     N_("Drop List Button"),
@@ -976,8 +976,9 @@ return;
 #endif
     label_box.border_type = bt_none;
     label_box.border_width = label_box.padding = /*label_box.flags =*/ 0;
-    button_font = _GGadgetInitDefaultBox("GButton.",&_GGadget_button_box,NULL);
-    label_font = _GGadgetInitDefaultBox("GLabel.",&label_box,button_font);
+    // XXX deal with default
+    _GGadgetInitDefaultBox("GButton.",&_GGadget_button_box,&gbutton_ri.font);
+    _GGadgetInitDefaultBox("GLabel.",&label_box,&glabel_ri.font);
     shift_on_press = GResourceFindBool("GButton.ShiftOnPress",false);
     _GGadget_droplist_box = _GGadget_button_box;
     _GGadget_defaultbutton_box = _GGadget_button_box;

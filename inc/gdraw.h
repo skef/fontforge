@@ -34,11 +34,10 @@ enum font_style { fs_none, fs_italic=1, fs_smallcaps=2, fs_condensed=4, fs_exten
 enum font_type { ft_unknown, ft_serif, ft_sans, ft_mono, ft_cursive, ft_max };
 
 typedef struct {
-    const unichar_t *family_name;	/* may be more than one */
+    const char *utf8_family_name;	/* may be more than one */
     int16 point_size;			/* negative values are in pixels */
     int16 weight;
     enum font_style style;
-    char *utf8_family_name;
 } FontRequest;
 
 typedef struct font_instance FontInstance, GFont;

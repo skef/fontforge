@@ -2121,7 +2121,7 @@ extern GResInfo metricsview_ri;
 GResInfo bitmapview_ri = {
     &metricsview_ri, NULL,NULL, NULL,
     NULL,
-    NULL,
+    { NULL, NULL },
     NULL,
     bitmapview_re,
     N_("Bitmap View"),

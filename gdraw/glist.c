@@ -969,7 +969,7 @@ static GGadgetCreateData listhvbox =
 static GResInfo glist_ri = {
     NULL, &ggadget_ri,NULL, NULL,
     &list_box,
-    &list_font,
+    { NULL, &list_font },
     &listhvbox,
     NULL,
     N_("List"),
@@ -988,7 +988,7 @@ static GResInfo glist_ri = {
 static void GListInit() {
     _GGadgetCopyDefaultBox(&list_box);
     list_box.flags |= box_foreground_border_outer;
-    list_font = _GGadgetInitDefaultBox("GList.",&list_box,NULL);
+    _GGadgetInitDefaultBox("GList.",&list_box,&glist_ri.font);
     glist_inited = true;
 }
 

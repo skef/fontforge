@@ -28,6 +28,7 @@
 #include <fontforge-config.h>
 
 #include "basics.h"
+#include "ffglib.h"
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
@@ -35,6 +36,9 @@
 #include "gwidget.h"
 #include "ustring.h"
 #include "utype.h"
+
+#include "assert.h"
+#include "math.h"
 
 GBox _ggadget_Default_Box = { bt_raised, bs_rect, 2, 2, 0, 0, 
     COLOR_CREATE(0xd8,0xd8,0xd8),		/* border left */ /* brightest */
@@ -52,8 +56,8 @@ GBox _ggadget_Default_Box = { bt_raised, bs_rect, 2, 2, 0, 0,
     COLOR_CREATE(0x00,0x00,0x00),		/* border outer */
 };
 GBox _GListMark_Box = GBOX_EMPTY; /* Don't initialize here */
-FontInstance *_ggadget_default_font = NULL;
-static FontInstance *popup_font = NULL;
+GResFont _ggadget_default_font = { NULL, NULL };
+GResFont popup_font = { NULL, NULL };
 int _GListMarkSize = 12;
 GResImage *_GListMark_Image = NULL, *_GListMark_DisImage;
 static int _GGadget_FirstLine = 6;
@@ -138,7 +142,7 @@ static GGadgetCreateData droplistbox =
 GResInfo listmark_ri = {
     NULL, &ggadget_ri, NULL,NULL,
     &_GListMark_Box,	/* No box */
-    NULL,
+    { NULL, NULL },
     &droplistbox,
     listmark_re,
     N_("List Mark"),
@@ -187,92 +191,200 @@ return( def );
 return( (void *) (intpt) ret );
 }
 
+static void GResHashFree(gpointer p) {
+    free(p);
+}
+
 /* font name may be something like:
 	bold italic extended 12pt courier
 	400 10pt small-caps
-    family name comes at the end, size must have "pt" after it
+    family name comes at the end, size must have "pt" or "px" after it
 */
-void *GResource_font_cvt(char *val, void *def) {
+static int _GResToFontRequest(char *resname, FontRequest *rq, GHashTable *ht,
+                              int name_is_value, int force_resolve) {
     static char *styles[] = { "normal", "italic", "oblique", "small-caps",
 	    "bold", "light", "extended", "condensed", NULL };
-    FontRequest rq;
-    FontInstance *fi;
-    char *pt, *end, ch;
-    int ret;
-    char *freeme=NULL;
+    char *val, *pt, *end, ch, *relname, *e;
+    int ret, top_level = false, percent = 100, adjust = 0;
+    int found_rel = false, found_style = false, found_weight = false, err = false;
+    FontRequest rel_rq;
 
-    memset(&rq,0,sizeof(rq));
-    rq.utf8_family_name = SANS_UI_FAMILIES;
-    rq.point_size = 10;
-    rq.weight = 400;
-    rq.style = 0;
-    if ( def!=NULL )
-	GDrawDecomposeFont((FontInstance *)def, &rq);
-    else if ( _ggadget_default_font!=NULL )
-	GDrawDecomposeFont(_ggadget_default_font, &rq);
+    if ( ht==NULL ) {
+	ht = g_hash_table_new_full(g_str_hash, g_str_equal, GResHashFree, GResHashFree);
+	top_level = true;
+    }
 
-    for ( pt=val; *pt && *pt!='"'; ) {
+    memset(rq,0,sizeof(rq));
+    rq->weight = 400;
+
+    if ( name_is_value )
+	val = resname;
+    else {
+	val = GResourceFindString(resname);
+    }
+
+    if ( val==NULL ) {
+	if ( top_level )
+	    GDrawError("Missing font resource reference to '%s': cannot resolve", resname);
+	err = true;
+    }
+
+    for ( pt=val; !err && *pt && *pt!='"'; ) {
 	for ( end=pt; *end!=' ' && *end!='\0'; ++end );
-	ch = *end; *end = '\0';
+	ch = *end;
+	*end = '\0';
 	ret = match(styles,pt);
 	if ( ret==-1 && isdigit(*pt)) {
-	    char *e;
 	    ret = strtol(pt,&e,10);
 	    if ( strmatch(e,"pt")==0 )
-		rq.point_size = ret;
-	    else if ( *e=='\0' )
-		rq.weight = ret;
-	    else {
+		rq->point_size = ret;
+	    else if ( strmatch(e,"px")==0 )
+		rq->point_size = -ret;
+	    else if ( strmatch(e,"%")==0 ) {
+		percent = ret;
+		if ( percent<0 )
+		    percent = -percent;
+	    } else if ( *e=='\0' ) {
+		found_weight = true;
+		rq->weight = ret;
+	    } else {
 		*end = ch;
-    break;
+		break;
 	    }
+	} else if ( ret==-1 && *pt=='+' || *pt=='-' ) {
+	    adjust = strtol(pt,&e,10);
+	} else if ( ret==-1 && *pt=='^' ) {
+	    relname = copy(pt+1);
+	    if ( g_hash_table_contains(ht, relname) ) {
+		GDrawError("Circular font resource reference to '%s': cannot resolve", relname);
+		if ( force_resolve ) {
+		    err = true;
+		    break;
+		} else
+		    continue;
+	    }
+	    g_hash_table_add(ht, copy(relname));
+	    if ( !_GResToFontRequest(relname, &rel_rq, ht, false, force_resolve) ) {
+		err = true;
+		break;
+	    }
+	    found_rel = true;
 	} else if ( ret==-1 ) {
 	    *end = ch;
-    break;
-	} else if ( ret==0 )
-	    /* Do Nothing */;
-	else if ( ret==1 || ret==2 )
-	    rq.style |= fs_italic;
-	else if ( ret==3 )
-	    rq.style |= fs_smallcaps;
-	else if ( ret==4 )
-	    rq.weight = 700;
-	else if ( ret==5 )
-	    rq.weight = 300;
-	else if ( ret==6 )
-	    rq.style |= fs_extended;
-	else
-	    rq.style |= fs_condensed;
+	    break;
+	} else if ( ret==0 ) {
+	    found_weight = true;
+	    rq->weight = 400;
+	} else if ( ret==1 || ret==2 ) {
+	    found_style = true;
+	    rq->style |= fs_italic;
+	} else if ( ret==3 ) {
+	    found_style = true;
+	    rq->style |= fs_smallcaps;
+	} else if ( ret==4 ) {
+	    found_weight = true;
+	    rq->weight = 700;
+	} else if ( ret==5 ) {
+	    found_weight = true;
+	    rq->weight = 300;
+	} else if ( ret==6 ) {
+	    found_style = true;
+	    rq->style |= fs_extended;
+	} else {
+	    found_style = true;
+	    rq->style |= fs_condensed;
+	}
 	*end = ch;
 	pt = end;
 	while ( *pt==' ' ) ++pt;
     }
 
-    if ( *pt!='\0' )
-	rq.utf8_family_name = freeme = copy(pt);
-		
-    fi = GDrawInstanciateFont(NULL,&rq);
+    if ( !err ) {
+	if ( *pt!='\0' )
+	    rq->utf8_family_name = copy(pt);
+	if ( found_rel && rq->utf8_family_name==NULL && rel_rq.utf8_family_name!=NULL )
+	    rq->utf8_family_name = copy(rel_rq.utf8_family_name);
+	if ( found_rel && !found_weight )
+	    rq->weight = rel_rq.weight;
+	if ( found_rel && !found_style )
+	    rq->style = rel_rq.style;
+	if ( rq->point_size==0 ) {
+	    if ( found_rel ) {
+		if ( rel_rq.point_size==0 ) {
+		    GDrawError("Point size not set for '%s': cannot calculate relative point size", relname);
+		    if ( force_resolve )
+			err = true;
+		} else {
+		    float tmp = (float)percent * (float)rel_rq.point_size / 100.0;
+		    rq->point_size = (int) ((tmp - floor(tmp) > 0.5) ? ceil(tmp) : floor(tmp));
+		    if ( rq->point_size < 0 )
+			rq->point_size -= adjust;
+		    else
+			rq->point_size += adjust;
+		}
+	    } else if ( force_resolve ) {
+		err = true;
+	    }
+	}
+    }
 
-    free(freeme);
+    if ( top_level )
+	g_hash_table_destroy(ht);
 
-    if ( fi==NULL )
-return( def );
-return( (void *) fi );
+    free((char *)rel_rq.utf8_family_name);
+    if ( !name_is_value )
+	free(val);
+
+    if ( err ) {
+	free((char *)rq->utf8_family_name);
+	rq->utf8_family_name = NULL;
+	return false;
+    }
+    
+    return true;
 }
 
-FontInstance *GResourceFindFont(char *resourcename,FontInstance *deffont) {
-    char *val = GResourceFindString(resourcename);
-    if ( val==NULL )
-return( deffont );
-
-return( GResource_font_cvt(val,deffont));
+int ResStrToFontRequest(const char *resstr, FontRequest *rq) {
+    return _GResToFontRequest(resstr, rq, NULL, name_is_value, true);
 }
+
+void GResourceFindFontRQ(const char *resourcename, GResFont *font, FontRequest *def_rq) {
+    FontRequest rq;
+    font->rstr = GResourceFindString(resourcename);
+
+    font->fi = NULL;
+
+    if ( font->rstr!=NULL && ResStrToFontRequest(rstr, &rq) )
+	font->fi = GDrawInstanciateFont(NULL, &rq);
+
+    if ( font->fi == NULL )
+	font->fi = GDrawInstanciateFont(NULL, &def_rq);
+
+    if ( font->fi==NULL ) {
+	; // XXX we're in trouble here, emit an ierror and may be allocate a generic font
+	font->fi = _ggadget_default_font.fi;
+    }
+}
+
+void GResourceFindFont(const char *resourcename, GResFont *font, const char *defstring) {
+    FontRequest rq;
+
+    memset(&rq, 0, sizeof(rq));
+#ifdef NDEBUG
+    int a =
+#endif
+    ResStrToFontRequest(defstring, rq);
+    assert(a);
+    GResourceFindFontRQ(resourcename, font, &rq);
+    free(rq.utf8_family_name);
+}
+
 
 void _GGadgetCopyDefaultBox(GBox *box) {
     *box = _ggadget_Default_Box;
 }
 
-FontInstance *_GGadgetInitDefaultBox(char *class,GBox *box, FontInstance *deffont) {
+void GGadgetInitDefaultBox(char *class,GBox *box, GResFont *grfont) {
     GResStruct bordertype[] = {
 	{ "Box.BorderType", rt_string, NULL, border_type_cvt, 0 },
 	GRESSTRUCT_EMPTY
@@ -302,7 +414,7 @@ FontInstance *_GGadgetInitDefaultBox(char *class,GBox *box, FontInstance *deffon
 	{ "Box.BorderTop", rt_color, NULL, NULL, 0 },
 	{ "Box.BorderRight", rt_color, NULL, NULL, 0 },
 	{ "Box.BorderBottom", rt_color, NULL, NULL, 0 },
-	{ "Font", rt_string, NULL, GResource_font_cvt, 0 },
+	{ "Font", rt_string, NULL, NULL, 0 },
 	{ "Box.GradientBG", rt_bool, NULL, NULL, 0 },
 	{ "Box.GradientStartCol", rt_color, NULL, NULL, 0 },
 	{ "Box.ShadowOuter", rt_bool, NULL, NULL, 0 },
@@ -312,12 +424,10 @@ FontInstance *_GGadgetInitDefaultBox(char *class,GBox *box, FontInstance *deffon
     };
     intpt bt, bs;
     int bw, pad, rr, inner, outer, active, depressed, def, grad, shadow;
-    FontInstance *fi=deffont;
+    char *font_rstr;
 
     if ( !_ggadget_inited )
 	GGadgetInit();
-    if ( fi==NULL )
-	fi = _ggadget_default_font;
     bt = box->border_type;
     bs = box->border_shape;
     bw = box->border_width;
@@ -356,7 +466,7 @@ FontInstance *_GGadgetInitDefaultBox(char *class,GBox *box, FontInstance *deffon
     boxtypes[21].val = &box->border_brighter;
     boxtypes[22].val = &box->border_darkest;
     boxtypes[23].val = &box->border_darker;
-    boxtypes[24].val = &fi;
+    boxtypes[24].val = &font_rstr;
     boxtypes[25].val = &grad;
     boxtypes[26].val = &box->gradient_bg_end;
     boxtypes[27].val = &shadow;
@@ -391,18 +501,20 @@ FontInstance *_GGadgetInitDefaultBox(char *class,GBox *box, FontInstance *deffon
     if ( shadow )
 	box->flags |= box_foreground_shadow_outer;
 
-    if ( fi==NULL ) {
+    if ( grfont!=NULL ) {
+	assert( grfont->fi!=NULL );
+	// Treat the value of *grfont->font as the default,
+	// (which may be NULL)
+	grfont->rstr = font_rstr;
 	FontRequest rq;
 	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 10;
-	rq.weight = 400;
-	rq.style = 0;
-	fi = GDrawInstanciateFont(NULL,&rq);
-	if ( fi==NULL )
-	    GDrawFatalError("Cannot find a default font for gadgets");
-    }
-return( fi );
+	if (GResToFontRequest(font_rstr, &rq, true, false)) {
+	    FontInstance *fi = GDrawInstanciateFont(NULL,&rq);
+	    if ( fi!=NULL )
+		*grfont->fi = fi;
+	}
+    } else
+	free(font_rstr);
 }
 
 static int localeptsize(void) {
@@ -422,16 +534,13 @@ static int localeptsize(void) {
 }
 
 void GGadgetInit(void) {
-    static GResStruct res[] = {
-	{ "Font", rt_string, NULL, GResource_font_cvt, 0 },
-	GRESSTRUCT_EMPTY
-    };
     if ( !_ggadget_inited ) {
 	_ggadget_inited = true;
 	GGadgetSetImagePath(GResourceFindString("GGadget.ImagePath"));
 	_ggadget_Default_Box.main_background = GDrawGetDefaultBackground(NULL);
 	_ggadget_Default_Box.main_foreground = GDrawGetDefaultForeground(NULL);
-	_ggadget_default_font = _GGadgetInitDefaultBox("GGadget.",&_ggadget_Default_Box,NULL);
+	_GGadgetInitDefaultBox("GGadget.",&_ggadget_Default_Box,&_ggadget_default_font);
+	// XXX verify _ggadget_default_font is set
 	_GGadgetCopyDefaultBox(&_GListMark_Box);
 	_GListMark_Box.border_width = _GListMark_Box.padding = 1;
 	/*_GListMark_Box.flags = 0;*/
@@ -454,19 +563,9 @@ void GGadgetInit(void) {
 	popup_background = GResourceFindColor("GGadget.Popup.Background",popup_background);
 	popup_delay = GResourceFindInt("GGadget.Popup.Delay",popup_delay);
 	popup_lifetime = GResourceFindInt("GGadget.Popup.LifeTime",popup_lifetime);
-	res[0].val = &popup_font;
-	GResourceFind( res, "GGadget.Popup.");
-	if ( popup_font==NULL ) {
-	    FontRequest rq;
-	    memset(&rq,0,sizeof(rq));
-	    rq.utf8_family_name = SANS_UI_FAMILIES;
-	    rq.point_size = localeptsize();
-	    rq.weight = 400;
-	    rq.style = 0;
-	    popup_font = GDrawInstanciateFont(NULL,&rq);
-	    if ( popup_font==NULL )
-		popup_font = _ggadget_default_font;
-	}
+	char *pdstr = smprintf("400 %d %s", localeptsize(), SANS_UI_FAMILIES);
+        GResourceFindFont("GGadget.Popup.Font", &popup_font, pdstr);
+	free(pdstr);
     }
 }
 
@@ -570,7 +669,7 @@ return( false );
     }
     pt = msg = (unichar_t *) popup_info.msg;
     if ( msg!=NULL ) {
-	GDrawSetFont(popup,popup_font);
+	GDrawSetFont(popup,popup_font.fi);
 	do {
 	    temp = -1;
 	    if (( ept = u_strchr(pt,'\n'))!=NULL )
@@ -581,7 +680,7 @@ return( false );
 	    pt = ept+1;
 	} while ( ept!=NULL && *pt!='\0' );
     }
-    GDrawWindowFontMetrics(popup,popup_font,&as, &ds, &ld);
+    GDrawWindowFontMetrics(popup,popup_font.fi,&as, &ds, &ld);
     pos.width = width+2*GDrawPointsToPixels(popup,2);
     pos.height = lines*(as+ds) + img_height + 2*GDrawPointsToPixels(popup,2);
 
@@ -620,7 +719,7 @@ return( true );
 	    y += GImageGetHeight(popup_info.img);
 	}
 	if ( pt!=NULL ) {
-	    GDrawWindowFontMetrics(popup,popup_font,&as, &ds, &ld);
+	    GDrawWindowFontMetrics(popup,popup_font.fi,&as, &ds, &ld);
 	    fh = as+ds;
 	    y += as;
 	    while ( *pt!='\0' ) {
@@ -675,7 +774,7 @@ return;
 	pos.x = pos.y = 0; pos.width = pos.height = 1;
 	popup = GDrawCreateTopWindow(GDrawGetDisplayOfWindow(base),&pos,
 		msgpopup_eh,NULL,&pattrs);
-	GDrawSetFont(popup,popup_font);
+	GDrawSetFont(popup,popup_font.fi);
     }
     popup_timer = GDrawRequestTimer(popup,popup_delay,0,(void *) msg);
 }
@@ -1266,7 +1365,7 @@ void GGadgetSetFont(GGadget *g,GFont *font) {
 
 GFont *GGadgetGetFont(GGadget *g) {
     if ( g==NULL )
-return( _ggadget_default_font );
+return( _ggadget_default_font.fi );
     if ( g->funcs->get_font!=NULL )
 return( (g->funcs->get_font)(g) );
 

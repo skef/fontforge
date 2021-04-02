@@ -2101,7 +2101,7 @@ static void SFTextAreaInit() {
     _GGadgetCopyDefaultBox(&sftextarea_box);
     sftextarea_box.padding = 3;
     sftextarea_box.flags = box_active_border_inner;
-    sftextarea_font = _GGadgetInitDefaultBox("SFTextArea.",&sftextarea_box,sftextarea_font);
+    _GGadgetInitDefaultBox("SFTextArea.",&sftextarea_box,NULL);
     sftextarea_inited = true;
 }
 

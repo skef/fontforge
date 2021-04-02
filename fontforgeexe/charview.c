@@ -13460,7 +13460,7 @@ extern GResInfo bitmapview_ri;
 GResInfo charview2_ri = {
     &bitmapview_ri, NULL,NULL, NULL,
     NULL,
-    NULL,
+    { NULL, NULL },
     NULL,
     charview2_re,
     N_("Outline View 2"),
@@ -13478,7 +13478,7 @@ GResInfo charview2_ri = {
 GResInfo charview_ri = {
     &charview2_ri, NULL,NULL, NULL,
     NULL,
-    NULL,
+    { NULL, NULL },
     NULL,
     charview_re,
     N_("Outline View"),

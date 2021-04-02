@@ -46,7 +46,7 @@ static GResInfo gtabset_ri, gvtabset_ri;
 static GResInfo gtabset_ri = {
     &gvtabset_ri, &ggadget_ri, &gvtabset_ri, NULL,
     &gtabset_box,
-    NULL,
+    { NULL, &gtabset_font },
     NULL,
     NULL,
     N_("TabSet"),
@@ -66,7 +66,7 @@ static GResInfo gtabset_ri = {
 static GResInfo gvtabset_ri = {
     NULL, &gtabset_ri, &gtabset_ri, NULL,
     &gvtabset_box,
-    NULL,
+    { NULL, NULL },
     NULL,
     NULL,
     N_("VerticalTabSet"),
@@ -93,7 +93,7 @@ return;
     _GGadgetCopyDefaultBox(&gtabset_box);
     gtabset_box.border_width = 1; gtabset_box.border_shape = bs_rect;
     /*gtabset_box.flags = 0;*/
-    gtabset_font = _GGadgetInitDefaultBox("GTabSet.",&gtabset_box,NULL);
+    _GGadgetInitDefaultBox("GTabSet.",&gtabset_box,&gtabset_ri.font);
 
     gvtabset_box = gtabset_box; /* needs this to figure inheritance */
     _GGadgetInitDefaultBox("GVTabSet.",&gvtabset_box,NULL);

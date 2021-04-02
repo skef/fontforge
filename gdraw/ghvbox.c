@@ -44,7 +44,7 @@ static int ghvbox_inited = false;
 GResInfo ghvgroupbox_ri = {
     NULL, &ggadget_ri, NULL, NULL,
     &hvgroup_box,
-    NULL,
+    { NULL, NULL },
     NULL,
     NULL,
     N_("HV Group Box"),

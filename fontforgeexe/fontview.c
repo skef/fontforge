@@ -7360,7 +7360,7 @@ GResInfo fontview_ri;
 GResInfo view_ri = {
     &fontview_ri, NULL,NULL, NULL,
     NULL,
-    NULL,
+    { NULL, NULL },
     NULL,
     view_re,
     N_("View"),
@@ -7379,7 +7379,7 @@ GResInfo view_ri = {
 GResInfo fontview_ri = {
     &charview_ri, NULL,NULL, NULL,
     NULL,
-    NULL,
+    { NULL, NULL },
     NULL,
     fontview_re,
     N_("FontView"),

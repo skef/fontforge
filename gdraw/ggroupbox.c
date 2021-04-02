@@ -44,7 +44,7 @@ static GGadgetCreateData linebox =
 GResInfo gline_ri = {
     NULL, &ggadget_ri, NULL, NULL,
     &_GGroup_LineBox,
-    NULL,
+    { NULL, NULL },
     &linebox,
     NULL,
     N_("Line"),

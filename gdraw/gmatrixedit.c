@@ -40,7 +40,7 @@
 
 static GBox gmatrixedit_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gmatrixedit_button_box = GBOX_EMPTY; /* Don't initialize here */
-static FontInstance *gmatrixedit_font = NULL, *gmatrixedit_titfont = NULL;
+static GResFont gmatrixedit_font, gmatrixedit_titfont;
 static Color gmatrixedit_title_bg = 0x808080, gmatrixedit_title_fg = 0x000000, gmatrixedit_title_divider = 0xffffff;
 static Color gmatrixedit_rules = 0x000000;
 static Color gmatrixedit_frozencol = 0xff0000,
@@ -80,7 +80,7 @@ static GResInfo gmatrixedit_ri = {
 static GResInfo gmatrixedit2_ri = {
     NULL, &ggadget_ri, &gmatrixedit_ri,NULL,
     NULL,
-    NULL,
+    { NULL, NULL },
     NULL,
     gmatrixedit_re,
     N_("Matrix Edit Continued"),
@@ -109,13 +109,11 @@ return;
     /*gmatrixedit_box.flags = 0;*/
     gmatrixedit_box.main_background = COLOR_TRANSPARENT;
     gmatrixedit_box.disabled_background = COLOR_TRANSPARENT;
-    GDrawDecomposeFont(_ggadget_default_font,&rq);
-    gmatrixedit_font = GDrawInstanciateFont(NULL,&rq);
-    gmatrixedit_font = _GGadgetInitDefaultBox("GMatrixEdit.",&gmatrixedit_box,gmatrixedit_font);
+    _GGadgetInitDefaultBox("GMatrixEdit.",&gmatrixedit_box,&gmatrixedit_font);
     GDrawDecomposeFont(gmatrixedit_font,&rq);
     rq.point_size = (rq.point_size>=12) ? rq.point_size-2 : rq.point_size>=10 ? rq.point_size-1 : rq.point_size;
     rq.weight = 700;
-    gmatrixedit_titfont = GResourceFindFont("GMatrixEdit.TitleFont",GDrawInstanciateFont(NULL,&rq));
+    GResourceFindFontRQ("GMatrixEdit.TitleFont",&gmatrixedit_titfont, &rq);
     gmatrixedit_title_bg = GResourceFindColor("GMatrixEdit.TitleBG",gmatrixedit_title_bg);
     gmatrixedit_title_fg = GResourceFindColor("GMatrixEdit.TitleFG",gmatrixedit_title_fg);
     gmatrixedit_title_divider = GResourceFindColor("GMatrixEdit.TitleDivider",gmatrixedit_title_divider);
@@ -1979,8 +1977,8 @@ GGadget *GMatrixEditCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     _GGadget_Create(&gme->g,base,gd,data,&gmatrixedit_box);
     gme->g.takes_input = true; gme->g.takes_keyboard = false; gme->g.focusable = false;
 
-    gme->font = gmatrixedit_font;
-    gme->titfont = gmatrixedit_titfont;
+    gme->font = gmatrixedit_font.fi;
+    gme->titfont = gmatrixedit_titfont.fi;
     GDrawWindowFontMetrics(base,gme->font,&as, &ds, &ld);
     gme->font_as = gme->as = as;
     gme->font_fh = gme->fh = as+ds;

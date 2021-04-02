@@ -719,7 +719,7 @@ void SFBdfProperties(SplineFont *sf, EncMap *map, BDFFont *thisone) {
     static GFont *font = NULL;
     extern int _GScrollBar_Width;
     int sbwidth;
-    static unichar_t sans[] = { 'h','e','l','v','e','t','i','c','a',',','c','l','e','a','r','l','y','u',',','u','n','i','f','o','n','t',  '\0' };
+    static char sans[] = { 'h','e','l','v','e','t','i','c','a',',','c','l','e','a','r','l','y','u',',','u','n','i','f','o','n','t',  '\0' };
     static GBox small = GBOX_EMPTY;
     GGadgetData gd;
     /* I don't use a MatrixEdit here because I want to be able to display */
@@ -783,7 +783,7 @@ return;
 
     if ( font==NULL ) {
 	memset(&rq,0,sizeof(rq));
-	rq.family_name = sans;
+	rq.utf8_family_name = sans;
 	rq.point_size = 10;
 	rq.weight = 400;
 	font = GDrawInstanciateFont(gw,&rq);

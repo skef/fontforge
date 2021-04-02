@@ -66,7 +66,7 @@ static GGadgetCreateData textbox =
 static GResInfo gtextfield_ri = {
     &listfield_ri, &ggadget_ri,NULL, NULL,
     &_GGadget_gtextfield_box,
-    &_gtextfield_font,
+    { NULL, &_gtextfield_font },
     &textbox,
     NULL,
     N_("Text Field"),
@@ -91,7 +91,7 @@ static GGadgetCreateData textlistbox =
 static GResInfo listfield_ri = {
     &listfieldmenu_ri, &gtextfield_ri,&listfieldmenu_ri, &listmark_ri,
     &glistfield_box,
-    NULL,
+    { NULL, NULL },
     &textlistbox,
     NULL,
     N_("List Field"),
@@ -109,7 +109,7 @@ static GResInfo listfield_ri = {
 static GResInfo listfieldmenu_ri = {
     &numericfield_ri, &listfield_ri, &listmark_ri,NULL,
     &glistfieldmenu_box,
-    NULL,
+    { NULL, NULL },
     &textlistbox,
     NULL,
     N_("List Field Menu"),
@@ -134,7 +134,7 @@ static GGadgetCreateData numbox =
 static GResInfo numericfield_ri = {
     &numericfieldspinner_ri, &gtextfield_ri,&numericfieldspinner_ri, NULL,
     &gnumericfield_box,
-    NULL,
+    { NULL, NULL },
     &numbox,
     NULL,
     N_("Numeric Field"),
@@ -152,7 +152,7 @@ static GResInfo numericfield_ri = {
 static GResInfo numericfieldspinner_ri = {
     NULL, &numericfield_ri,NULL, NULL,
     &gnumericfieldspinner_box,
-    NULL,
+    { NULL, NULL },
     &numbox,
     NULL,
     N_("Numeric Field Sign"),
@@ -2571,25 +2571,24 @@ static void GTextFieldInit() {
     memset(&rq,0,sizeof(rq));
     GGadgetInit();
     GDrawDecomposeFont(_ggadget_default_font,&rq);
-    rq.family_name = NULL;
     rq.utf8_family_name = MONO_UI_FAMILIES;
     _gtextfield_font = GDrawInstanciateFont(NULL,&rq);
     _GGadgetCopyDefaultBox(&_GGadget_gtextfield_box);
     _GGadget_gtextfield_box.padding = 3;
     /*_GGadget_gtextfield_box.flags = box_active_border_inner;*/
-    _gtextfield_font = _GGadgetInitDefaultBox("GTextField.",&_GGadget_gtextfield_box,_gtextfield_font);
+    _GGadgetInitDefaultBox("GTextField.",&_GGadget_gtextfield_box,&gtextfield_ri.font);
     glistfield_box = _GGadget_gtextfield_box;
-    _GGadgetInitDefaultBox("GComboBox.",&glistfield_box,_gtextfield_font);
+    _GGadgetInitDefaultBox("GComboBox.",&glistfield_box,NULL);
     glistfieldmenu_box = glistfield_box;
     glistfieldmenu_box.padding = 1;
-    _GGadgetInitDefaultBox("GComboBoxMenu.",&glistfieldmenu_box,_gtextfield_font);
+    _GGadgetInitDefaultBox("GComboBoxMenu.",&glistfieldmenu_box,NULL);
     gnumericfield_box = _GGadget_gtextfield_box;
-    _GGadgetInitDefaultBox("GNumericField.",&gnumericfield_box,_gtextfield_font);
+    _GGadgetInitDefaultBox("GNumericField.",&gnumericfield_box,NULL);
     gnumericfieldspinner_box = gnumericfield_box;
     gnumericfieldspinner_box.border_type = bt_none;
     gnumericfieldspinner_box.border_width = 0;
     gnumericfieldspinner_box.padding = 0;
-    _GGadgetInitDefaultBox("GNumericFieldSpinner.",&gnumericfieldspinner_box,_gtextfield_font);
+    _GGadgetInitDefaultBox("GNumericFieldSpinner.",&gnumericfieldspinner_box,NULL);
     gtextfield_inited = true;
 }
 

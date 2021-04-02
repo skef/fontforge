@@ -68,7 +68,7 @@ static GGadgetCreateData radiobox =
 static GResInfo gradio_ri = {
     &gradioon_ri, &ggadget_ri,&gradioon_ri, &gradiooff_ri,
     &radio_box,
-    &checkbox_font,
+    { NULL, NULL },
     &radiobox,
     NULL,
     N_("Radio Button"),
@@ -91,7 +91,7 @@ static struct resed gradioon_re[] = {
 static GResInfo gradioon_ri = {
     &gradiooff_ri, &ggadget_ri,&gradiooff_ri, &gradio_ri,
     &radio_on_box,
-    NULL,
+    { NULL, NULL },
     &radiobox,
     gradioon_re,
     N_("Radio On Mark"),
@@ -114,7 +114,7 @@ static struct resed gradiooff_re[] = {
 static GResInfo gradiooff_ri = {
     &gcheckbox_ri, &ggadget_ri,&gradioon_ri, &gradio_ri,
     &radio_off_box,
-    NULL,
+    { NULL, NULL },
     &radiobox,
     gradiooff_re,
     N_("Radio Off Mark"),
@@ -145,7 +145,7 @@ static GGadgetCreateData checkboxbox =
 static GResInfo gcheckbox_ri = {
     &gcheckboxon_ri, &ggadget_ri,&gcheckboxon_ri, &gcheckboxoff_ri,
     &checkbox_box,
-    &checkbox_font,
+    { NULL, &checkbox_font },
     &checkboxbox,
     NULL,
     N_("Check Box"),
@@ -168,7 +168,7 @@ static struct resed gcheckboxon_re[] = {
 static GResInfo gcheckboxon_ri = {
     &gcheckboxoff_ri, &ggadget_ri,&gcheckboxoff_ri, &gcheckbox_ri,
     &checkbox_on_box,
-    NULL,
+    { NULL, NULL },
     &checkboxbox,
     gcheckboxon_re,
     N_("Check Box On Mark"),
@@ -192,7 +192,7 @@ static struct resed gcheckboxoff_re[] = {
 static GResInfo gcheckboxoff_ri = {
     NULL, &ggadget_ri,&gcheckboxon_ri, &gcheckbox_ri,
     &checkbox_off_box,
-    NULL,
+    { NULL, NULL },
     &checkboxbox,
     gcheckboxoff_re,
     N_("Check Box Off Mark"),
@@ -662,8 +662,8 @@ static void GRadioInit() {
     checkbox_on_box.border_type = bt_raised;
     checkbox_off_box.border_type = bt_lowered;
     checkbox_on_box.flags = checkbox_off_box.flags |= box_do_depressed_background;
-    checkbox_font = _GGadgetInitDefaultBox("GRadio.",&radio_box,NULL);
-    checkbox_font = _GGadgetInitDefaultBox("GCheckBox.",&checkbox_box,checkbox_font);
+    _GGadgetInitDefaultBox("GRadio.",&radio_box,NULL);
+    _GGadgetInitDefaultBox("GCheckBox.",&checkbox_box,&gcheckbox_ri.font);
 
     visibility_on_box.border_type=bt_none;
     visibility_on_box.padding=1;

@@ -196,7 +196,7 @@ static struct resed progress_re[] = {
 static GResInfo progress_ri = {
     NULL, NULL, NULL,NULL,
     NULL,	/* No box */
-    &progress_font,
+    { NULL , &progress_font },
     NULL,
     progress_re,
     N_("Progress"),

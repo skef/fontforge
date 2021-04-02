@@ -45,15 +45,19 @@ struct resed {
     int found;
 };
 
-#define RESED_EMPTY { NULL, NULL, 0, NULL, NULL, NULL, { 0 }, 0, 0 }
+typedef struct gresfont {
+    char *rstr;
+    GFont *fi;
+} GResFont;
 
+#define RESED_EMPTY { NULL, NULL, 0, NULL, NULL, NULL, { 0 }, 0, 0 }
 
 typedef struct gresinfo {
     struct gresinfo *next;
     struct gresinfo *inherits_from;
     struct gresinfo *seealso1, *seealso2;
     GBox *boxdata;
-    GFont **font;
+    GResFont *font;
     GGadgetCreateData *examples;
     struct resed *extras;
     char *name;
@@ -101,5 +105,9 @@ enum override_mask_flags {
 
 extern void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_filename)(const char *));
 extern void GResEditFind( struct resed *resed, char *prefix);
+extern int ResStrToFontRequest(const char *resname, FontRequest *rq);
+extern void GResourceFindFontRQ(const char *resourcename, GResFont *font, FontRequest *rq);
+extern void GResourceFindFont(const char *resourcename, GResFont *font, const char *defstr);
+
 
 #endif /* FONTFORGE_GRESEDIT_H */

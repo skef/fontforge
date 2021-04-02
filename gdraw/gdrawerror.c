@@ -124,7 +124,7 @@ GDisplay *global_gd;
 void _GDraw_InitError(GDisplay *gd) {
     GRect screen, pos;
     static unichar_t title[]= { 'E', 'r', 'r', 'o', 'r', '\0' };
-    static unichar_t courier[] = { 'c', 'o', 'u', 'r', 'i', 'e', 'r', '\0' };
+    static char courier[] = { 'c', 'o', 'u', 'r', 'i', 'e', 'r', '\0' };
     static GDisplay *static_gd;
     GWindowAttrs wattrs;
     FontRequest rq;
@@ -162,7 +162,7 @@ return;
     error = GDrawCreateTopWindow(gd,&pos,e_h,NULL,&wattrs);
 
     memset(&rq,0,sizeof(rq));
-    rq.family_name = courier;
+    rq.utf8_family_name = courier;
     rq.point_size = -12;
     rq.weight = 400;
     rq.style = 0;

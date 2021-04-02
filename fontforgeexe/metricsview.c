@@ -5473,7 +5473,7 @@ static struct resed metricsview_re[] = {
 GResInfo metricsview_ri = {
     NULL, NULL,NULL, NULL,
     NULL,
-    NULL,
+    { NULL, NULL },
     NULL,
     metricsview_re,
     N_("MetricsView"),
