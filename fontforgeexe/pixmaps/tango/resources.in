@@ -300,5 +300,8 @@ fontforge.MetricsView.KernLineColor: #3d7905
 fontforge.MetricsView.SelectedGlyphColor: #2b2b2b
 fontforge.MetricsView.SideBearingLineColor: #12376c
 fontforge.View.Background: #ffffff
+fontforge.View.DefaultFont: 400 12pt dejavu sans,unifont
+fontforge.View.MonoFont: ^View.DefaultFont dejavu sans mono,monospace
+fontforge.View.SerifFont: ^View.DefaultFont dejavu serif,times
 Gdraw.GVisibilityBoxOn.Image:check_on.png
 Gdraw.GVisibilityBoxOff.Image:check_off.png

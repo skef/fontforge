@@ -2064,14 +2064,13 @@ void CVDebugReInit(CharView *cv,int restart_debug,int dbg_fpgm) {
     GWindowAttrs wattrs;
     GRect pos, size;
     TT_ExecContext exc;
-    FontRequest rq;
     int as,ds,ld;
     GGadgetCreateData gcd[9];
     GTextInfo label[9];
     extern int _GScrollBar_Width;
     double scalex, scaley;
     int i;
-    static GFont *monofont = NULL;
+    static GResFont monofont = { "400 12px " SANS_UI_FAMILIES, NULL };
 
     scalex = (cv->b.sc->parent->ascent+cv->b.sc->parent->descent)/(rint(cv->ft_pointsizex*cv->ft_dpi/72.0)) / (1<<6);
     scaley = (cv->b.sc->parent->ascent+cv->b.sc->parent->descent)/(rint(cv->ft_pointsizey*cv->ft_dpi/72.0)) / (1<<6);
@@ -2206,15 +2205,9 @@ return;
 	dv->ii.v = GWidgetCreateSubWindow(dv->dv,&pos,ii_v_e_h,&dv->ii,&wattrs);
 	dv->ii.instrdata = &dv->id;
 
-	if ( monofont==NULL ) {
-	    memset(&rq,0,sizeof(rq));
-	    rq.utf8_family_name = MONO_UI_FAMILIES;
-	    rq.point_size = -12;
-	    rq.weight = 400;
-	    monofont = GDrawInstanciateFont(cv->gw,&rq);
-	    monofont = GResourceFindFont("DebugView.Font",monofont);
-	}
-	dv->ii.gfont = monofont;
+	GResourceFindFont("DebugView.Font", &monofont);
+
+	dv->ii.gfont = monofont.fi;
 	GDrawSetFont(dv->ii.v,dv->ii.gfont);
 	GDrawWindowFontMetrics(dv->ii.v,dv->ii.gfont,&as,&ds,&ld);
 	dv->ii.as = as+1;

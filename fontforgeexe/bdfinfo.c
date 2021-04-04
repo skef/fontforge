@@ -32,6 +32,7 @@
 #include "bitmapchar.h"
 #include "fontforgeui.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "splinefill.h"
 #include "splinefont.h"
 #include "ustring.h"
@@ -715,11 +716,9 @@ void SFBdfProperties(SplineFont *sf, EncMap *map, BDFFont *thisone) {
     GWindowAttrs wattrs;
     GGadgetCreateData gcd[10];
     GTextInfo label[9];
-    FontRequest rq;
-    static GFont *font = NULL;
+    static GResFont font = { "400 10pt " SANS_UI_FAMILIES, NULL };
     extern int _GScrollBar_Width;
     int sbwidth;
-    static char sans[] = { 'h','e','l','v','e','t','i','c','a',',','c','l','e','a','r','l','y','u',',','u','n','i','f','o','n','t',  '\0' };
     static GBox small = GBOX_EMPTY;
     GGadgetData gd;
     /* I don't use a MatrixEdit here because I want to be able to display */
@@ -781,15 +780,8 @@ return;
     bd.width = pos.width; bd.height = pos.height;
     bd.value_x = GDrawPointsToPixels(bd.gw,135);
 
-    if ( font==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = sans;
-	rq.point_size = 10;
-	rq.weight = 400;
-	font = GDrawInstanciateFont(gw,&rq);
-	font = GResourceFindFont("BDFProperties.Font",font);
-    }
-    bd.font = font;
+    GResourceFindFont("BDFProperties.Font", &font);
+    bd.font = font.fi;
     {
 	int as, ds, ld;
 	GDrawWindowFontMetrics(gw,bd.font,&as,&ds,&ld);

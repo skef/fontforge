@@ -29,6 +29,7 @@
 
 #include "cvundoes.h"
 #include "fontforgeui.h"
+#include "gresedit.h"
 #include "spiro.h"
 #include "splinefill.h"
 #include "splineorder2.h"
@@ -104,7 +105,8 @@ static GCursor tools[cvt_max+1] = { ct_pointer }, spirotools[cvt_max+1];
 enum cvtools cv_b1_tool = cvt_pointer, cv_cb1_tool = cvt_pointer,
 	     cv_b2_tool = cvt_magnify, cv_cb2_tool = cvt_ruler;
 
-static GFont *toolsfont=NULL, *layersfont=NULL;
+static GResFont toolsfont = { "400 10px " SANS_UI_FAMILIES, NULL };
+static GResFont layersfont = { "400 10px " SANS_UI_FAMILIES, NULL };
 
 #define CV_LAYERS_WIDTH		104
 #define CV_LAYERS_HEIGHT	100
@@ -1083,7 +1085,7 @@ static void ToolsExpose(GWindow pixmap, CharView *cv, GRect *r) {
     int bottomOfMainIconsY = d.maxicony + d.lastIconHeight;
     
     
-    GDrawSetFont(pixmap,toolsfont);
+    GDrawSetFont(pixmap,toolsfont.fi);
     temp.x = 52-16;
     temp.y = bottomOfMainIconsY;
     temp.width = 16;
@@ -1478,7 +1480,6 @@ return( true );
 GWindow CVMakeTools(CharView *cv) {
     GRect r;
     GWindowAttrs wattrs;
-    FontRequest rq;
 
     if ( cvtools!=NULL )
 return( cvtools );
@@ -1504,14 +1505,7 @@ return( cvtools );
 	/* Success! They've got a wacom tablet */
     }
 
-    if ( toolsfont==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -10;
-	rq.weight = 400;
-	toolsfont = GDrawInstanciateFont(NULL,&rq);
-	toolsfont = GResourceFindFont("ToolsPalette.Font",toolsfont);
-    }
+    GResourceFindFont("ToolsPalette.Font", &toolsfont);
 
     if ( cvvisible[1])
 	SetPaletteVisible(cv->gw, cvtools,true);
@@ -2002,7 +1996,6 @@ static void CVMakeLayers2(CharView *cv) {
     GGadgetCreateData gcd[25];
     GTextInfo label[25];
     static GBox radio_box = { bt_none, bs_rect, 0, 0, 0, 0, 0, 0, 0, 0, COLOR_DEFAULT, COLOR_DEFAULT, 0, 0, 0, 0, 0, 0, 0 };
-    FontRequest rq;
     int i;
     extern int _GScrollBar_Width;
 
@@ -2030,18 +2023,11 @@ return;
     memset(&label,0,sizeof(label));
     memset(&gcd,0,sizeof(gcd));
 
-    if ( layersfont==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	layersfont = GDrawInstanciateFont(cvlayers2,&rq);
-	layersfont = GResourceFindFont("LayersPalette.Font",layersfont);
-    }
+    GResourceFindFont("LayersPalette.Font", &layersfont);
 
     for ( i=0; i<sizeof(label)/sizeof(label[0]); ++i )
-	label[i].font = layersfont;
-    layer2.font = layersfont;
+	label[i].font = layersfont.fi;
+    layer2.font = layersfont.fi;
 
     gcd[0].gd.pos.width = GDrawPointsToPixels(cv->gw,_GScrollBar_Width);
     gcd[0].gd.pos.x = CV_LAYERS2_WIDTH-gcd[0].gd.pos.width;
@@ -3254,7 +3240,6 @@ GWindow CVMakeLayers(CharView *cv) {
     GGadgetCreateData gcd[25];
     GTextInfo label[25];
     GGadget *gadget;
-    FontRequest rq;
     extern int _GScrollBar_Width;
     int i=0;
     int viscol=0;
@@ -3265,15 +3250,9 @@ return( cvlayers );
      /* Initialize layerinfo */
     if ( layerinfo.clut==NULL )
 	layerinfo.clut = _BDFClut(4);
-    if ( layersfont==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	layersfont = GDrawInstanciateFont(cvlayers2,&rq);
-	layersfont = GResourceFindFont("LayersPalette.Font",layersfont);
-    }
-    layerinfo.font = layersfont;
+
+    GResourceFindFont("LayersPalette.Font", &layersfont);
+    layerinfo.font = layersfont.fi;
 
      /* Initialize palette window */
     memset(&wattrs,0,sizeof(wattrs));
@@ -3994,7 +3973,6 @@ GWindow BVMakeLayers(BitmapView *bv) {
     GGadgetCreateData gcd[8], boxes[2], *hvarray[5][3];
     GTextInfo label[8];
     static GBox radio_box = { bt_none, bs_rect, 0, 0, 0, 0, 0, 0, 0, 0, COLOR_DEFAULT, COLOR_DEFAULT, 0, 0, 0, 0, 0, 0, 0 };
-    FontRequest rq;
     int i;
 
     if ( bvlayers!=NULL )
@@ -4020,16 +3998,9 @@ return(bvlayers);
     memset(&gcd,0,sizeof(gcd));
     memset(&boxes,0,sizeof(boxes));
 
-    if ( layersfont==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	layersfont = GDrawInstanciateFont(cvlayers2,&rq);
-	layersfont = GResourceFindFont("LayersPalette.Font",layersfont);
-    }
+    GResourceFindFont("LayersPalette.Font", &layersfont);
     for ( i=0; i<sizeof(label)/sizeof(label[0]); ++i )
-	label[i].font = layersfont;
+	label[i].font = layersfont.fi;
 
 /* GT: Abbreviation for "Visible" */
     label[0].text = (unichar_t *) _("V");

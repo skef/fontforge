@@ -42,7 +42,7 @@ static GBox glistfield_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox glistfieldmenu_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gnumericfield_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gnumericfieldspinner_box = GBOX_EMPTY; /* Don't initialize here */
-FontInstance *_gtextfield_font = NULL;
+GResFont _gtextfield_font = { "400 10pt " MONO_UI_FAMILIES, NULL };
 static int gtextfield_inited = false;
 
 static GResInfo listfield_ri, listfieldmenu_ri, numericfield_ri, numericfieldspinner_ri;
@@ -66,7 +66,7 @@ static GGadgetCreateData textbox =
 static GResInfo gtextfield_ri = {
     &listfield_ri, &ggadget_ri,NULL, NULL,
     &_GGadget_gtextfield_box,
-    { NULL, &_gtextfield_font },
+    &_gtextfield_font,
     &textbox,
     NULL,
     N_("Text Field"),
@@ -91,7 +91,7 @@ static GGadgetCreateData textlistbox =
 static GResInfo listfield_ri = {
     &listfieldmenu_ri, &gtextfield_ri,&listfieldmenu_ri, &listmark_ri,
     &glistfield_box,
-    { NULL, NULL },
+    NULL,
     &textlistbox,
     NULL,
     N_("List Field"),
@@ -109,7 +109,7 @@ static GResInfo listfield_ri = {
 static GResInfo listfieldmenu_ri = {
     &numericfield_ri, &listfield_ri, &listmark_ri,NULL,
     &glistfieldmenu_box,
-    { NULL, NULL },
+    NULL,
     &textlistbox,
     NULL,
     N_("List Field Menu"),
@@ -134,7 +134,7 @@ static GGadgetCreateData numbox =
 static GResInfo numericfield_ri = {
     &numericfieldspinner_ri, &gtextfield_ri,&numericfieldspinner_ri, NULL,
     &gnumericfield_box,
-    { NULL, NULL },
+    NULL,
     &numbox,
     NULL,
     N_("Numeric Field"),
@@ -152,7 +152,7 @@ static GResInfo numericfield_ri = {
 static GResInfo numericfieldspinner_ri = {
     NULL, &numericfield_ri,NULL, NULL,
     &gnumericfieldspinner_box,
-    { NULL, NULL },
+    NULL,
     &numbox,
     NULL,
     N_("Numeric Field Sign"),
@@ -2565,30 +2565,27 @@ struct gfuncs glistfield_funcs = {
     NULL
 };
 
-static void GTextFieldInit() {
-    FontRequest rq;
-
-    memset(&rq,0,sizeof(rq));
+void GTextFieldInit() {
+    if ( gtextfield_inited )
+	return;
     GGadgetInit();
-    GDrawDecomposeFont(_ggadget_default_font,&rq);
-    rq.utf8_family_name = MONO_UI_FAMILIES;
-    _gtextfield_font = GDrawInstanciateFont(NULL,&rq);
     _GGadgetCopyDefaultBox(&_GGadget_gtextfield_box);
     _GGadget_gtextfield_box.padding = 3;
     /*_GGadget_gtextfield_box.flags = box_active_border_inner;*/
-    _GGadgetInitDefaultBox("GTextField.",&_GGadget_gtextfield_box,&gtextfield_ri.font);
+    _GGadgetInitDefaultBox("GTextField.", &_GGadget_gtextfield_box);
+    GResourceFindFont("GTextField.Font", &_gtextfield_font);
     glistfield_box = _GGadget_gtextfield_box;
-    _GGadgetInitDefaultBox("GComboBox.",&glistfield_box,NULL);
+    _GGadgetInitDefaultBox("GComboBox.",&glistfield_box);
     glistfieldmenu_box = glistfield_box;
     glistfieldmenu_box.padding = 1;
-    _GGadgetInitDefaultBox("GComboBoxMenu.",&glistfieldmenu_box,NULL);
+    _GGadgetInitDefaultBox("GComboBoxMenu.",&glistfieldmenu_box);
     gnumericfield_box = _GGadget_gtextfield_box;
-    _GGadgetInitDefaultBox("GNumericField.",&gnumericfield_box,NULL);
+    _GGadgetInitDefaultBox("GNumericField.",&gnumericfield_box);
     gnumericfieldspinner_box = gnumericfield_box;
     gnumericfieldspinner_box.border_type = bt_none;
     gnumericfieldspinner_box.border_width = 0;
     gnumericfieldspinner_box.padding = 0;
-    _GGadgetInitDefaultBox("GNumericFieldSpinner.",&gnumericfieldspinner_box,NULL);
+    _GGadgetInitDefaultBox("GNumericFieldSpinner.",&gnumericfieldspinner_box);
     gtextfield_inited = true;
 }
 
@@ -2714,8 +2711,7 @@ static void GTextFieldFit(GTextField *gt) {
 
 static GTextField *_GTextFieldCreate(GTextField *gt, struct gwindow *base, GGadgetData *gd,void *data, GBox *def) {
 
-    if ( !gtextfield_inited )
-	GTextFieldInit();
+    GTextFieldInit();
     gt->g.funcs = &gtextfield_funcs;
     _GGadget_Create(&gt->g,base,gd,data,def);
 
@@ -2731,7 +2727,7 @@ static GTextField *_GTextFieldCreate(GTextField *gt, struct gwindow *base, GGadg
     }
     if ( gt->text==NULL )
 	gt->text = calloc(1,sizeof(unichar_t));
-    gt->font = _gtextfield_font;
+    gt->font = _gtextfield_font.fi;
     if ( gd->label!=NULL && gd->label->font!=NULL )
 	gt->font = gd->label->font;
     if ( (gd->flags & gg_textarea_wrap) && gt->multi_line )
@@ -3157,7 +3153,6 @@ void GCompletionFieldSetCompletionMode(GGadget *g,int enabled) {
 
 GResInfo *_GTextFieldRIHead(void) {
 
-    if ( !gtextfield_inited )
-	GTextFieldInit();
+    GTextFieldInit();
 return( &gtextfield_ri );
 }

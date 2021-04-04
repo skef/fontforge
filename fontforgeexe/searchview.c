@@ -31,6 +31,7 @@
 #include "fontforgeui.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "search.h"
 #include "splineutil.h"
 #include "ustring.h"
@@ -644,11 +645,11 @@ SearchView *SVCreate(FontView *fv) {
     GGadgetCreateData gcd[14], boxes[6], *butarray[14], *allowarray[6],
 	    *fudgearray[4], *halfarray[3], *varray[14];
     GTextInfo label[14];
-    FontRequest rq;
     int as, ds, ld;
     char fudgebuf[20];
     int k, sel_pos, efdo_pos;
-    static GFont *plainfont = NULL, *boldfont=NULL;
+    static GResFont plainfont = { "400 12pt " SANS_UI_FAMILIES, NULL };
+    static GResFont boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
 
     if ( searcher!=NULL ) {
 	if ( SVAttachFV(fv,true)) {
@@ -675,19 +676,9 @@ return( NULL );
     sv->gw = gw = GDrawCreateTopWindow(NULL,&pos,sv_e_h,&sv->cv_srch,&wattrs);
     SVSetTitle(sv);
 
-    if ( plainfont==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	plainfont = GDrawInstanciateFont(NULL,&rq);
-	plainfont = GResourceFindFont("SearchView.Font",plainfont);
-	GDrawDecomposeFont(plainfont, &rq);
-	rq.weight = 700;
-	boldfont = GDrawInstanciateFont(NULL,&rq);
-	boldfont = GResourceFindFont("SearchView.BoldFont",boldfont);
-    }
-    sv->plain = plainfont; sv->bold = boldfont;
+    GResourceFindFont("SearchView.Font", &plainfont);
+    GResourceFindFont("SearchView.BoldFont", &boldfont);
+    sv->plain = plainfont.fi; sv->bold = boldfont.fi;
     GDrawWindowFontMetrics(sv->gw,sv->plain,&as,&ds,&ld);
     sv->fh = as+ds; sv->as = as;
 

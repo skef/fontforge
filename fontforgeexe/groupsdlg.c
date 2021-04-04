@@ -30,6 +30,7 @@
 #include "fontforgeui.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "groups.h"
 #include "namelist.h"
 #include "splineutil.h"
@@ -549,23 +550,15 @@ return( true );
 }
 
 static void GroupWCreate(struct groupdlg *grp,GRect *pos) {
-    FontRequest rq;
     int as, ds, ld;
     GGadgetCreateData gcd[5];
     GTextInfo label[4];
     int sbsize = GDrawPointsToPixels(NULL,_GScrollBar_Width);
     GWindowAttrs wattrs;
-    static GFont *font=NULL;
+    static GResFont font = { "400 12pt " SANS_UI_FAMILIES, NULL };
 
-    if ( font==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	font = GDrawInstanciateFont(grp->gw,&rq);
-	font = GResourceFindFont("Groups.Font",font);
-    }
-    grp->font = font;
+    GResourceFindFont("Groups.Font", &font);
+    grp->font = font.fi;
     GDrawWindowFontMetrics(grp->gw,grp->font,&as,&ds,&ld);
     grp->fh = as+ds; grp->as = as;
 

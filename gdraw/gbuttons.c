@@ -43,7 +43,8 @@ static GBox _GGadget_colorbutton_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox _GGadget_droplist_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox label_box = GBOX_EMPTY; /* Don't initialize here */
 static int shift_on_press = 0;
-static FontInstance *label_font = NULL, *button_font = NULL;
+static GResFont label_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+static GResFont button_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
 static int gbutton_inited = false;
 #define COLOR_BUTTON_BOX_LEN	10
 
@@ -51,7 +52,7 @@ static GResInfo gcancel_ri, gdefault_ri, gbutton_ri, gdroplist_ri, gcolor_ri;
 static GResInfo glabel_ri = {
     &gbutton_ri, &ggadget_ri,NULL, NULL,
     &label_box,
-    { NULL, &label_font },
+    &label_font,
     NULL,
     NULL,
     N_("Label"),
@@ -85,7 +86,7 @@ static struct resed gbutton_re[] = {
 static GResInfo gbutton_ri = {
     &gdefault_ri, &ggadget_ri,&gdefault_ri, &gcancel_ri,
     &_GGadget_button_box,
-    { NULL, &button_font },
+    &button_font,
     &buttonbox,
     gbutton_re,
     N_("Button"),
@@ -117,7 +118,7 @@ static GGadgetCreateData defbox =
 static GResInfo gdefault_ri = {
     &gcancel_ri, &gbutton_ri,&gcancel_ri,NULL,
     &_GGadget_defaultbutton_box,
-    { NULL, NULL },
+    NULL,
     &defbox,
     NULL,
     N_("Default Button"),
@@ -146,7 +147,7 @@ static GGadgetCreateData cancelbox =
 static GResInfo gcancel_ri = {
     &gcolor_ri, &gbutton_ri,&gdefault_ri,NULL,
     &_GGadget_cancelbutton_box,
-    { NULL, NULL },
+    NULL,
     &cancelbox,
     NULL,
     N_("Cancel Button"),
@@ -175,7 +176,7 @@ static GGadgetCreateData colorbox =
 static GResInfo gcolor_ri = {
     &gdroplist_ri, &gbutton_ri,NULL,NULL,
     &_GGadget_colorbutton_box,
-    { NULL, NULL },
+    NULL,
     &colorbox,
     NULL,
     N_("Color Button"),
@@ -207,7 +208,7 @@ static GGadgetCreateData droplistbox =
 static GResInfo gdroplist_ri = {
     NULL, &gbutton_ri,&listmark_ri,NULL,
     &_GGadget_droplist_box,
-    { NULL, NULL },
+    NULL,
     &droplistbox,
     NULL,
     N_("Drop List Button"),
@@ -976,9 +977,10 @@ return;
 #endif
     label_box.border_type = bt_none;
     label_box.border_width = label_box.padding = /*label_box.flags =*/ 0;
-    // XXX deal with default
-    _GGadgetInitDefaultBox("GButton.",&_GGadget_button_box,&gbutton_ri.font);
-    _GGadgetInitDefaultBox("GLabel.",&label_box,&glabel_ri.font);
+    _GGadgetInitDefaultBox("GButton.", &_GGadget_button_box);
+    GResourceFindFont("GButton.Font", &button_font);
+    _GGadgetInitDefaultBox("GLabel.",&label_box);
+    GResourceFindFont("GLabel.Font", &label_font);
     shift_on_press = GResourceFindBool("GButton.ShiftOnPress",false);
     _GGadget_droplist_box = _GGadget_button_box;
     _GGadget_defaultbutton_box = _GGadget_button_box;
@@ -995,10 +997,10 @@ return;
     _GGadget_droplist_box.border_shape = _ggadget_Default_Box.border_shape;
 #endif
     _GGadget_colorbutton_box  = _GGadget_button_box;
-    _GGadgetInitDefaultBox("GDefaultButton.",&_GGadget_defaultbutton_box,NULL);
-    _GGadgetInitDefaultBox("GCancelButton.",&_GGadget_cancelbutton_box,NULL);
-    _GGadgetInitDefaultBox("GDropList.",&_GGadget_droplist_box,NULL);
-    _GGadgetInitDefaultBox("GColorButton.",&_GGadget_colorbutton_box,NULL);
+    _GGadgetInitDefaultBox("GDefaultButton.",&_GGadget_defaultbutton_box);
+    _GGadgetInitDefaultBox("GCancelButton.",&_GGadget_cancelbutton_box);
+    _GGadgetInitDefaultBox("GDropList.",&_GGadget_droplist_box);
+    _GGadgetInitDefaultBox("GColorButton.",&_GGadget_colorbutton_box);
     gbutton_inited = true;
 }
 
@@ -1032,7 +1034,7 @@ static GLabel *_GLabelCreate(GLabel *gl, struct gwindow *base, GGadgetData *gd,v
 	_GWidget_SetDefaultButton(&gl->g);
     if (( gl->is_cancel = gd->flags&gg_but_cancel?1:0 ))
 	_GWidget_SetCancelButton(&gl->g);
-    gl->font = def==&label_box ? label_font : button_font;
+    gl->font = def==&label_box ? label_font.fi : button_font.fi;
     if ( gd->label!=NULL ) {
 	gl->image_precedes = gd->label->image_precedes;
 	if ( gd->label->font!=NULL )

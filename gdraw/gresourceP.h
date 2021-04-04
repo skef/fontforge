@@ -28,7 +28,7 @@
 #ifndef FONTFORGE_GRESOURCE_P_H
 #define FONTFORGE_GRESOURCE_P_H
 
-int _GResource_FindResName(const char *name);
+int _GResource_FindResName(const char *name, int do_restrict);
 extern struct _GResource_Res { char *res, *val; unsigned int generic: 1; unsigned int new: 1; } *_GResource_Res;
 extern char *_GGadget_ImagePath;
 

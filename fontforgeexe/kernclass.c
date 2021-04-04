@@ -31,6 +31,7 @@
 #include "fontforgeui.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "lookups.h"
 #include "splinefill.h"
 #include "splineutil.h"
@@ -2780,11 +2781,10 @@ void KernClassD(KernClass *kc, SplineFont *sf, int layer, int isv) {
     KernClassDlg *kcd;
     int i, j, kc_width, vi;
     int as, ds, ld, sbsize;
-    FontRequest rq;
     static unichar_t kernw[] = { '-', '1', '2', '3', '4', '5', 0 };
     GWindow gw;
     char titlebuf[300];
-    static GFont *font;
+    static GResFont font = { "400 12pt " MONO_UI_FAMILIES, NULL };
     char sepbuf[40], mkbuf[40];
     struct matrixinit firstmi, secondmi;
 
@@ -2870,15 +2870,8 @@ return;
 
     kc_width = GDrawPixelsToPoints(NULL,pos.width*100/GGadgetScale(100));
 
-    if ( font==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.point_size = 12;
-	rq.weight = 400;
-	rq.utf8_family_name = MONO_UI_FAMILIES;
-	font = GDrawInstanciateFont(gw,&rq);
-	font = GResourceFindFont("KernClass.Font",font);
-    }
-    kcd->font = font;
+    GResourceFindFont("KernClass.Font", &font);
+    kcd->font = font.fi;
     GDrawWindowFontMetrics(gw,kcd->font,&as,&ds,&ld);
     kcd->fh = as+ds; kcd->as = as;
     GDrawSetFont(gw,kcd->font);

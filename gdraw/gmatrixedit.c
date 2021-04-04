@@ -40,7 +40,8 @@
 
 static GBox gmatrixedit_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gmatrixedit_button_box = GBOX_EMPTY; /* Don't initialize here */
-static GResFont gmatrixedit_font, gmatrixedit_titfont;
+static GResFont gmatrixedit_font = { "400 12pt " MONO_UI_FAMILIES, NULL };
+static GResFont gmatrixedit_titfont = { "400 8pt " SANS_UI_FAMILIES, NULL };
 static Color gmatrixedit_title_bg = 0x808080, gmatrixedit_title_fg = 0x000000, gmatrixedit_title_divider = 0xffffff;
 static Color gmatrixedit_rules = 0x000000;
 static Color gmatrixedit_frozencol = 0xff0000,
@@ -80,7 +81,7 @@ static GResInfo gmatrixedit_ri = {
 static GResInfo gmatrixedit2_ri = {
     NULL, &ggadget_ri, &gmatrixedit_ri,NULL,
     NULL,
-    { NULL, NULL },
+    NULL,
     NULL,
     gmatrixedit_re,
     N_("Matrix Edit Continued"),
@@ -97,8 +98,6 @@ static GResInfo gmatrixedit2_ri = {
 };
 
 static void _GMatrixEdit_Init(void) {
-    FontRequest rq;
-
     if ( gmatrixedit_inited )
 return;
     _GGadgetCopyDefaultBox(&gmatrixedit_box);
@@ -109,11 +108,9 @@ return;
     /*gmatrixedit_box.flags = 0;*/
     gmatrixedit_box.main_background = COLOR_TRANSPARENT;
     gmatrixedit_box.disabled_background = COLOR_TRANSPARENT;
-    _GGadgetInitDefaultBox("GMatrixEdit.",&gmatrixedit_box,&gmatrixedit_font);
-    GDrawDecomposeFont(gmatrixedit_font,&rq);
-    rq.point_size = (rq.point_size>=12) ? rq.point_size-2 : rq.point_size>=10 ? rq.point_size-1 : rq.point_size;
-    rq.weight = 700;
-    GResourceFindFontRQ("GMatrixEdit.TitleFont",&gmatrixedit_titfont, &rq);
+    _GGadgetInitDefaultBox("GMatrixEdit.", &gmatrixedit_box);
+    GResourceFindFont("GMatrixEdit.Font", &gmatrixedit_font);
+    GResourceFindFont("GMatrixEdit.TitleFont", &gmatrixedit_titfont);
     gmatrixedit_title_bg = GResourceFindColor("GMatrixEdit.TitleBG",gmatrixedit_title_bg);
     gmatrixedit_title_fg = GResourceFindColor("GMatrixEdit.TitleFG",gmatrixedit_title_fg);
     gmatrixedit_title_divider = GResourceFindColor("GMatrixEdit.TitleDivider",gmatrixedit_title_divider);
@@ -128,7 +125,7 @@ return;
     gmatrixedit_button_box.flags |= box_foreground_border_inner;
     gmatrixedit_button_box.main_background = gmatrixedit_box.main_background;
     gmatrixedit_button_box.disabled_background = gmatrixedit_box.disabled_background;
-    _GGadgetInitDefaultBox("GMatrixEditButton.",&gmatrixedit_button_box,NULL);
+    _GGadgetInitDefaultBox("GMatrixEditButton.",&gmatrixedit_button_box);
 }
 
 static void MatrixDataFree(GMatrixEdit *gme) {

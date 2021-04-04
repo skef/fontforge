@@ -34,11 +34,11 @@
 #include "ustring.h"
 #include "utype.h"
 
-GImage *GResourceFindImage(char *name, GImage *def) {
+GImage *GResourceFindImage(const char *name, GImage *def) {
     int pos;
     GImage *ret;
 
-    pos = _GResource_FindResName(name);
+    pos = _GResource_FindResName(name, true);
     if ( pos==-1 )
 return( def );
 

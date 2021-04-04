@@ -39,8 +39,8 @@
 
 static GBox menubar_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox menu_box = GBOX_EMPTY; /* Don't initialize here */
-static GResFont menu_font = { NULL, NULL };
-static GResFont menubar_font = { NULL, NULL };
+static GResFont menu_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+static GResFont menubar_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
 static int gmenubar_inited = false;
 #ifdef __Mac
 static int mac_menu_icons = true;
@@ -121,8 +121,6 @@ static void GMenuInit() {
     char *keystr, *end;
 
     GGadgetInit();
-    menu_font.rstr = copy("400 10pt sans");
-    menubar_font.rstr = copy(menu_font.rstr);
     _GGadgetCopyDefaultBox(&menubar_box);
     _GGadgetCopyDefaultBox(&menu_box);
     menubar_box.border_shape = menu_box.border_shape = bs_rect;
@@ -130,8 +128,10 @@ static void GMenuInit() {
     menu_box.padding = 1;
     menubar_box.flags |= box_foreground_border_outer;
     menu_box.flags |= box_foreground_border_outer;
-    _GGadgetInitDefaultBox("GMenuBar.",&menubar_box,&menubar_font);
-    _GGadgetInitDefaultBox("GMenu.",&menu_box,&menu_font);
+    _GGadgetInitDefaultBox("GMenuBar.", &menubar_box);
+    GResourceFindFont("GMenuBar.Font", &menubar_font);
+    _GGadgetInitDefaultBox("GMenu.",&menu_box);
+    GResourceFindFont("GMenu.Font", &menu_font);
     keystr = GResourceFindString("Keyboard");
     if ( keystr!=NULL ) {
 	if ( strmatch(keystr,"mac")==0 ) keyboard = kb_mac;

@@ -31,6 +31,7 @@
 #include "chardata.h"
 #include "fontforgeui.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "lookups.h"
 #include "ttf.h"
 #include "ustring.h"
@@ -1313,9 +1314,8 @@ void StateMachineEdit(SplineFont *sf,ASM *sm,struct gfi_data *d) {
     GTextInfo label[20];
     int i, k, vk;
     int as, ds, ld, sbsize;
-    FontRequest rq;
     static unichar_t statew[] = { '1', '2', '3', '4', '5', 0 };
-    static GFont *font = NULL;
+    static GResFont font = { "400 12pt " MONO_UI_FAMILIES, NULL };
     struct matrix_data *md;
     struct matrixinit mi;
     static char *specialclasses[4] = { N_("{End of Text}"),
@@ -1480,15 +1480,8 @@ void StateMachineEdit(SplineFont *sf,ASM *sm,struct gfi_data *d) {
 	GMatrixEditSetColumnCompletion(list,0,SMD_GlyphListCompletion);
     }
 
-    if ( font==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.point_size = 12;
-	rq.weight = 400;
-	rq.utf8_family_name = MONO_UI_FAMILIES;
-	font = GDrawInstanciateFont(gw,&rq);
-	font = GResourceFindFont("StateMachine.Font",font);
-    }
-    smd.font = font;
+    GResourceFindFont("StateMachine.Font", &font);
+    smd.font = font.fi;
     GDrawWindowFontMetrics(gw,smd.font,&as,&ds,&ld);
     smd.fh = as+ds; smd.as = as;
     GDrawSetFont(gw,smd.font);

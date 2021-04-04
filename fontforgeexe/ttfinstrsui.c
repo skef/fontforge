@@ -30,6 +30,7 @@
 #include "cvundoes.h"
 #include "fontforgeui.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "splineutil.h"
 #include "ttf.h"
 #include "ttfinstrs.h"
@@ -692,11 +693,10 @@ static void InstrDlgCreate(struct instrdata *id,char *title) {
     GRect pos;
     GWindow gw;
     GWindowAttrs wattrs;
-    FontRequest rq;
     int as,ds,ld, lh;
     GGadgetCreateData gcd[11], *butarray[9], *harray[3], *varray[8];
     GTextInfo label[6];
-    static GFont *font=NULL;
+    static GResFont font = { "400 12px " MONO_UI_FAMILIES, NULL };
 
     instrhelpsetup();
 
@@ -829,15 +829,8 @@ static void InstrDlgCreate(struct instrdata *id,char *title) {
     iv->instrinfo.v = GWidgetCreateSubWindow(gw,&pos,ii_v_e_h,&iv->instrinfo,&wattrs);
     GDrawSetVisible(iv->instrinfo.v,true);
 
-    if ( font==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = MONO_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	font = GDrawInstanciateFont(gw,&rq);
-	font = GResourceFindFont("TTInstruction.Font",font);
-    }
-    iv->instrinfo.gfont = font;
+    GResourceFindFont("TTInstruction.Font", &font);
+    iv->instrinfo.gfont = font.fi;
     GDrawSetFont(iv->instrinfo.v,iv->instrinfo.gfont);
     GGadgetSetFont(iv->text,iv->instrinfo.gfont);
     GDrawWindowFontMetrics(iv->instrinfo.v,iv->instrinfo.gfont,&as,&ds,&ld);
@@ -1372,7 +1365,6 @@ static void cvtCreateEditor(struct ttf_table *tab,SplineFont *sf,uint32 tag) {
     GRect pos, subpos, gsize;
     GWindow gw;
     GWindowAttrs wattrs;
-    FontRequest rq;
     int as,ds,ld, lh;
     GGadgetCreateData gcd[9], *butarray[8], *harray[4], *harray2[3], *varray[7];
     GTextInfo label[5], lab;
@@ -1381,7 +1373,7 @@ static void cvtCreateEditor(struct ttf_table *tab,SplineFont *sf,uint32 tag) {
     int numlen;
     static GBox tfbox;
     int i;
-    static GFont *font = NULL;
+    static GResFont font = { "400 12px " MONO_UI_FAMILIES, NULL } ;
 
     sv->table = tab;
     sv->sf = sf;
@@ -1521,15 +1513,8 @@ static void cvtCreateEditor(struct ttf_table *tab,SplineFont *sf,uint32 tag) {
     sv->v = GWidgetCreateSubWindow(gw,&subpos,sv_v_e_h,sv,&wattrs);
     GDrawSetVisible(sv->v,true);
 
-    if ( font==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = MONO_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	font = GDrawInstanciateFont(gw,&rq);
-	font = GResourceFindFont("CVT.Font",font);
-    }
-    sv->gfont = font;
+    GResourceFindFont("CVT.Font", &font);
+    sv->gfont = font.fi;
     GDrawSetFont(sv->v,sv->gfont);
     GDrawSetFont(sv->gw,sv->gfont);
     GDrawWindowFontMetrics(sv->gw,sv->gfont,&as,&ds,&ld);

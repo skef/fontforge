@@ -1057,10 +1057,10 @@ static int TileAsk(struct tiledata *td,SplineFont *sf) {
     GGadgetCreateData gcd[24], boxes[5], *harray[8], *varray[5],
 	*rhvarray[4][5], *chvarray[4][5];
     GTextInfo label[24];
-    FontRequest rq;
     int as, ds, ld;
     int i,k;
-    static GFont *font = NULL, *bold=NULL;
+    static GResFont font = { "400 12pt " SANS_UI_FAMILIES, NULL },
+    static GResFont bold = { "700 12pt " SANS_UI_FAMILIES, NULL };
 
     TPDInit( &tpd,sf );
     tpd.td = td;
@@ -1078,21 +1078,10 @@ static int TileAsk(struct tiledata *td,SplineFont *sf) {
     pos.height = 300;
     tpd.gw = gw = GDrawCreateTopWindow(NULL,&pos,tpd_e_h,&tpd.cv_first,&wattrs);
 
-    if ( font==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	font = GDrawInstanciateFont(NULL,&rq);
-	font = GResourceFindFont("TilePath.Font",font);
-
-	GDrawDecomposeFont(font, &rq);
-	rq.weight = 700;
-	bold = GDrawInstanciateFont(NULL,&rq);
-	bold = GResourceFindFont("TilePath.BoldFont",bold);
-    }
-    tpd.plain = font;
-    tpd.bold = bold;
+    GResourceFindFont("TilePath.Font",font);
+    GResourceFindFont("TilePath.BoldFont",bold);
+    tpd.plain = font.fi;
+    tpd.bold = bold.fi;
     GDrawWindowFontMetrics(tpd.gw,tpd.plain,&as,&ds,&ld);
     tpd.fh = as+ds; tpd.as = as;
 

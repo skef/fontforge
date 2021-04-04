@@ -45,7 +45,7 @@ static GBox visibility_on_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox visibility_off_box = GBOX_EMPTY; /* Don't initialize here */
 static GResImage *radon, *radoff, *checkon, *checkoff, *raddison, *raddisoff, *checkdison, *checkdisoff;
 static GResImage *visibilityon, *visibilityoff, *visibilitydison, *visibilitydisoff;
-static FontInstance *checkbox_font = NULL;
+static GResFont checkbox_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
 static int gradio_inited = false;
 
 static GResInfo gradio_ri, gradioon_ri, gradiooff_ri;
@@ -68,7 +68,7 @@ static GGadgetCreateData radiobox =
 static GResInfo gradio_ri = {
     &gradioon_ri, &ggadget_ri,&gradioon_ri, &gradiooff_ri,
     &radio_box,
-    { NULL, NULL },
+    NULL,
     &radiobox,
     NULL,
     N_("Radio Button"),
@@ -91,7 +91,7 @@ static struct resed gradioon_re[] = {
 static GResInfo gradioon_ri = {
     &gradiooff_ri, &ggadget_ri,&gradiooff_ri, &gradio_ri,
     &radio_on_box,
-    { NULL, NULL },
+    NULL,
     &radiobox,
     gradioon_re,
     N_("Radio On Mark"),
@@ -114,7 +114,7 @@ static struct resed gradiooff_re[] = {
 static GResInfo gradiooff_ri = {
     &gcheckbox_ri, &ggadget_ri,&gradioon_ri, &gradio_ri,
     &radio_off_box,
-    { NULL, NULL },
+    NULL,
     &radiobox,
     gradiooff_re,
     N_("Radio Off Mark"),
@@ -145,7 +145,7 @@ static GGadgetCreateData checkboxbox =
 static GResInfo gcheckbox_ri = {
     &gcheckboxon_ri, &ggadget_ri,&gcheckboxon_ri, &gcheckboxoff_ri,
     &checkbox_box,
-    { NULL, &checkbox_font },
+    &checkbox_font,
     &checkboxbox,
     NULL,
     N_("Check Box"),
@@ -168,7 +168,7 @@ static struct resed gcheckboxon_re[] = {
 static GResInfo gcheckboxon_ri = {
     &gcheckboxoff_ri, &ggadget_ri,&gcheckboxoff_ri, &gcheckbox_ri,
     &checkbox_on_box,
-    { NULL, NULL },
+    NULL,
     &checkboxbox,
     gcheckboxon_re,
     N_("Check Box On Mark"),
@@ -192,7 +192,7 @@ static struct resed gcheckboxoff_re[] = {
 static GResInfo gcheckboxoff_ri = {
     NULL, &ggadget_ri,&gcheckboxon_ri, &gcheckbox_ri,
     &checkbox_off_box,
-    { NULL, NULL },
+    NULL,
     &checkboxbox,
     gcheckboxoff_re,
     N_("Check Box Off Mark"),
@@ -662,20 +662,21 @@ static void GRadioInit() {
     checkbox_on_box.border_type = bt_raised;
     checkbox_off_box.border_type = bt_lowered;
     checkbox_on_box.flags = checkbox_off_box.flags |= box_do_depressed_background;
-    _GGadgetInitDefaultBox("GRadio.",&radio_box,NULL);
-    _GGadgetInitDefaultBox("GCheckBox.",&checkbox_box,&gcheckbox_ri.font);
+    _GGadgetInitDefaultBox("GRadio.",&radio_box);
+    _GGadgetInitDefaultBox("GCheckBox.",&checkbox_box);
+    GResourceFindFont("GCheckBox.Font",&checkbox_font);
 
     visibility_on_box.border_type=bt_none;
     visibility_on_box.padding=1;
     visibility_off_box.border_type=bt_none;
     visibility_off_box.padding=1;
 
-    _GGadgetInitDefaultBox("GRadioOn.",&radio_on_box,NULL);
-    _GGadgetInitDefaultBox("GRadioOff.",&radio_off_box,NULL);
-    _GGadgetInitDefaultBox("GCheckBoxOn.",&checkbox_on_box,NULL);
-    _GGadgetInitDefaultBox("GCheckBoxOff.",&checkbox_off_box,NULL);
-    _GGadgetInitDefaultBox("GVisibilityBoxOn.",&visibility_on_box,NULL);
-    _GGadgetInitDefaultBox("GVisibitityBoxOff.",&visibility_off_box,NULL);
+    _GGadgetInitDefaultBox("GRadioOn.",&radio_on_box);
+    _GGadgetInitDefaultBox("GRadioOff.",&radio_off_box);
+    _GGadgetInitDefaultBox("GCheckBoxOn.",&checkbox_on_box);
+    _GGadgetInitDefaultBox("GCheckBoxOff.",&checkbox_off_box);
+    _GGadgetInitDefaultBox("GVisibilityBoxOn.",&visibility_on_box);
+    _GGadgetInitDefaultBox("GVisibitityBoxOff.",&visibility_off_box);
 
     if ( radio_on_box.depressed_background == radio_off_box.depressed_background ) {
 	radio_on_box.depressed_background = radio_on_box.active_border;
@@ -750,7 +751,7 @@ static GCheckBox *_GCheckBoxCreate(GCheckBox *gl, struct gwindow *base, GGadgetD
     _GGadget_Create(&gl->g,base,gd,data,def);
 
     gl->g.takes_input = true; gl->g.takes_keyboard = true; gl->g.focusable = true;
-    gl->font = checkbox_font;
+    gl->font = checkbox_font.fi;
     if ( gd->label!=NULL ) {
 	gl->image_precedes = gd->label->image_precedes;
 	if ( gd->label->font!=NULL )

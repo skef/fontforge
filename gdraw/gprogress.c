@@ -60,7 +60,7 @@ typedef struct gprogress {
 
 static Color progress_background, progress_foreground;
 static Color progress_fillcol = 0xc0c0ff;
-static GFont *progress_font = NULL;
+static GResFont progress_font = { "400 12pt "MONO_UI_FAMILIES, NULL };
 static int progress_init = false;
 
 static GProgress *current;
@@ -196,7 +196,7 @@ static struct resed progress_re[] = {
 static GResInfo progress_ri = {
     NULL, NULL, NULL,NULL,
     NULL,	/* No box */
-    { NULL , &progress_font },
+    &progress_font,
     NULL,
     progress_re,
     N_("Progress"),
@@ -220,7 +220,7 @@ static void GProgressResInit(void) {
 		    GDrawGetDefaultBackground(NULL));
 	progress_fillcol = GResourceFindColor("GProgress.FillColor",
 		    progress_fillcol);
-	progress_font = GResourceFindFont("GProgress.Font",NULL);
+	GResourceFindFont("GProgress.Font", &progress_font);
 	progress_init = true;
     }
 }
@@ -256,16 +256,8 @@ return;
     new->prev = current;
 
     root = GDrawGetRoot(NULL);
-    if ( progress_font == NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = MONO_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	progress_font = GDrawAttachFont(root,&rq);
-    } else {
-        GDrawSetFont(root, progress_font);
-    }
-    GDrawWindowFontMetrics(root,new->font = progress_font,&as,&ds,&ld);
+    GDrawSetFont(root, progress_font.fi);
+    GDrawWindowFontMetrics(root,new->font = progress_font.fi,&as,&ds,&ld);
 
     if ( new->line1!=NULL )
 	new->l1width = GDrawGetTextWidth(root,new->line1,-1);

@@ -34,6 +34,7 @@
 #include "fvfonts.h"
 #include "gfile.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "lookups.h"
 #include "sfd.h"
 #include "sfundo.h"
@@ -5805,9 +5806,9 @@ static int kern_format_dlg( SplineFont *sf, int def_layer,
     struct kf_dlg kf;
     int i,j, guts_row;
     /* Returns are 0=>Pairs, 1=>Classes, 2=>Cancel */
-    FontRequest rq;
     int as, ds, ld;
-    static GFont *plainfont = NULL, *boldfont=NULL;
+    static GResFont plainfont = { "400 12pt " SANS_UI_FAMILIES, NULL };
+    static GResFont boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
 
     if ( sub->separation==0 && !sub->kerning_by_touch ) {
 	sub->separation = sf->width_separation;
@@ -5841,19 +5842,9 @@ static int kern_format_dlg( SplineFont *sf, int def_layer,
     pos.height = 100;
     kf.gw = GDrawCreateTopWindow(NULL,&pos,kf_e_h,&kf,&wattrs);
 
-    if ( plainfont==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	plainfont = GDrawInstanciateFont(NULL,&rq);
-	plainfont = GResourceFindFont("KernFormat.Font",plainfont);
-	GDrawDecomposeFont(plainfont, &rq);
-	rq.weight = 700;
-	boldfont = GDrawInstanciateFont(NULL,&rq);
-	boldfont = GResourceFindFont("KernFormat.BoldFont",boldfont);
-    }
-    kf.plain = plainfont; kf.bold = boldfont;
+    GResourceFindFont("KernFormat.Font", &plainfont);
+    GResourceFindFont("KernFormat.BoldFont", &boldfont);
+    kf.plain = plainfont.fi; kf.bold = boldfont.fi;
     GDrawWindowFontMetrics(kf.gw,kf.plain,&as,&ds,&ld);
     kf.fh = as+ds; kf.as = as;
 

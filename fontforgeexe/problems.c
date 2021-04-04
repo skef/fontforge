@@ -33,6 +33,7 @@
 #include "fontforgeui.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "gwidget.h"
 #include "namelist.h"
 #include "splineorder2.h"
@@ -5319,10 +5320,9 @@ void SFValidationWindow(SplineFont *sf,int layer,enum fontformat format) {
     int cidmax;
     SplineFont *sub;
     SplineChar *sc;
-    FontRequest rq;
     int as, ds, ld;
     int mask, needs_blue;
-    static GFont *valfont=NULL;
+    static GResFont valfont = { "400 11pt " SANS_UI_FAMILIES, NULL };
 
     if ( sf->cidmaster )
 	sf = sf->cidmaster;
@@ -5392,15 +5392,8 @@ return;
     pos.height = GDrawPointsToPixels(NULL,300);
     valwin->gw = gw = GDrawCreateTopWindow(NULL,&pos,vw_e_h,valwin,&wattrs);
 
-    if ( valfont==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = "Helvetica";
-	rq.point_size = 11;
-	rq.weight = 400;
-	valfont = GDrawInstanciateFont(gw,&rq);
-	valfont = GResourceFindFont("Validate.Font",valfont);
-    }
-    valwin->font = valfont;
+    GResourceFindFont("Validate.Font", &valfont);
+    valwin->font = valfont.fi;
     GDrawWindowFontMetrics(valwin->gw,valwin->font,&as,&ds,&ld);
     valwin->fh = as+ds;
     valwin->as = as;

@@ -32,7 +32,7 @@
 
 #include <iconv.h>
 
-enum res_type { rt_int, rt_double, rt_bool/* int */, rt_color, rt_string };
+enum res_type { rt_int, rt_double, rt_bool/* int */, rt_color, rt_string, rt_font };
 
 typedef struct gresstruct {
     const char *resname;
@@ -47,14 +47,14 @@ typedef struct gresstruct {
 
 extern char *GResourceProgramName;
 
-void GResourceSetProg(char *prog);
-void GResourceAddResourceFile(char *filename,char *prog,int warn);
-void GResourceAddResourceString(char *string,char *prog);
-void GResourceFind( GResStruct *info, char *prefix);
-char *GResourceFindString(char *name);
-int GResourceFindBool(char *name, int def);
-long GResourceFindInt(char *name, long def);
-Color GResourceFindColor(char *name, Color def);
-GImage *GResourceFindImage(char *name, GImage *def);
+void GResourceSetProg(const char *prog);
+void GResourceAddResourceFile(const char *filename,const char *prog,int warn);
+void GResourceAddResourceString(const char *string,const char *prog);
+void GResourceFind( GResStruct *info, const char *prefix);
+char *GResourceFindString(const char *name);
+int GResourceFindBool(const char *name, int def);
+long GResourceFindInt(const char *name, long def);
+Color GResourceFindColor(const char *name, Color def);
+GImage *GResourceFindImage(const char *name, GImage *def);
 
 #endif /* FONTFORGE_GRESOURCE_H */

@@ -44,7 +44,7 @@ static GGadgetCreateData linebox =
 GResInfo gline_ri = {
     NULL, &ggadget_ri, NULL, NULL,
     &_GGroup_LineBox,
-    { NULL, NULL },
+    NULL,
     &linebox,
     NULL,
     N_("Line"),
@@ -71,8 +71,8 @@ return;
     /*group_box.flags = _GGroup_LineBox.flags = 0;*/
     group_box.main_background = COLOR_TRANSPARENT;
     group_box.disabled_background = COLOR_TRANSPARENT;
-    _GGadgetInitDefaultBox("GLine.",&_GGroup_LineBox,NULL);
-    _GGadgetInitDefaultBox("GGroup.",&group_box,NULL);
+    _GGadgetInitDefaultBox("GLine.",&_GGroup_LineBox);
+    _GGadgetInitDefaultBox("GGroup.",&group_box);
     ggroup_inited = true;
 }
 

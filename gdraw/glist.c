@@ -950,7 +950,7 @@ struct gfuncs GList_funcs = {
 };
 
 static GBox list_box = GBOX_EMPTY; /* Don't initialize here */;
-static FontInstance *list_font = NULL;
+static GResFont list_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
 static int glist_inited = false;
 
 static GTextInfo list_choices[] = {
@@ -969,7 +969,7 @@ static GGadgetCreateData listhvbox =
 static GResInfo glist_ri = {
     NULL, &ggadget_ri,NULL, NULL,
     &list_box,
-    { NULL, &list_font },
+    &list_font,
     &listhvbox,
     NULL,
     N_("List"),
@@ -988,7 +988,8 @@ static GResInfo glist_ri = {
 static void GListInit() {
     _GGadgetCopyDefaultBox(&list_box);
     list_box.flags |= box_foreground_border_outer;
-    _GGadgetInitDefaultBox("GList.",&list_box,&glist_ri.font);
+    _GGadgetInitDefaultBox("GList.", &list_box);
+    GResourceFindFont("GList.Font", &list_font);
     glist_inited = true;
 }
 
@@ -1014,7 +1015,7 @@ static GList *_GListCreate(GList *gl, struct gwindow *base, GGadgetData *gd,void
 	GListInit();
     gl->g.funcs = &GList_funcs;
     _GGadget_Create(&gl->g,base,gd,data,def);
-    gl->font = list_font;
+    gl->font = list_font.fi;
     gl->g.takes_input = gl->g.takes_keyboard = true; gl->g.focusable = true;
 
     if ( !(gd->flags & gg_list_internal ) ) {
@@ -1099,10 +1100,10 @@ static void GListPopupFigurePos(GGadget *owner,GTextInfo **ti,GRect *pos) {
 	GListInit();
     GDrawGetSize(GDrawGetRoot(GDrawGetDisplayOfWindow(owner->base)),&rootsize);
     maxh = 2*rootsize.height/3;
-    width = GTextInfoGetMaxWidth(owner->base,ti,list_font);
+    width = GTextInfoGetMaxWidth(owner->base,ti,list_font.fi);
     height = 0;
     for ( i=0; height<maxh && (ti[i]->text!=NULL || ti[i]->image!=NULL || ti[i]->line); ++i )
-	height += GTextInfoGetHeight(owner->base,ti[i],list_font);
+	height += GTextInfoGetHeight(owner->base,ti[i],list_font.fi);
     if ( ti[i]->text!=NULL || ti[i]->image!=NULL || ti[i]->line )	/* Need a scroll bar if more */
 	width += GDrawPointsToPixels(owner->base,_GScrollBar_Width) +
 		GDrawPointsToPixels(owner->base,1);
@@ -1211,7 +1212,7 @@ GResInfo *_GListRIHead(void) {
     if ( !glist_inited )
 	GListInit();
     /* bp = GBoxBorderWidth(GDrawGetRoot(NULL),&list_box);*/	/* This gives bizarre values */
-    GDrawWindowFontMetrics(GDrawGetRoot(NULL),list_font,&as, &ds, &ld);	/* I don't have a window yet... */
+    GDrawWindowFontMetrics(GDrawGetRoot(NULL),list_font.fi,&as, &ds, &ld);	/* I don't have a window yet... */
     list_gcd[0].gd.pos.height = list_gcd[1].gd.pos.height = 2*(as+ds)+4;
 return( &glist_ri );
 }

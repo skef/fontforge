@@ -33,6 +33,7 @@
 #include "gfile.h"
 #include "gkeysym.h"
 #include "glyphcomp.h"
+#include "gresedit.h"
 #include "lookups.h"
 #include "splinefill.h"
 #include "splinesaveafm.h"
@@ -2771,12 +2772,12 @@ static void ShowAttCreateDlg(struct att_dlg *att, SplineFont *sf, int which,
 	char *win_title) {
     GRect pos;
     GWindowAttrs wattrs;
-    FontRequest rq;
     int as, ds, ld;
     GGadgetCreateData gcd[5];
     GTextInfo label[4];
     int sbsize = GDrawPointsToPixels(NULL,_GScrollBar_Width);
-    static GFont *monofont=NULL, *propfont=NULL;
+    static GResFont monofont = { "400 12pt " MONO_UI_FAMILIES, NULL };
+    static GResFont propfont = { "400 12pt " SANS_UI_FAMILIES, NULL };
 
     if ( sf->cidmaster ) sf = sf->cidmaster;
 
@@ -2797,21 +2798,10 @@ static void ShowAttCreateDlg(struct att_dlg *att, SplineFont *sf, int which,
     pos.height = GDrawPointsToPixels(NULL,300);
     att->gw = GDrawCreateTopWindow(NULL,&pos,att_e_h,att,&wattrs);
 
-    if ( propfont==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	propfont = GDrawInstanciateFont(att->gw,&rq);
-	propfont = GResourceFindFont("ShowATT.Font",propfont);
-
-	GDrawDecomposeFont(propfont, &rq);
-	rq.utf8_family_name = MONO_UI_FAMILIES;	/* I want to show tabluar data sometimes */
-	monofont = GDrawInstanciateFont(att->gw,&rq);
-	monofont = GResourceFindFont("ShowATT.MonoFont",monofont);
-    }
-    att->font = propfont;
-    att->monofont = monofont;
+    GResourceFindFont("ShowATT.Font", &propfont);
+    GResourceFindFont("ShowATT.MonoFont", &monofont);
+    att->font = propfont.fi;
+    att->monofont = monofont.fi;
     GDrawWindowFontMetrics(att->gw,att->font,&as,&ds,&ld);
     att->fh = as+ds; att->as = as;
 

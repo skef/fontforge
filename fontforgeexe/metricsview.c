@@ -5189,7 +5189,6 @@ MetricsView *MetricsViewCreate(FontView *fv,SplineChar *sc,BDFFont *bdf) {
     GGadgetData gd;
     GRect gsize;
     MetricsView *mv = calloc(1,sizeof(MetricsView));
-    FontRequest rq;
     static GWindow icon = NULL;
     extern int _GScrollBar_Width;
     // The maximum length of a glyph's name is 31 chars:
@@ -5201,7 +5200,7 @@ MetricsView *MetricsViewCreate(FontView *fv,SplineChar *sc,BDFFont *bdf) {
     GTextInfo label;
     int i,j,cnt;
     int as,ds,ld;
-    static GFont *mvfont=NULL;
+    static GResFont mvfont = { "400 12px " SANS_UI_FAMILIES, NULL };
     SplineFont *master = fv->b.sf->cidmaster ? fv->b.sf->cidmaster : fv->b.sf;
 
     MetricsViewInit();
@@ -5262,15 +5261,8 @@ MetricsView *MetricsViewCreate(FontView *fv,SplineChar *sc,BDFFont *bdf) {
     gd.flags = gg_visible|gg_enabled|gg_pos_in_pixels|gg_sb_vert;
     mv->vsb = GScrollBarCreate(gw,&gd,mv);
 
-    if ( mvfont==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	mvfont = GDrawInstanciateFont(gw,&rq);
-	mvfont = GResourceFindFont("MetricsView.Font",mvfont);
-    }
-    mv->font = mvfont;
+    GResourceFindFont("MetricsView.Font", &mvfont);
+    mv->font = mvfont.fi;
     GDrawWindowFontMetrics(gw,mv->font,&as,&ds,&ld);
     mv->fh = as+ds; mv->as = as;
 
@@ -5473,7 +5465,7 @@ static struct resed metricsview_re[] = {
 GResInfo metricsview_ri = {
     NULL, NULL,NULL, NULL,
     NULL,
-    { NULL, NULL },
+    NULL,
     NULL,
     metricsview_re,
     N_("MetricsView"),

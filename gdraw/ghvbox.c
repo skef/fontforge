@@ -44,7 +44,7 @@ static int ghvbox_inited = false;
 GResInfo ghvgroupbox_ri = {
     NULL, &ggadget_ri, NULL, NULL,
     &hvgroup_box,
-    { NULL, NULL },
+    NULL,
     NULL,
     NULL,
     N_("HV Group Box"),
@@ -74,8 +74,8 @@ return;
     /*hvgroup_box.flags = hvbox_box.flags = 0;*/
     hvgroup_box.main_background = COLOR_TRANSPARENT;
     hvgroup_box.disabled_background = COLOR_TRANSPARENT;
-    _GGadgetInitDefaultBox("GHVBox.",&hvbox_box,NULL);
-    _GGadgetInitDefaultBox("GGroup.",&hvgroup_box,NULL);
+    _GGadgetInitDefaultBox("GHVBox.",&hvbox_box);
+    _GGadgetInitDefaultBox("GGroup.",&hvgroup_box);
     ghvbox_inited = true;
 }
 

@@ -42,7 +42,7 @@
 
 static GBox sftextarea_box = GBOX_EMPTY; /* Don't initialize here */
 static int sftextarea_inited = false;
-static FontInstance *sftextarea_font;
+static GResFont sftextarea_font = { "400 10pt " MONO_UI_FAMILIES, NULL };
 
 static unichar_t nullstr[] = { 0 }, 
 	newlinestr[] = { '\n', 0 }, tabstr[] = { '\t', 0 };
@@ -2091,17 +2091,12 @@ struct gfuncs sftextarea_funcs = {
 };
 
 static void SFTextAreaInit() {
-    FontRequest rq;
-
     GGadgetInit();
-    GDrawDecomposeFont(_ggadget_default_font,&rq);
-    rq.utf8_family_name = MONO_UI_FAMILIES;
-    sftextarea_font = GDrawInstanciateFont(NULL,&rq);
-    sftextarea_font = GResourceFindFont("SFTextArea.Font",sftextarea_font);
     _GGadgetCopyDefaultBox(&sftextarea_box);
     sftextarea_box.padding = 3;
     sftextarea_box.flags = box_active_border_inner;
-    _GGadgetInitDefaultBox("SFTextArea.",&sftextarea_box,NULL);
+    _GGadgetInitDefaultBox("SFTextArea.", &sftextarea_box);
+    GResourceFindFont("SFTextArea.Font", &sftextarea_font);
     sftextarea_inited = true;
 }
 
@@ -2232,7 +2227,7 @@ static SFTextArea *_SFTextAreaCreate(SFTextArea *st, struct gwindow *base, GGadg
     }
     if ( st->li.text==NULL )
 	st->li.text = calloc(1,sizeof(unichar_t));
-    st->font = sftextarea_font;
+    st->font = sftextarea_font.fi;
     if ( gd->label!=NULL && gd->label->font!=NULL )
 	st->font = gd->label->font;
     SFTextAreaFit(st);

@@ -30,6 +30,7 @@
 #include "fontP.h"
 #include "gdraw.h"
 #include "gfile.h"
+#include "gresedit.h"
 #include "gresource.h"
 #include "gresourceP.h"
 #include "ustring.h"
@@ -47,8 +48,8 @@ static int rcompar(const void *_r1,const void *_r2) {
 return( strcmp(r1->res,r2->res));
 }
 
-int _GResource_FindResName(const char *name) {
-    int top=rsummit, bottom = rbase;
+int _GResource_FindResName(const char *name, int do_restrict) {
+    int top=do_restrict?rsummit:rcur, bottom = do_restrict?rbase:0;
     int test, cmp;
 
     if ( rcur==0 )
@@ -58,7 +59,7 @@ return( -1 );
 	if ( top==bottom )
 return( -1 );
 	test = (top+bottom)/2;
-	cmp = strcmp(name,_GResource_Res[test].res+rskiplen);
+	cmp = strcmp(name,_GResource_Res[test].res+(do_restrict?rskiplen:0));
 	if ( cmp==0 )
 return( test );
 	if ( test==bottom )
@@ -70,7 +71,7 @@ return( -1 );
     }
 }
 
-static int GResourceRestrict(char *prefix) {
+static int GResourceRestrict(const char *prefix) {
     int top=rcur, bottom = 0;
     int test, cmp;
     int plen;
@@ -148,8 +149,9 @@ return( -1 );
 return( 0 );
 }
 
-void GResourceSetProg(char *prog) {
-    char filename[1025], *pt;
+void GResourceSetProg(const char *prog) {
+    char filename[1025];
+    const char *pt;
     extern char *_GFile_find_program_dir(char *prog);
 
     if ( prog!=NULL ) {
@@ -167,8 +169,9 @@ return;
 return;
 }
 
-void GResourceAddResourceString(char *string,char *prog) {
-    char *pt, *ept, *next;
+void GResourceAddResourceString(const char *string,const char *prog) {
+    char *ept;
+    const char *pt, *next;
     int cnt, plen;
     struct _GResource_Res temp;
     int i,j,k, off;
@@ -256,7 +259,7 @@ return;
 	_GResource_Res[i].new = false;
 }
 
-void GResourceAddResourceFile(char *filename,char *prog,int warn) {
+void GResourceAddResourceFile(const char *filename,const char *prog,int warn) {
     FILE *file;
     char buffer[1000];
 
@@ -271,23 +274,26 @@ return;
     fclose(file);
 }
 
-void GResourceFind( GResStruct *info,char *prefix) {
+void GResourceFind( GResStruct *info,const char *prefix) {
     int pos;
+    extern void _GResourceFindFont(const char *resourcename, GResFont *font, int is_value);
 
     if ( GResourceRestrict(prefix)== -1 ) {
 	rbase = rskiplen = 0; rsummit = rcur;
 return;
     }
     while ( info->resname!=NULL ) {
-	pos = _GResource_FindResName(info->resname);
+	pos = _GResource_FindResName(info->resname, true);
 	info->found = (pos!=-1);
-	if ( pos==-1 )
+	if ( pos==-1 && info->type!=rt_font ) // rt_font may need default initialization
 	    /* Do Nothing */;
 	else if ( info->type == rt_string ) {
 	    if ( info->cvt!=NULL )
 		*(void **) (info->val) = (info->cvt)( _GResource_Res[pos].val, *(void **) (info->val) );
 	    else
 		*(char **) (info->val) = copy( _GResource_Res[pos].val );
+	} else if ( info->type == rt_font ) {
+	    _GResourceFindFont(_GResource_Res[pos].val, (GResFont *) info->val, true);
 	} else if ( info->type == rt_color ) {
 	    Color temp = _GImage_ColourFName(_GResource_Res[pos].val );
 	    if ( temp==-1 ) {
@@ -341,21 +347,21 @@ return;
     rbase = rskiplen = 0; rsummit = rcur;
 }
 
-char *GResourceFindString(char *name) {
+char *GResourceFindString(const char *name) {
     int pos;
 
-    pos = _GResource_FindResName(name);
+    pos = _GResource_FindResName(name, false);
     if ( pos==-1 )
 return( NULL );
     else
 return( copy(_GResource_Res[pos].val));
 }
 
-int GResourceFindBool(char *name, int def) {
+int GResourceFindBool(const char *name, int def) {
     int pos;
     int val = -1;
 
-    pos = _GResource_FindResName(name);
+    pos = _GResource_FindResName(name, false);
     if ( pos==-1 )
 return( def );
 
@@ -372,12 +378,12 @@ return( def );
 return( val );
 }
 
-long GResourceFindInt(char *name, long def) {
+long GResourceFindInt(const char *name, long def) {
     int pos;
     char *end;
     long ret;
 
-    pos = _GResource_FindResName(name);
+    pos = _GResource_FindResName(name, false);
     if ( pos==-1 )
 return( def );
 
@@ -388,11 +394,11 @@ return( def );
 return( ret );
 }
 
-Color GResourceFindColor(char *name, Color def) {
+Color GResourceFindColor(const char *name, Color def) {
     int pos;
     Color ret;
 
-    pos = _GResource_FindResName(name);
+    pos = _GResource_FindResName(name, false);
     if ( pos==-1 )
 return( def );
 

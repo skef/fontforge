@@ -32,6 +32,7 @@
 #include "fvcomposite.h"
 #include "fvfonts.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "lookups.h"
 #include "psfont.h"
 #include "splinefill.h"
@@ -1089,10 +1090,9 @@ void SFShowKernPairs(SplineFont *sf,SplineChar *sc,AnchorClass *ac,int layer) {
     GWindowAttrs wattrs;
     GGadgetCreateData gcd[9], boxes[6], *hvarray[3][3], *harray[3], *barray[10], *varray[5];
     GTextInfo label[9];
-    FontRequest rq;
     int as, ds, ld,i;
     static int done=false;
-    static GFont *font=NULL;
+    static GResFont font = { "400 12px " SANS_UI_FAMILIES, NULL };
 
     memset(&kpd,0,sizeof(kpd));
     kpd.sf = sf;
@@ -1239,15 +1239,8 @@ return;
 
     kpd.bdf = SplineFontPieceMeal(kpd.sf,kpd.layer,(intpt) (gcd[1].gd.label->userdata),72,true,NULL);
 
-    if ( font==NULL ) {
-	memset(&rq,'\0',sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = -12;
-	rq.weight = 400;
-	font = GDrawInstanciateFont(gw,&rq);
-	font = GResourceFindFont("Combinations.Font",font);
-    }
-    kpd.font = font;
+    GResourceFindFont("Combinations.Font", &font);
+    kpd.font = font.fi;
     GDrawWindowFontMetrics(gw,kpd.font,&as,&ds,&ld);
     kpd.fh = as+ds; kpd.as = as;
 

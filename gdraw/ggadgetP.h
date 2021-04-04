@@ -512,7 +512,7 @@ extern int _GGadget_Skip;		/* in points, def hor space between gadgets */
 extern int _GGadget_TextImageSkip;	/* in points, def hor space text and image */
 extern GBox _GListMark_Box, _GGroup_LineBox;
 extern GResImage *_GListMark_Image;
-extern FontInstance *_ggadget_default_font;
+extern GResFont _ggadget_default_font;
 
 void _GWidget_AddGGadget(GWindow gw,struct ggadget *g);
 void _GWidget_RemoveGadget(struct ggadget *g);
@@ -526,7 +526,7 @@ void _GWidget_SetPopupOwner(GGadget *g);
 void _GWidget_ClearPopupOwner(GGadget *g);
 
 extern void _GGadgetCopyDefaultBox(GBox *box);
-extern void _GGadgetInitDefaultBox(char *class, GBox *box, GResFont *grfont);
+extern void _GGadgetInitDefaultBox(char *class, GBox *box);
 extern void _ggadget_underlineMnemonic(GWindow gw,int32 x,int32 y,unichar_t *label,
 	unichar_t mneumonic, Color fg,int ymax);
 extern void _ggadgetFigureSize(GWindow gw, GBox *design, GRect *r, int isdef);

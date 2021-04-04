@@ -29,6 +29,7 @@
 
 #include "cvruler.h"
 #include "fontforgeui.h"
+#include "gresedit.h"
 #include "splineutil.h"
 #include "splineutil2.h"
 #include "ustring.h"
@@ -338,7 +339,7 @@ static int ruler_linger_e_h(GWindow gw, GEvent *event) {
 return( true );
 }
 	
-static GFont *rvfont=NULL;
+static GResFont rvfont = { "400 12px " MONO_UI_FAMILIES, NULL };
 
 /*
  * Comparison function for use with qsort.
@@ -450,7 +451,6 @@ static void RulerPlace(CharView *cv, GEvent *event) {
     int i,h,w;
     GWindowAttrs wattrs;
     GRect pos;
-    FontRequest rq;
     int as, ds, ld;
 
     if ( cv->ruler_w==NULL ) {
@@ -464,15 +464,8 @@ static void RulerPlace(CharView *cv, GEvent *event) {
 	pos.x = pos.y = 0; pos.width=pos.height = 20;
 	cv->ruler_w = GWidgetCreateTopWindow(NULL,&pos,ruler_e_h,cv,&wattrs);
 
-	if ( rvfont==NULL ) {
-	    memset(&rq,0,sizeof(rq));
-	    rq.utf8_family_name = FIXED_UI_FAMILIES;
-	    rq.point_size = -12;
-	    rq.weight = 400;
-	    rvfont = GDrawInstanciateFont(cv->ruler_w,&rq);
-	    rvfont = GResourceFindFont("CharView.Measure.Font",rvfont);
-	}
-	cv->rfont = rvfont;
+	GResourceFindFont("CharView.Measure.Font", &rvfont);
+	cv->rfont = rvfont.fi;
 	GDrawWindowFontMetrics(cv->ruler_w,cv->rfont,&as,&ds,&ld);
 	cv->rfh = as+ds; cv->ras = as;
     } else
@@ -530,7 +523,6 @@ static void RulerLingerPlace(CharView *cv, GEvent *event) {
     int i,h,w;
     GWindowAttrs wattrs;
     GRect pos;
-    FontRequest rq;
     int as, ds, ld;
     int line;
     int old_pressed;
@@ -546,15 +538,8 @@ static void RulerLingerPlace(CharView *cv, GEvent *event) {
 	pos.x = pos.y = 0; pos.width=pos.height = 20;
 	cv->ruler_linger_w = GWidgetCreateTopWindow(NULL,&pos,ruler_linger_e_h,cv,&wattrs);
 
-	if ( rvfont==NULL ) {
-	    memset(&rq,0,sizeof(rq));
-	    rq.utf8_family_name = FIXED_UI_FAMILIES;
-	    rq.point_size = -12;
-	    rq.weight = 400;
-	    rvfont = GDrawInstanciateFont(cv->ruler_w,&rq);
-	    rvfont = GResourceFindFont("CharView.Measure.Font",rvfont);
-	}
-	cv->rfont = rvfont;
+	GResourceFindFont("CharView.Measure.Font", &rvfont);
+	cv->rfont = rvfont.fi;
 	GDrawWindowFontMetrics(cv->ruler_linger_w,cv->rfont,&as,&ds,&ld);
 	cv->rfh = as+ds; cv->ras = as;
     } else
@@ -820,7 +805,6 @@ static void CpInfoPlace(CharView *cv, GEvent *event) {
     int h,w;
     GWindowAttrs wattrs;
     GRect pos;
-    FontRequest rq;
     int as, ds, ld;
     SplinePoint *sp;
 
@@ -835,15 +819,8 @@ static void CpInfoPlace(CharView *cv, GEvent *event) {
 	pos.x = pos.y = 0; pos.width=pos.height = 20;
 	cv->ruler_w = GWidgetCreateTopWindow(NULL,&pos,cpinfo_e_h,cv,&wattrs);
 
-	if ( rvfont==NULL ) {
-	    memset(&rq,0,sizeof(rq));
-	    rq.utf8_family_name = FIXED_UI_FAMILIES;
-	    rq.point_size = -12;
-	    rq.weight = 400;
-	    rvfont = GDrawInstanciateFont(cv->ruler_w,&rq);
-	    rvfont = GResourceFindFont("CharView.Measure.Font",rvfont);
-	}
-	cv->rfont = rvfont;
+	GResourceFindFont("CharView.Measure.Font", &rvfont);
+	cv->rfont = rvfont.fi;
 	GDrawWindowFontMetrics(cv->ruler_w,cv->rfont,&as,&ds,&ld);
 	cv->rfh = as+ds; cv->ras = as;
     } else

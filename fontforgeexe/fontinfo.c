@@ -36,6 +36,7 @@
 #include "featurefile.h"
 #include "fontforgeui.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "gutils.h"
 #include "lookups.h"
 #include "namelist.h"
@@ -7480,7 +7481,6 @@ void FontInfo(SplineFont *sf,int deflayer,int defaspect,int sync) {
     int i,j,k,g, psrow;
     int mcs;
     char title[130];
-    FontRequest rq;
     int as, ds, ld;
     char **nlnames;
     char createtime[200], modtime[200];
@@ -7492,7 +7492,7 @@ void FontInfo(SplineFont *sf,int deflayer,int defaspect,int sync) {
     int ltype;
     static GBox small_blue_box;
     extern GBox _GGadget_button_box;
-    static GFont *fi_font=NULL;
+    static GResFont fi_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
     char *copied_copyright;
 
     FontInfoInit();
@@ -10803,15 +10803,8 @@ return;
     OS2_UnicodeChange(GWidgetGetControl(gw,CID_UnicodeRanges),NULL);
     OS2_CodePageChange(GWidgetGetControl(gw,CID_CodePageRanges),NULL);
 
-    if ( fi_font==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = SANS_UI_FAMILIES;
-	rq.point_size = 12;
-	rq.weight = 400;
-	fi_font = GDrawInstanciateFont(gw,&rq);
-	fi_font = GResourceFindFont("FontInfo.Font",fi_font);
-    }
-    d->font = fi_font;
+    GResourceFindFont("FontInfo.Font", &fi_font);
+    d->font = fi_font.fi;
     GDrawWindowFontMetrics(gw,d->font,&as,&ds,&ld);
     d->as = as; d->fh = as+ds;
 

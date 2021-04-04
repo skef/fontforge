@@ -405,16 +405,30 @@ return( true );
 static void GRE_ParseFont(GGadget *g) {
     char *fontdesc = GGadgetGetTitle8(g);
     FontRequest rq;
+    GResFont *rf = (GResFont *) GGadgetGetUserData(g);
+    FontInstance *fi;
+
+    if ( fontdesc!=NULL && rf->rstr!=NULL && strcmp(fontdesc, rf->rstr)==0 )
+	return;
 
     if ( !ResStrToFontRequest(fontdesc, &rq) ) {
-	gwwv_post_error(_("Bad font"),_("Bad or incomplete font specification"));
+	gwwv_post_error(_("Bad font"),_("Bad or incomplete font specification '%s'"), fontdesc);
+	free(fontdesc);
+    } else {
+	fi = GDrawInstanciateFont(NULL, &rq);
+	if ( fi==NULL ) {
+	    gwwv_post_error(_("Bad font"),_("Could not find font corresponding to '%s'"), fontdesc);
+	    free(fontdesc);
+	} else {
+	    // The old rstr might be a constant so just (potentially) leak here.
+	    rf->rstr = fontdesc;
+	    rf->fi = fi;
+	}
     }
     free((char *) rq.utf8_family_name);
-    free(fontdesc);
 }
 
 static int GRE_FontChanged(GGadget *g, GEvent *e) {
-
     if ( e->type==et_controlevent && e->u.control.subtype == et_textfocuschanged &&
 	    !e->u.control.u.tf_focus.gained_focus ) {
 	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
@@ -493,7 +507,7 @@ static void GRE_DoCancel(GRE *gre) {
 		    *(int *) (extras->val) = extras->orig.dval;
 		  break;
 		  case rt_font:
-		    *(GFont **) (extras->val) = extras->orig.fontval;
+		    *(GResFont *) (extras->val) = extras->orig.fontval;
 		  break;
 		  case rt_image:
 		    _ri = extras->val;
@@ -661,7 +675,7 @@ static int GRE_Save(GGadget *g, GEvent *e) {
                     cid += 3;
                 }
             }
-            if ( res->font.font!=NULL ) {
+            if ( res->font!=NULL ) {
                 if ( !GGadgetIsChecked( GWidgetGetControl(gre->gw,gre->tofree[i].fontcid-1))
                       || (res->override_mask&omf_font) ) {
                     char *ival = GGadgetGetTitle8( GWidgetGetControl(gre->gw,gre->tofree[i].fontcid));
@@ -784,7 +798,7 @@ return( true );
 		    free(sval);
 		}
 	    }
-	    if ( res->font.font!=NULL ) {
+	    if ( res->font!=NULL ) {
 		/* We try to do this as we go along, but we wait for a focus */
 		/*  out event to parse changes. Now if the last thing they were*/
 		/*  doing was editing the font, then we might not get a focus */
@@ -925,7 +939,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    ++cnt;
 	if ( res->boxdata!=NULL )
 	    cnt += 3*18 + 8*2;
-	if ( res->font.font )
+	if ( res->font )
 	    cnt+=2;
 	if ( res->inherits_from!=NULL )
 	    cnt+=2;
@@ -1883,11 +1897,11 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    tofree[i].marray[j++] = &tofree[i].colbox;
 	}
 
-	if ( res->font.font!=NULL ) {
-	    if ( res->font.rstr )
-		tofree[i].fontname = copy(res->font.rstr);
-	    else
-		tofree[i].fontname = GFontSpec2String(*res->font.font);
+	if ( res->font!=NULL ) {
+	    if ( res->font->rstr )
+		tofree[i].fontname = copy(res->font->rstr);
+	    else if ( res->font->fi )
+		tofree[i].fontname = GFontSpec2String(res->font->fi);
 
 	    lab[k].text = (unichar_t *) _("Font:");
 	    lab[k].text_is_1byte = true;
@@ -1903,7 +1917,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	    gcd[k].gd.flags = gg_visible|gg_enabled;
 	    gcd[k].gd.cid = tofree[i].fontcid = ++cid;
 	    gcd[k].gd.handle_controlevent = GRE_FontChanged;
-	    gcd[k].data = &res->font;
+	    gcd[k].data = res->font;
 	    gcd[k++].creator = GTextFieldCreate;
 	    tofree[i].fontarray[1] = &gcd[k-1];
 	    tofree[i].fontarray[2] = GCD_Glue;
@@ -2113,7 +2127,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 			tofree[i].earray[hl][7] = NULL;
 			base=0; ++hl;
 		    }
-		    extras->orig.fontval = *(GFont **) (extras->val);
+		    extras->orig.fontval = *(GResFont *) (extras->val);
 		    lab[k].text = (unichar_t *) S_(extras->name);
 		    lab[k].text_is_1byte = true;
 		    gcd[k].gd.label = &lab[k];
@@ -2123,8 +2137,12 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		    gcd[k++].creator = GLabelCreate;
 		    tofree[i].earray[hl][base] = &gcd[k-1];
 
-		    if ( extras->orig.fontval != NULL ) {
-			tofree[i].extradefs[l] = GFontSpec2String( extras->orig.fontval );
+		    if ( extras->orig.fontval.rstr != NULL ) {
+			lab[k].text = (unichar_t *) extras->orig.fontval.rstr;
+			lab[k].text_is_1byte = true;
+			gcd[k].gd.label = &lab[k];
+		    } else if ( extras->orig.fontval.fi != NULL ) {
+			tofree[i].extradefs[l] = GFontSpec2String( extras->orig.fontval.fi );
 			lab[k].text = (unichar_t *) tofree[i].extradefs[l];
 			lab[k].text_is_1byte = true;
 			gcd[k].gd.label = &lab[k];
@@ -2279,7 +2297,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 	if ( tofree[i].sabox.ret!=NULL )
 	    GHVBoxSetExpandableCol(tofree[i].sabox.ret,gb_expandglue);
 	if ( tofree[i].fontbox.ret!=NULL )
-	    GHVBoxSetExpandableCol(tofree[i].fontbox.ret,2);
+	    GHVBoxSetExpandableCol(tofree[i].fontbox.ret,1);
 	if ( res->boxdata!=NULL ) {
 	    GGadgetSelectOneListItem(GWidgetGetControl(gw,tofree[i].btcid),res->boxdata->border_type);
 	    GGadgetSelectOneListItem(GWidgetGetControl(gw,tofree[i].btcid+3),res->boxdata->border_shape);
@@ -2326,7 +2344,7 @@ static struct resed gdrawin_re[] = {
 static GResInfo gdraw_ri = {
     NULL, NULL,NULL, NULL,
     NULL,
-    { NULL, NULL },
+    NULL,
     NULL,
     gdrawcm_re,
     N_("GDraw"),
@@ -2456,10 +2474,6 @@ void GResEditFind( struct resed *resed, char *prefix) {
 	    info[i].type = rt_color;
 	info[i].val = resed[i].val;
 	info[i].cvt = resed[i].cvt;
-	if ( info[i].type==rt_font ) {
-	    info[i].type = rt_string;
-	    info[i].cvt = GResource_font_cvt;
-	}
     }
     GResourceFind(info,prefix);
     for ( i=0; resed[i].name!=NULL; ++i )

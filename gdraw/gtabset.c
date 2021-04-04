@@ -36,7 +36,7 @@
 
 static GBox gtabset_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gvtabset_box = GBOX_EMPTY; /* Don't initialize here */
-static FontInstance *gtabset_font = NULL;
+static GResFont gtabset_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
 static int gtabset_inited = false;
 
 static int GTS_TABPADDING = 25;
@@ -46,7 +46,7 @@ static GResInfo gtabset_ri, gvtabset_ri;
 static GResInfo gtabset_ri = {
     &gvtabset_ri, &ggadget_ri, &gvtabset_ri, NULL,
     &gtabset_box,
-    { NULL, &gtabset_font },
+    &gtabset_font,
     NULL,
     NULL,
     N_("TabSet"),
@@ -66,7 +66,7 @@ static GResInfo gtabset_ri = {
 static GResInfo gvtabset_ri = {
     NULL, &gtabset_ri, &gtabset_ri, NULL,
     &gvtabset_box,
-    { NULL, NULL },
+    NULL,
     NULL,
     NULL,
     N_("VerticalTabSet"),
@@ -93,10 +93,11 @@ return;
     _GGadgetCopyDefaultBox(&gtabset_box);
     gtabset_box.border_width = 1; gtabset_box.border_shape = bs_rect;
     /*gtabset_box.flags = 0;*/
-    _GGadgetInitDefaultBox("GTabSet.",&gtabset_box,&gtabset_ri.font);
+    _GGadgetInitDefaultBox("GTabSet.", &gtabset_box);
+    GResourceFindFont("GTabSet.Font", &gtabset_font);
 
     gvtabset_box = gtabset_box; /* needs this to figure inheritance */
-    _GGadgetInitDefaultBox("GVTabSet.",&gvtabset_box,NULL);
+    _GGadgetInitDefaultBox("GVTabSet.",&gvtabset_box);
 
     gtabset_inited = true;
 }
@@ -863,7 +864,7 @@ GGadget *GTabSetCreate(struct gwindow *base, GGadgetData *gd,void *data) {
 	GTabSetInit();
     gts->g.funcs = &gtabset_funcs;
     _GGadget_Create(&gts->g,base,gd,data, gd->flags&gg_tabset_vert ? &gvtabset_box  : &gtabset_box);
-    gts->font = gtabset_font;
+    gts->font = gtabset_font.fi;
 
     gts->g.takes_input = true; gts->g.takes_keyboard = true; gts->g.focusable = true;
 

@@ -83,7 +83,8 @@ int compact_font_on_open=0;
 int warn_script_unsaved = 0;
 int navigation_mask = 0;		/* Initialized in startui.c */
 
-static char *fv_fontnames = MONO_UI_FAMILIES;
+static int fv_fontpx;
+static GResFont fv_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
 extern void python_call_onClosingFunctions();
 
 #define	FV_LAB_HEIGHT	15
@@ -114,7 +115,7 @@ static unsigned char fontview2_bits[] = {
 
 extern int _GScrollBar_Width;
 
-static int fv_fontsize = 11, fv_fs_init=0;
+static int fv_fs_init=0;
 static Color fvselcol = 0xffff00, fvselfgcol=0x000000;
 Color view_bgcol;
 static Color fvglyphinfocol = 0xff0000;
@@ -5718,10 +5719,8 @@ static GFont *FVCheckFont(FontView *fv,int type) {
     FontRequest rq;
 
     if ( fv->fontset[type]==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = fv_fontnames;
-	rq.point_size = fv_fontsize;
-	rq.weight = 400;
+	memset(&rq, 0, sizeof(rq));
+	GDrawDecomposeFont(fv_font.fi, &rq);
 	rq.style = 0;
 	if (type&_uni_italic)
 	    rq.style |= fs_italic;
@@ -7043,6 +7042,18 @@ return;
     atexit(&FontViewFinishNonStatic);
 }
 
+// These aren't used but exist to make the resource system work.
+static GResFont sans_viewfont = { "400 12pt " SANS_UI_FAMILIES, NULL };
+static GResFont mono_viewfont = { "400 12pt " MONO_UI_FAMILIES, NULL };
+static GResFont serif_viewfont = { "400 12pt " SERIF_UI_FAMILIES, NULL };
+
+static struct resed view_re[] = {
+    {N_("DefaultFont"), "DefaultFont", rt_font, &sans_viewfont, N_("The primary display font family (normally sans-serif) at the normal size for FontView characters"), NULL, { 0 }, 0, 0 },
+    {N_("MonoFont"), "MonoFont", rt_font, &mono_viewfont, N_("A monospace font family at the same size as DefaultFont"), NULL, { 0 }, 0, 0 },
+    {N_("SerifFont"), "SerifFont", rt_font, &serif_viewfont, N_("A font family with serifs at the same size as DefaultFont (for the splash screen)"), NULL, { 0 }, 0, 0 },
+    {N_("Color|Background"), "Background", rt_color, &view_bgcol, N_("Background color for the drawing area of all views"), NULL, { 0 }, 0, 0 },
+    RESED_EMPTY
+};
 static struct resed fontview_re[] = {
     {N_("Glyph Info Color"), "GlyphInfoColor", rt_color, &fvglyphinfocol, N_("Color of the font used to display glyph information in the fontview"), NULL, { 0 }, 0, 0 },
     {N_("Empty Slot FG Color"), "EmptySlotFgColor", rt_color, &fvemtpyslotfgcol, N_("Color used to draw the foreground of empty slots"), NULL, { 0 }, 0, 0 },
@@ -7050,8 +7061,7 @@ static struct resed fontview_re[] = {
     {N_("Selected FG Color"), "SelectedFgColor", rt_color, &fvselfgcol, N_("Color used to draw the foreground of selected glyphs"), NULL, { 0 }, 0, 0 },
     {N_("Changed Color"), "ChangedColor", rt_color, &fvchangedcol, N_("Color used to mark a changed glyph"), NULL, { 0 }, 0, 0 },
     {N_("Hinting Needed Color"), "HintingNeededColor", rt_color, &fvhintingneededcol, N_("Color used to mark glyphs that need hinting"), NULL, { 0 }, 0, 0 },
-    {N_("Font Size"), "FontSize", rt_int, &fv_fontsize, N_("Size (in points) of the font used to display information and glyph labels in the fontview"), NULL, { 0 }, 0, 0 },
-    {N_("Font Family"), "FontFamily", rt_stringlong, &fv_fontnames, N_("A comma separated list of font family names used to display small example images of glyphs over the user designed glyphs"), NULL, { 0 }, 0, 0 },
+    {N_("Font"), "Font", rt_font, &fv_font, N_("Font used to display small example images of glyphs over the user designed glyphs"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
 
@@ -7059,13 +7069,12 @@ static void FVCreateInnards(FontView *fv,GRect *pos) {
     GWindow gw = fv->gw;
     GWindowAttrs wattrs;
     GGadgetData gd;
-    FontRequest rq;
     BDFFont *bdf;
     int as,ds,ld;
     extern int use_freetype_to_rasterize_fv;
     SplineFont *sf = fv->b.sf;
 
-    fv->lab_height = FV_LAB_HEIGHT-13+GDrawPointsToPixels(NULL,fv_fontsize);
+    fv->lab_height = FV_LAB_HEIGHT-13+fv_fontpx;
 
     memset(&gd,0,sizeof(gd));
     gd.pos.y = pos->y; gd.pos.height = pos->height;
@@ -7075,7 +7084,6 @@ static void FVCreateInnards(FontView *fv,GRect *pos) {
     gd.flags = gg_visible|gg_enabled|gg_pos_in_pixels|gg_sb_vert;
     gd.handle_controlevent = FVScroll;
     fv->vsb = GScrollBarCreate(gw,&gd,fv);
-
 
     memset(&wattrs,0,sizeof(wattrs));
     wattrs.mask = wam_events|wam_cursor|wam_backcol;
@@ -7092,11 +7100,7 @@ static void FVCreateInnards(FontView *fv,GRect *pos) {
     GDrawSetGIC(fv->gw,fv->gic,0,20);
 
     fv->fontset = calloc(_uni_fontmax,sizeof(GFont *));
-    memset(&rq,0,sizeof(rq));
-    rq.utf8_family_name = fv_fontnames;
-    rq.point_size = fv_fontsize;
-    rq.weight = 400;
-    fv->fontset[0] = GDrawInstanciateFont(gw,&rq);
+    fv->fontset[0] = fv_font.fi;
     GDrawSetFont(fv->v,fv->fontset[0]);
     GDrawWindowFontMetrics(fv->v,fv->fontset[0],&as,&ds,&ld);
     fv->lab_as = as;
@@ -7121,6 +7125,7 @@ static void FVCreateInnards(FontView *fv,GRect *pos) {
 
 static FontView *FontView_Create(SplineFont *sf, int hide) {
     FontView *fv = (FontView *) __FontViewCreate(sf);
+    FontRequest rq;
     GRect pos;
     GWindow gw;
     GWindowAttrs wattrs;
@@ -7158,7 +7163,7 @@ static FontView *FontView_Create(SplineFont *sf, int hide) {
 
     if ( !fv_fs_init ) {
 	GResEditFind( fontview_re, "FontView.");
-	view_bgcol = GResourceFindColor("View.Background",GDrawGetDefaultBackground(NULL));
+	GResEditFind( view_re, "View.");
 	fv_fs_init = true;
     }
 
@@ -7182,7 +7187,13 @@ static FontView *FontView_Create(SplineFont *sf, int hide) {
     fv->mb = GMenu2BarCreate( gw, &gd, NULL);
     GGadgetGetSize(fv->mb,&gsize);
     fv->mbh = gsize.height;
-    fv->infoh = 1+GDrawPointsToPixels(NULL,fv_fontsize);
+
+    // Reset this static here in case fv_font has changed
+    GDrawDecomposeFont(fv_font.fi, &rq);
+    fv_fontpx = -rq.point_size; // positive means points, negative means pixels
+    if ( fv_fontpx < 0 )
+	fv_fontpx = GDrawPointsToPixels(NULL, -fv_fontpx);
+    fv->infoh = 1+fv_fontpx;
 
     pos.x = 0; pos.y = fv->mbh+fv->infoh;
     FVCreateInnards(fv,&pos);
@@ -7352,15 +7363,11 @@ struct fv_interface gdraw_fv_interface = {
 };
 
 extern GResInfo charview_ri;
-static struct resed view_re[] = {
-    {N_("Color|Background"), "Background", rt_color, &view_bgcol, N_("Background color for the drawing area of all views"), NULL, { 0 }, 0, 0 },
-    RESED_EMPTY
-};
 GResInfo fontview_ri;
 GResInfo view_ri = {
     &fontview_ri, NULL,NULL, NULL,
     NULL,
-    { NULL, NULL },
+    NULL,
     NULL,
     view_re,
     N_("View"),
@@ -7379,7 +7386,7 @@ GResInfo view_ri = {
 GResInfo fontview_ri = {
     &charview_ri, NULL,NULL, NULL,
     NULL,
-    { NULL, NULL },
+    NULL,
     NULL,
     fontview_re,
     N_("FontView"),
@@ -7438,7 +7445,7 @@ void KFFontViewInits(struct kf_dlg *kf,GGadget *drawable) {
     kf->first_fv = __FontViewCreate(kf->sf); kf->first_fv->b.container = (struct fvcontainer *) kf;
     kf->second_fv = __FontViewCreate(kf->sf); kf->second_fv->b.container = (struct fvcontainer *) kf;
 
-    kf->infoh = infoh = 1+GDrawPointsToPixels(NULL,fv_fontsize);
+    kf->infoh = infoh = 1+fv_fontpx;
     kf->first_fv->mbh = kf->mbh;
     pos.x = 0; pos.y = kf->mbh+infoh+kf->fh+4;
     pos.width = 16*kf->first_fv->cbw+1;
@@ -7731,7 +7738,7 @@ char *GlyphSetFromSelection(SplineFont *sf,int def_layer,char *current) {
     ps = sf->display_size; sf->display_size = -24;
     gs.fv = __FontViewCreate(sf);
 
-    infoh = 1+GDrawPointsToPixels(NULL,fv_fontsize);
+    infoh = 1+fv_fontpx;
     gs.fv->mbh = mbh;
     pos.x = 0; pos.y = mbh+infoh;
     pos.width = 16*gs.fv->cbw+1;

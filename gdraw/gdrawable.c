@@ -34,13 +34,12 @@
 #include "gwidget.h"
 
 static GBox gdrawable_box = GBOX_EMPTY; /* Don't initialize here */
-static FontInstance *gdrawable_font = NULL;
 static int gdrawable_inited = false;
 
 static GResInfo gdrawable_ri = {
     NULL, &ggadget_ri, NULL,NULL,
     &gdrawable_box,
-    { NULL, &gdrawable_font },
+    NULL,
     NULL,
     NULL,
     N_("Drawing Area"),
@@ -62,7 +61,7 @@ static void GDrawableInit() {
     _GGadgetCopyDefaultBox(&gdrawable_box);
     gdrawable_box.border_width = gdrawable_box.padding = 0;
     gdrawable_box.border_type = bt_none;
-    _GGadgetInitDefaultBox("GDrawable.",&gdrawable_box,&gdrawable_ri.font);
+    _GGadgetInitDefaultBox("GDrawable.", &gdrawable_box);
     gdrawable_inited = true;
 }
 

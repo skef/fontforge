@@ -29,6 +29,7 @@
 
 #include "fontforgeui.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "gresource.h"
 #include "ustring.h"
 #include "utype.h"
@@ -152,7 +153,6 @@ static void UI_IError(const char *format,...) {
 #define MAX_ERR_LINES	400
 static struct errordata {
     char *errlines[MAX_ERR_LINES];
-    GFont *font;
     int fh, as;
     GGadget *vsb;
     GWindow gw, v;
@@ -162,6 +162,8 @@ static struct errordata {
     int start_l, start_c, end_l, end_c;
     int down;
 } errdata;
+
+static GResFont errfont = { "400 10pt " SANS_UI_FAMILIES, NULL };
 
 static void ErrHide(void) {
     GDrawSetVisible(errdata.gw,false);
@@ -338,7 +340,7 @@ return( ret );
 static void MouseToPos(GEvent *event,int *_l, int *_c) {
     int l,c=0;
 
-    GDrawSetFont(errdata.v,errdata.font);
+    GDrawSetFont(errdata.v,errfont.fi);
     l = event->u.mouse.y/errdata.fh + errdata.offtop;
     if ( l>=errdata.cnt ) {
 	l = errdata.cnt-1;
@@ -396,7 +398,7 @@ return( GGadgetDispatchEvent(errdata.vsb,event));
     switch ( event->type ) {
       case et_expose:
 	  /*GDrawFillRect(gw,&event->u.expose.rect,GDrawGetDefaultBackground(NULL));*/
-	  GDrawSetFont(gw,errdata.font);
+	  GDrawSetFont(gw,errfont.fi);
 	  s_l = errdata.start_l, s_c = errdata.start_c, e_l = errdata.end_l, e_c = errdata.end_c;
 	  if ( s_l>e_l ) {
 		  s_l = e_l; s_c = e_c; e_l = errdata.start_l; e_c = errdata.start_c;
@@ -474,7 +476,6 @@ return( true );
 
 static void CreateErrorWindow(void) {
     GWindowAttrs wattrs;
-    FontRequest rq;
     GRect pos,size;
     int as, ds, ld;
     GWindow gw;
@@ -496,13 +497,8 @@ static void CreateErrorWindow(void) {
     pos.y = size.height - pos.height - 30;
     errdata.gw = gw = GDrawCreateTopWindow(NULL,&pos,warnings_e_h,&errdata,&wattrs);
 
-    memset(&rq,0,sizeof(rq));
-    rq.utf8_family_name = SANS_UI_FAMILIES;
-    rq.point_size = 10;
-    rq.weight = 400;
-    errdata.font = GDrawInstanciateFont(NULL,&rq);
-    errdata.font = GResourceFindFont("Warnings.Font",errdata.font);
-    GDrawWindowFontMetrics(errdata.gw,errdata.font,&as,&ds,&ld);
+    GResourceFindFont("Warnings.Font", &errfont);
+    GDrawWindowFontMetrics(errdata.gw,errfont.fi,&as,&ds,&ld);
     errdata.as = as;
     errdata.fh = as+ds;
 

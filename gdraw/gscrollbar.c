@@ -51,7 +51,7 @@ static GResInfo gthumb_ri;
 static GResInfo gscrollbar_ri = {
     &gthumb_ri, &ggadget_ri,&gthumb_ri, NULL,
     &scrollbar_box,
-    { NULL, NULL },
+    NULL,
     &scrollbarbox,
     NULL,
     N_("ScrollBar"),
@@ -70,7 +70,7 @@ static GResInfo gscrollbar_ri = {
 static GResInfo gthumb_ri = {
     NULL, &ggadget_ri,&gscrollbar_ri, NULL,
     &thumb_box,
-    { NULL, NULL },
+    NULL,
     &scrollbarbox,
     NULL,
     N_("SB Thumb"),
@@ -501,8 +501,8 @@ static void GScrollBarInit() {
     thumb_box.main_background = GDrawColorDarken(thumb_box.main_background,0x8);
     thumb_box.border_width = 1;
     thumb_box.padding = 0;
-    _GGadgetInitDefaultBox("GScrollBar.",&scrollbar_box,NULL);
-    _GGadgetInitDefaultBox("GScrollBarThumb.",&thumb_box,NULL);
+    _GGadgetInitDefaultBox("GScrollBar.",&scrollbar_box);
+    _GGadgetInitDefaultBox("GScrollBarThumb.",&thumb_box);
     _GScrollBar_Width = GResourceFindInt("GScrollBar.Width",_GScrollBar_Width);
     _GScrollBar_StartTime = GResourceFindInt("GScrollBar.StartupTime",_GScrollBar_StartTime);
     _GScrollBar_RepeatTime = GResourceFindInt("GScrollBar.RepeatTime",_GScrollBar_RepeatTime);

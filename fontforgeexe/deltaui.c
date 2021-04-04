@@ -33,6 +33,7 @@
 #include "fontforgeui.h"
 #include "gimage.h"
 #include "gkeysym.h"
+#include "gresedit.h"
 #include "ustring.h"
 #include "utype.h"
 
@@ -962,9 +963,8 @@ static void StartDeltaDisplay(QGData *qg) {
 	    *varray[4];
     GTextInfo label[8];
     int i, k;
-    FontRequest rq;
     int as, ds, ld;
-    static GFont *valfont=NULL;
+    static GResFont valfont = { "400 11pt " SANS_UI_FAMILIES, NULL };
     static int sorts_translated = 0;
 
     if (!sorts_translated)
@@ -989,15 +989,8 @@ static void StartDeltaDisplay(QGData *qg) {
     qg->gw = gw = GDrawCreateTopWindow(NULL,&pos,qg_e_h,qg,&wattrs);
     qg->done = false;
 
-    if ( valfont==NULL ) {
-	memset(&rq,0,sizeof(rq));
-	rq.utf8_family_name = "Helvetica";
-	rq.point_size = 11;
-	rq.weight = 400;
-	valfont = GDrawInstanciateFont(gw,&rq);
-	valfont = GResourceFindFont("Validate.Font",valfont);
-    }
-    qg->font = valfont;
+    GResourceFindFont("Validate.Font", &valfont);
+    qg->font = valfont.fi;
     GDrawWindowFontMetrics(gw,qg->font,&as,&ds,&ld);
     qg->fh = as+ds;
     qg->as = as;
