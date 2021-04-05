@@ -50,6 +50,8 @@
 
 extern int lookup_hideunused;
 
+GResFont glyphinfo_font = { "400 12pt " MONO_UI_FAMILIES, NULL };
+
 static int last_gi_aspect = 0;
 
 typedef struct charinfo {
@@ -4337,7 +4339,6 @@ void SCCharInfo(SplineChar *sc,int deflayer, EncMap *map,int enc) {
     GTabInfo aspects[17];
     static GBox smallbox = { bt_raised, bs_rect, 2, 1, 0, 0, 0, 0, 0, 0, COLOR_DEFAULT, COLOR_DEFAULT, 0, 0, 0, 0, 0, 0, 0 };
     static int boxset=0;
-    static GResFont font = { "400 12pt " MONO_UI_FAMILIES, NULL };
 
     CharInfoInit();
 
@@ -5275,10 +5276,10 @@ return;
 
 	GHVBoxFitWindow(mbox[0].ret);
 
-	GResourceFindFont("GlyphInfo.Font", &font);
+	GResourceFindFont("GlyphInfo.Font", &glyphinfo_font);
 
 	for ( i=0; i<5; ++i )
-	    GGadgetSetFont(psgcd[i][0].ret,font.fi);
+	    GGadgetSetFont(psgcd[i][0].ret,glyphinfo_font.fi);
 	for ( i=0; i<2; ++i ) {
 	    GCompletionFieldSetCompletion(vargcd[i][1].ret,CI_GlyphNameCompletion);
 	    GCompletionFieldSetCompletionMode(vargcd[i][1].ret,true);

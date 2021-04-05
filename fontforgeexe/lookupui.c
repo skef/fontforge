@@ -58,6 +58,8 @@ void SFUntickAllPSTandKern(SplineFont *sf);
 int kernsLength( KernPair *kp );
 
 static int DEBUG = 1;
+GResFont kernformat_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
+GResFont kernformat_boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
 
 /* ************************************************************************** */
 /* ******************************* UI routines ****************************** */
@@ -5807,8 +5809,6 @@ static int kern_format_dlg( SplineFont *sf, int def_layer,
     int i,j, guts_row;
     /* Returns are 0=>Pairs, 1=>Classes, 2=>Cancel */
     int as, ds, ld;
-    static GResFont plainfont = { "400 12pt " SANS_UI_FAMILIES, NULL };
-    static GResFont boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
 
     if ( sub->separation==0 && !sub->kerning_by_touch ) {
 	sub->separation = sf->width_separation;
@@ -5842,9 +5842,10 @@ static int kern_format_dlg( SplineFont *sf, int def_layer,
     pos.height = 100;
     kf.gw = GDrawCreateTopWindow(NULL,&pos,kf_e_h,&kf,&wattrs);
 
-    GResourceFindFont("KernFormat.Font", &plainfont);
-    GResourceFindFont("KernFormat.BoldFont", &boldfont);
-    kf.plain = plainfont.fi; kf.bold = boldfont.fi;
+    GResourceFindFont("KernFormat.Font", &kernformat_font);
+    GResourceFindFont("KernFormat.BoldFont", &kernformat_boldfont);
+    kf.plain = kernformat_font.fi;
+    kf.bold = kernformat_boldfont.fi;
     GDrawWindowFontMetrics(kf.gw,kf.plain,&as,&ds,&ld);
     kf.fh = as+ds; kf.as = as;
 

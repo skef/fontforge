@@ -596,13 +596,6 @@ will look at it.
    cloverleaf) key to control the menu (rather than the Control key). If this is
    set then the command key will be mapped to the control key internally.
 
-.. object:: Gdraw.MultiClickWiggle
-
-   An integer (pixels)
-
-   The maximum number of pixels the mouse is allowed to move between two clicks
-   and have them still be considered a double click.
-
 .. _xres.Keyboard:
 
 .. object:: Gdraw.Keyboard

@@ -31,6 +31,7 @@
 #include "fontforgeui.h"
 #include "gkeysym.h"
 #include "gresource.h"
+#include "gresedit.h"
 #include "splineorder2.h"
 #include "splineutil.h"
 #include "ustring.h"
@@ -39,6 +40,8 @@
 
 extern GBox _ggadget_Default_Box;
 #define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
+
+GResFont debugview_font = { "400 12px " SANS_UI_FAMILIES, NULL };
 
 int debug_wins = dw_registers|dw_stack;
 
@@ -2070,7 +2073,6 @@ void CVDebugReInit(CharView *cv,int restart_debug,int dbg_fpgm) {
     extern int _GScrollBar_Width;
     double scalex, scaley;
     int i;
-    static GResFont monofont = { "400 12px " SANS_UI_FAMILIES, NULL };
 
     scalex = (cv->b.sc->parent->ascent+cv->b.sc->parent->descent)/(rint(cv->ft_pointsizex*cv->ft_dpi/72.0)) / (1<<6);
     scaley = (cv->b.sc->parent->ascent+cv->b.sc->parent->descent)/(rint(cv->ft_pointsizey*cv->ft_dpi/72.0)) / (1<<6);
@@ -2205,9 +2207,9 @@ return;
 	dv->ii.v = GWidgetCreateSubWindow(dv->dv,&pos,ii_v_e_h,&dv->ii,&wattrs);
 	dv->ii.instrdata = &dv->id;
 
-	GResourceFindFont("DebugView.Font", &monofont);
+	GResourceFindFont("DebugView.Font", &debugview_font);
 
-	dv->ii.gfont = monofont.fi;
+	dv->ii.gfont = debugview_font.fi;
 	GDrawSetFont(dv->ii.v,dv->ii.gfont);
 	GDrawWindowFontMetrics(dv->ii.v,dv->ii.gfont,&as,&ds,&ld);
 	dv->ii.as = as+1;

@@ -50,6 +50,8 @@
 #define CID_Cancel	106
 #define CID_Top		107
 
+extern GResFont validate_font;
+
 static double delta_within = .02;
 static char *delta_sizes=NULL;
 static int delta_dpi = 100;
@@ -964,7 +966,6 @@ static void StartDeltaDisplay(QGData *qg) {
     GTextInfo label[8];
     int i, k;
     int as, ds, ld;
-    static GResFont valfont = { "400 11pt " SANS_UI_FAMILIES, NULL };
     static int sorts_translated = 0;
 
     if (!sorts_translated)
@@ -989,8 +990,8 @@ static void StartDeltaDisplay(QGData *qg) {
     qg->gw = gw = GDrawCreateTopWindow(NULL,&pos,qg_e_h,qg,&wattrs);
     qg->done = false;
 
-    GResourceFindFont("Validate.Font", &valfont);
-    qg->font = valfont.fi;
+    GResourceFindFont("Validate.Font", &validate_font);
+    qg->font = validate_font.fi;
     GDrawWindowFontMetrics(gw,qg->font,&as,&ds,&ld);
     qg->fh = as+ds;
     qg->as = as;

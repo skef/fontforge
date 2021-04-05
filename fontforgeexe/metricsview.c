@@ -71,6 +71,8 @@ static Color selglyphcol = 0x909090;
 static Color kernlinecol = 0x008000;
 static Color rbearinglinecol = 0x000080;
 
+static GResFont mv_font = { "400 12px " SANS_UI_FAMILIES, NULL };
+
 int pref_mv_shift_and_arrow_skip = 10;
 int pref_mv_control_shift_and_arrow_skip = 5;
 
@@ -5200,7 +5202,6 @@ MetricsView *MetricsViewCreate(FontView *fv,SplineChar *sc,BDFFont *bdf) {
     GTextInfo label;
     int i,j,cnt;
     int as,ds,ld;
-    static GResFont mvfont = { "400 12px " SANS_UI_FAMILIES, NULL };
     SplineFont *master = fv->b.sf->cidmaster ? fv->b.sf->cidmaster : fv->b.sf;
 
     MetricsViewInit();
@@ -5261,8 +5262,8 @@ MetricsView *MetricsViewCreate(FontView *fv,SplineChar *sc,BDFFont *bdf) {
     gd.flags = gg_visible|gg_enabled|gg_pos_in_pixels|gg_sb_vert;
     mv->vsb = GScrollBarCreate(gw,&gd,mv);
 
-    GResourceFindFont("MetricsView.Font", &mvfont);
-    mv->font = mvfont.fi;
+    GResourceFindFont("MetricsView.Font", &mv_font);
+    mv->font = mv_font.fi;
     GDrawWindowFontMetrics(gw,mv->font,&as,&ds,&ld);
     mv->fh = as+ds; mv->as = as;
 
@@ -5462,10 +5463,11 @@ static struct resed metricsview_re[] = {
     {N_("Selected Glyph Col"), "SelectedGlyphColor", rt_color, &selglyphcol, N_("Color used to mark the selected glyph"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
+extern GResInfo miscfonts_ri;
 GResInfo metricsview_ri = {
-    NULL, NULL,NULL, NULL,
+    &miscfonts_ri, NULL,NULL, NULL,
     NULL,
-    NULL,
+    &mv_font,
     NULL,
     metricsview_re,
     N_("MetricsView"),

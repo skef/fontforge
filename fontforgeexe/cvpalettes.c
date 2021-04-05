@@ -105,8 +105,8 @@ static GCursor tools[cvt_max+1] = { ct_pointer }, spirotools[cvt_max+1];
 enum cvtools cv_b1_tool = cvt_pointer, cv_cb1_tool = cvt_pointer,
 	     cv_b2_tool = cvt_magnify, cv_cb2_tool = cvt_ruler;
 
-static GResFont toolsfont = { "400 10px " SANS_UI_FAMILIES, NULL };
-static GResFont layersfont = { "400 10px " SANS_UI_FAMILIES, NULL };
+GResFont toolspalette_font = { "400 10px " SANS_UI_FAMILIES, NULL };
+GResFont layerspalette_font = { "400 10px " SANS_UI_FAMILIES, NULL };
 
 #define CV_LAYERS_WIDTH		104
 #define CV_LAYERS_HEIGHT	100
@@ -1085,7 +1085,7 @@ static void ToolsExpose(GWindow pixmap, CharView *cv, GRect *r) {
     int bottomOfMainIconsY = d.maxicony + d.lastIconHeight;
     
     
-    GDrawSetFont(pixmap,toolsfont.fi);
+    GDrawSetFont(pixmap,toolspalette_font.fi);
     temp.x = 52-16;
     temp.y = bottomOfMainIconsY;
     temp.width = 16;
@@ -1505,7 +1505,7 @@ return( cvtools );
 	/* Success! They've got a wacom tablet */
     }
 
-    GResourceFindFont("ToolsPalette.Font", &toolsfont);
+    GResourceFindFont("ToolsPalette.Font", &toolspalette_font);
 
     if ( cvvisible[1])
 	SetPaletteVisible(cv->gw, cvtools,true);
@@ -2023,11 +2023,11 @@ return;
     memset(&label,0,sizeof(label));
     memset(&gcd,0,sizeof(gcd));
 
-    GResourceFindFont("LayersPalette.Font", &layersfont);
+    GResourceFindFont("LayersPalette.Font", &layerspalette_font);
 
     for ( i=0; i<sizeof(label)/sizeof(label[0]); ++i )
-	label[i].font = layersfont.fi;
-    layer2.font = layersfont.fi;
+	label[i].font = layerspalette_font.fi;
+    layer2.font = layerspalette_font.fi;
 
     gcd[0].gd.pos.width = GDrawPointsToPixels(cv->gw,_GScrollBar_Width);
     gcd[0].gd.pos.x = CV_LAYERS2_WIDTH-gcd[0].gd.pos.width;
@@ -3251,8 +3251,8 @@ return( cvlayers );
     if ( layerinfo.clut==NULL )
 	layerinfo.clut = _BDFClut(4);
 
-    GResourceFindFont("LayersPalette.Font", &layersfont);
-    layerinfo.font = layersfont.fi;
+    GResourceFindFont("LayersPalette.Font", &layerspalette_font);
+    layerinfo.font = layerspalette_font.fi;
 
      /* Initialize palette window */
     memset(&wattrs,0,sizeof(wattrs));
@@ -3998,9 +3998,9 @@ return(bvlayers);
     memset(&gcd,0,sizeof(gcd));
     memset(&boxes,0,sizeof(boxes));
 
-    GResourceFindFont("LayersPalette.Font", &layersfont);
+    GResourceFindFont("LayersPalette.Font", &layerspalette_font);
     for ( i=0; i<sizeof(label)/sizeof(label[0]); ++i )
-	label[i].font = layersfont.fi;
+	label[i].font = layerspalette_font.fi;
 
 /* GT: Abbreviation for "Visible" */
     label[0].text = (unichar_t *) _("V");

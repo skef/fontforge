@@ -58,7 +58,9 @@
 /*   use approximate spline from points to find the new splines */
 /* Complications: */
 /*  There may not be an integral number of tiles, so we must be prepared to truncate some splines */
-
+    
+GResFont tilepath_font = { "400 12pt " SANS_UI_FAMILIES, NULL },
+GResFont tilepath_boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
 typedef struct tiledata {
     SplineSet *basetile;	/* Moved so that ymin==0, and x is adjusted */
 				/*  about the x-axis as implied by tilepos */
@@ -1059,8 +1061,6 @@ static int TileAsk(struct tiledata *td,SplineFont *sf) {
     GTextInfo label[24];
     int as, ds, ld;
     int i,k;
-    static GResFont font = { "400 12pt " SANS_UI_FAMILIES, NULL },
-    static GResFont bold = { "700 12pt " SANS_UI_FAMILIES, NULL };
 
     TPDInit( &tpd,sf );
     tpd.td = td;
@@ -1078,10 +1078,10 @@ static int TileAsk(struct tiledata *td,SplineFont *sf) {
     pos.height = 300;
     tpd.gw = gw = GDrawCreateTopWindow(NULL,&pos,tpd_e_h,&tpd.cv_first,&wattrs);
 
-    GResourceFindFont("TilePath.Font",font);
-    GResourceFindFont("TilePath.BoldFont",bold);
-    tpd.plain = font.fi;
-    tpd.bold = bold.fi;
+    GResourceFindFont("TilePath.Font",tilepath_font);
+    GResourceFindFont("TilePath.BoldFont",tilepath_boldfont);
+    tpd.plain = tilepath_font.fi;
+    tpd.bold = tilepath_boldfont.fi;
     GDrawWindowFontMetrics(tpd.gw,tpd.plain,&as,&ds,&ld);
     tpd.fh = as+ds; tpd.as = as;
 

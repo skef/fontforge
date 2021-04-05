@@ -55,6 +55,8 @@ static SearchView *searcher=NULL;
 #define CID_Fuzzy	1011
 #define CID_Endpoints	1012
 
+GResFont searchview_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
+GResFont searchview_boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
 static double old_fudge = .001;
 
 static void SVSelectSC(SearchView *sv) {
@@ -648,8 +650,6 @@ SearchView *SVCreate(FontView *fv) {
     int as, ds, ld;
     char fudgebuf[20];
     int k, sel_pos, efdo_pos;
-    static GResFont plainfont = { "400 12pt " SANS_UI_FAMILIES, NULL };
-    static GResFont boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
 
     if ( searcher!=NULL ) {
 	if ( SVAttachFV(fv,true)) {
@@ -676,9 +676,10 @@ return( NULL );
     sv->gw = gw = GDrawCreateTopWindow(NULL,&pos,sv_e_h,&sv->cv_srch,&wattrs);
     SVSetTitle(sv);
 
-    GResourceFindFont("SearchView.Font", &plainfont);
-    GResourceFindFont("SearchView.BoldFont", &boldfont);
-    sv->plain = plainfont.fi; sv->bold = boldfont.fi;
+    GResourceFindFont("SearchView.Font", &searchview_font);
+    GResourceFindFont("SearchView.BoldFont", &searchview_boldfont);
+    sv->plain = searchview_font.fi;
+    sv->bold = searchview_boldfont.fi;
     GDrawWindowFontMetrics(sv->gw,sv->plain,&as,&ds,&ld);
     sv->fh = as+ds; sv->as = as;
 

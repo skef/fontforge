@@ -47,13 +47,19 @@ static GGadgetCreateData scrollbar_gcd[] = {
 static GGadgetCreateData *sarray[] = { GCD_Glue, &scrollbar_gcd[0], GCD_Glue, &scrollbar_gcd[1], GCD_Glue, NULL, NULL };
 static GGadgetCreateData scrollbarbox =
     { GHVGroupCreate, { { 2, 2, 0, 0 }, NULL, 0, 0, 0, 0, 0, NULL, { (GTextInfo *) sarray }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL };
+static struct resed gscrollbar_re[] = {
+    {N_("Start Time"), "StartTime", rt_int, &_GScrollBar_StartTime, N_("Time (in milliseconds) before scrolling starts"), NULL, { 0 }, 0, 0 },
+    {N_("Repeat Time"), "RepeatTime", rt_int, &_GScrollBar_RepeatTime, N_("Time (in milliseconds) between scroll events"), NULL, { 0 }, 0, 0 },
+    {N_("Width"), "Width", rt_int, &_GScrollBar_Width, NULL, NULL, { 0 }, 0, 0 },
+    RESED_EMPTY
+};
 static GResInfo gthumb_ri;
 static GResInfo gscrollbar_ri = {
     &gthumb_ri, &ggadget_ri,&gthumb_ri, NULL,
     &scrollbar_box,
     NULL,
     &scrollbarbox,
-    NULL,
+    gscrollbar_re,
     N_("ScrollBar"),
     N_("Scroll Bar"),
     "GScrollBar",

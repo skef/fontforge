@@ -65,6 +65,8 @@ extern GBox _ggadget_Default_Box;
 #define ACTIVE_BORDER   (_ggadget_Default_Box.active_border)
 #define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
 
+GResFont fontinfo_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
+
 static int last_aspect=0;
 
 GTextInfo emsizes[] = {
@@ -7492,7 +7494,6 @@ void FontInfo(SplineFont *sf,int deflayer,int defaspect,int sync) {
     int ltype;
     static GBox small_blue_box;
     extern GBox _GGadget_button_box;
-    static GResFont fi_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
     char *copied_copyright;
 
     FontInfoInit();
@@ -10803,8 +10804,8 @@ return;
     OS2_UnicodeChange(GWidgetGetControl(gw,CID_UnicodeRanges),NULL);
     OS2_CodePageChange(GWidgetGetControl(gw,CID_CodePageRanges),NULL);
 
-    GResourceFindFont("FontInfo.Font", &fi_font);
-    d->font = fi_font.fi;
+    GResourceFindFont("FontInfo.Font", &fontinfo_font);
+    d->font = fontinfo_font.fi;
     GDrawWindowFontMetrics(gw,d->font,&as,&ds,&ld);
     d->as = as; d->fh = as+ds;
 

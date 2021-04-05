@@ -72,16 +72,38 @@ static int popup_delay=1000, popup_lifetime=20000;
 
 static GResInfo popup_ri;
 static struct resed ggadget_re[] = {
+    {N_("Skip"), "Skip", rt_int, &_GGadget_Skip, N_("Space (in points) to skip between gadget elements"), NULL, { 0 }, 0, 0 },
+    {N_("Line Skip"), "LineSkip", rt_int, &_GGadget_LineSkip, N_("Space (in points) to skip after a line"), NULL, { 0 }, 0, 0 },
+    {N_("First Line Skip"), "FirstLine", rt_int, &_GGadget_FirstLine, N_("Space (in points) before a line when it is the first element"), NULL, { 0 }, 0, 0 },
+    {N_("Left Margin"), "LeftMargin", rt_int, &_GGadget_LeftMargin, N_("The default left margin (in points)"), NULL, { 0 }, 0, 0 },
     {N_("Text Image Skip"), "TextImageSkip", rt_int, &_GGadget_TextImageSkip, N_("Space (in points) left between images and text in labels, buttons, menu items, etc. which have both"), NULL, { 0 }, 0, 0 },
     {N_("Image Path"), "ImagePath", rt_stringlong, &_GGadget_ImagePath, N_("List of directories to search for images, separated by colons"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
-GResInfo ggadget_ri = {
+GResInfo ggadget2_ri = {
     &listmark_ri, NULL,NULL, NULL,
+    NULL,
+    NULL,
+    NULL,
+    ggadget_re,
+    N_("GGadget 2"),
+    N_("More configuration parameters for the \"abstract\" gadget."),
+    "GGadget",
+    "Gdraw",
+    false,
+    0,
+    NULL,
+    GBOX_EMPTY,
+    NULL,
+    NULL,
+    NULL
+};
+GResInfo ggadget_ri = {
+    &ggadget2_ri, NULL,NULL, NULL,
     &_ggadget_Default_Box,
     &_ggadget_default_font,
     NULL,
-    ggadget_re,
+    NULL,
     N_("GGadget"),
     N_("This is an \"abstract\" gadget. It will never appear on the screen\nbut it is the root of gadget tree from which all others inherit"),
     "GGadget",
@@ -214,7 +236,7 @@ static int _GResToFontRequest(const char *resname, FontRequest *rq, GHashTable *
 	top_level = true;
     }
 
-    memset(rq,0,sizeof(rq));
+    memset(rq,0,sizeof(*rq));
     memset(&rel_rq,0,sizeof(rel_rq));
     rq->weight = 400;
 

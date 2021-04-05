@@ -3867,15 +3867,8 @@ static void GXResourceInit(GXDisplay *gdisp,char *programname) {
     Atom rmatom, type;
     int format, i; unsigned long nitems, bytes_after;
     unsigned char *ret = NULL;
-    GResStruct res[21];
-    int dithertemp; double sizetemp, sizetempcm;
-    int depth = -1, vc = -1, cm=-1, cmpos;
-    int tbf = 1;
-#if __Mac
-    int mxc = 1;	/* Don't leave this on by default. The cmd key uses the same bit as numlock on other systems */
-#else
-    int mxc = 0;
-#endif
+    GResStruct res[4];
+    int depth = -1, vc = -1, cm=-1;
 
     rmatom = XInternAtom(gdisp->display,"RESOURCE_MANAGER",true);
     if ( rmatom!=None ) {
@@ -3892,42 +3885,28 @@ static void GXResourceInit(GXDisplay *gdisp,char *programname) {
     GResourceAddResourceString((char *) ret,programname);
     if ( ret!=NULL ) XFree(ret);
 
+    GDrawResourceFind();
+    gdisp->def_background = _GDraw_res_bg;
+    gdisp->def_foreground = _GDraw_res_fg;
+    gdisp->bs.double_time = _GDraw_res_multiclicktime;
+    gdisp->bs.double_wiggle = _GDraw_res_multiclickwiggle;
+    gdisp->bs.SelNotifyTimeout = _GDraw_res_selnottime;
+    gdisp->macosx_cmd = _GDraw_res_macoscmd;
+    gdisp->twobmouse_win = _GDraw_res_twobuttonfixup;
+    gdisp->res = _GDraw_res_res>0 ? _GDraw_res_res : 100
+    if ( _GDraw_res_synchronize )
+        XSynchronize(gdisp->display,true);
+
     memset(res,0,sizeof(res));
     i = 0;
-    res[i].resname = "MultiClickTime"; res[i].type = rt_int; res[i].val = &gdisp->bs.double_time; ++i;
-    res[i].resname = "MultiClickWiggle"; res[i].type = rt_int; res[i].val = &gdisp->bs.double_wiggle; ++i;
-    res[i].resname = "SelectionNotifyTimeout"; res[i].type = rt_int; res[i].val = &gdisp->SelNotifyTimeout; ++i;
-    dithertemp = gdisp->do_dithering;
-    res[i].resname = "DoDithering"; res[i].type = rt_bool; res[i].val = &dithertemp; ++i;
-    res[i].resname = "ScreenWidthPixels"; res[i].type = rt_int; res[i].val = &gdisp->groot->pos.width; ++i;
-    res[i].resname = "ScreenHeightPixels"; res[i].type = rt_int; res[i].val = &gdisp->groot->pos.height; ++i;
-    sizetemp = WidthMMOfScreen(DefaultScreenOfDisplay(gdisp->display))/25.4;
-    sizetempcm = WidthMMOfScreen(DefaultScreenOfDisplay(gdisp->display))/10;
-    gdisp->xres = gdisp->groot->pos.width/sizetemp;
-    res[i].resname = "ScreenWidthInches"; res[i].type = rt_double; res[i].val = &sizetemp; ++i;
-    cmpos = i;
-    res[i].resname = "ScreenWidthCentimeters"; res[i].type = rt_double; res[i].val = &sizetempcm; ++i;
     res[i].resname = "Depth"; res[i].type = rt_int; res[i].val = &depth; ++i;
     res[i].resname = "VisualClass"; res[i].type = rt_string; res[i].val = &vc; res[i].cvt=vc_cvt; ++i;
-    res[i].resname = "TwoButtonFixup"; res[i].type = rt_bool; res[i].val = &tbf; ++i;
-    res[i].resname = "MacOSXCmd"; res[i].type = rt_bool; res[i].val = &mxc; ++i;
     res[i].resname = "Colormap"; res[i].type = rt_string; res[i].val = &cm; res[i].cvt=cm_cvt; ++i;
     res[i].resname = NULL;
     GResourceFind(res,NULL);
 
-    if ( !res[cmpos].found && !res[cmpos-1].found && rint(gdisp->groot->pos.width/sizetemp) == 75 )
-	gdisp->res = 100;	/* X seems to think that if it doesn't know */
-				/*  the screen width, then 75 dpi is a good guess */
-			        /*  Now-a-days, 100 seems better */
-    else
-    if ( res[cmpos].found && sizetempcm>=1 )
-	gdisp->res = gdisp->groot->pos.width*2.54/sizetempcm;
-    else if ( sizetemp>=1 )
-	gdisp->res = gdisp->groot->pos.width/sizetemp;
     gdisp->desired_depth = depth; gdisp->desired_vc = vc;
     gdisp->desired_cm = cm;
-    gdisp->macosx_cmd = mxc;
-    gdisp->twobmouse_win = tbf;
 }
 
 static struct displayfuncs xfuncs = {
@@ -4150,12 +4129,6 @@ return( NULL );
     groot->is_visible = true;
     
     GXResourceInit(gdisp,programname);
-
-    gdisp->bs.double_time = GResourceFindInt( "DoubleClickTime", gdisp->bs.double_time );
-    gdisp->def_background = GResourceFindColor( "Background", COLOR_CREATE(0xf5,0xff,0xfa));
-    gdisp->def_foreground = GResourceFindColor( "Foreground", COLOR_CREATE(0x00,0x00,0x00));
-    if ( GResourceFindBool("Synchronize", false ))
-	XSynchronize(gdisp->display,true);
 
 #ifdef X_HAVE_UTF8_STRING	/* Don't even try without this. I don't want to have to guess encodings myself... */
     /* X Input method initialization */

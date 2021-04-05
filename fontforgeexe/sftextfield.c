@@ -47,6 +47,25 @@ static GResFont sftextarea_font = { "400 10pt " MONO_UI_FAMILIES, NULL };
 static unichar_t nullstr[] = { 0 }, 
 	newlinestr[] = { '\n', 0 }, tabstr[] = { '\t', 0 };
 
+GResInfo sftextarea_ri = {
+    NULL, &ggadget_ri,NULL, NULL,
+    &sftextarea_box,
+    &sftextarea_font,
+    NULL,
+    NULL,
+    N_("SFTextArea"),
+    N_("SFTextArea"),
+    "SFTextArea",
+    "fontforge",
+    false,
+    0,
+    NULL,
+    GBOX_EMPTY,
+    NULL,
+    NULL,
+    NULL
+};
+
 static int SFTextArea_Show(SFTextArea *st, int pos);
 static void GTPositionGIC(SFTextArea *st);
 

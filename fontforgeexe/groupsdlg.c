@@ -40,7 +40,7 @@
 #include <math.h>
 #include <unistd.h>
 
-
+GResFont groups_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
 
 /******************************************************************************/
 /******************************** Group Widget ********************************/
@@ -555,10 +555,9 @@ static void GroupWCreate(struct groupdlg *grp,GRect *pos) {
     GTextInfo label[4];
     int sbsize = GDrawPointsToPixels(NULL,_GScrollBar_Width);
     GWindowAttrs wattrs;
-    static GResFont font = { "400 12pt " SANS_UI_FAMILIES, NULL };
 
-    GResourceFindFont("Groups.Font", &font);
-    grp->font = font.fi;
+    GResourceFindFont("Groups.Font", &groups_font);
+    grp->font = groups_font.fi;
     GDrawWindowFontMetrics(grp->gw,grp->font,&as,&ds,&ld);
     grp->fh = as+ds; grp->as = as;
 

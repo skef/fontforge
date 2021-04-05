@@ -339,7 +339,7 @@ static int ruler_linger_e_h(GWindow gw, GEvent *event) {
 return( true );
 }
 	
-static GResFont rvfont = { "400 12px " MONO_UI_FAMILIES, NULL };
+GResFont cv_measuretoolfont = { "400 12px " MONO_UI_FAMILIES, NULL };
 
 /*
  * Comparison function for use with qsort.
@@ -464,8 +464,8 @@ static void RulerPlace(CharView *cv, GEvent *event) {
 	pos.x = pos.y = 0; pos.width=pos.height = 20;
 	cv->ruler_w = GWidgetCreateTopWindow(NULL,&pos,ruler_e_h,cv,&wattrs);
 
-	GResourceFindFont("CharView.Measure.Font", &rvfont);
-	cv->rfont = rvfont.fi;
+	GResourceFindFont("CharView.MeasureToolFont", &cv_measuretoolfont);
+	cv->rfont = cv_measuretoolfont.fi;
 	GDrawWindowFontMetrics(cv->ruler_w,cv->rfont,&as,&ds,&ld);
 	cv->rfh = as+ds; cv->ras = as;
     } else
@@ -538,8 +538,8 @@ static void RulerLingerPlace(CharView *cv, GEvent *event) {
 	pos.x = pos.y = 0; pos.width=pos.height = 20;
 	cv->ruler_linger_w = GWidgetCreateTopWindow(NULL,&pos,ruler_linger_e_h,cv,&wattrs);
 
-	GResourceFindFont("CharView.Measure.Font", &rvfont);
-	cv->rfont = rvfont.fi;
+	GResourceFindFont("CharView.MeasureToolFont", &cv_measuretoolfont);
+	cv->rfont = cv_measuretoolfont.fi;
 	GDrawWindowFontMetrics(cv->ruler_linger_w,cv->rfont,&as,&ds,&ld);
 	cv->rfh = as+ds; cv->ras = as;
     } else
@@ -819,8 +819,8 @@ static void CpInfoPlace(CharView *cv, GEvent *event) {
 	pos.x = pos.y = 0; pos.width=pos.height = 20;
 	cv->ruler_w = GWidgetCreateTopWindow(NULL,&pos,cpinfo_e_h,cv,&wattrs);
 
-	GResourceFindFont("CharView.Measure.Font", &rvfont);
-	cv->rfont = rvfont.fi;
+	GResourceFindFont("CharView.MeasureToolFont", &cv_measuretoolfont);
+	cv->rfont = cv_measuretoolfont.fi;
 	GDrawWindowFontMetrics(cv->ruler_w,cv->rfont,&as,&ds,&ld);
 	cv->rfh = as+ds; cv->ras = as;
     } else

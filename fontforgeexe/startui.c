@@ -201,9 +201,9 @@ extern GImage splashimage_legacy;
 static GImage *splashimagep;
 static GWindow splashw;
 static GTimer *autosave_timer, *splasht;
-static GResFont splash_font = { "400 10pt " SERIF_UI_FAMILIES, NULL };
-static GResFont splash_mono = { "400 10pt " MONO_UI_FAMILIES, NULL };
-static GResFont splash_italic = { "400 10pt italic " SERIF_UI_FAMILIES, NULL };
+GResFont splash_font = { "400 10pt " SERIF_UI_FAMILIES, NULL };
+GResFont splash_monofont = { "400 10pt " MONO_UI_FAMILIES, NULL };
+GResFont splash_italicfont = { "400 10pt italic " SERIF_UI_FAMILIES, NULL };
 static int as,fh, linecnt;
 static unichar_t msg[546];
 static unichar_t *lines[32], *is, *ie;
@@ -631,11 +631,11 @@ static int splash_e_h(GWindow gw, GEvent *event) {
 	    // you will need to change this.
 	    if (i == 10) {
 		    x = 8+GDrawDrawText(gw,8,y,lines[i-1]+1,0,0x000000);
-		    GDrawSetFont(gw,splash_mono.fi);
+		    GDrawSetFont(gw,splash_monofont.fi);
 	    GDrawDrawText(gw,8,y,lines[i-1]+1,lines[i]-lines[i-1]-1,0x000000);
 	    } else if ( is>=lines[i-1]+1 && is<lines[i] ) {
 		    x = 8+GDrawDrawText(gw,8,y,lines[i-1]+1,is-lines[i-1]-1,0x000000);
-		    GDrawSetFont(gw,splash_italic.fi);
+		    GDrawSetFont(gw,splash_italicfont.fi);
 		    GDrawDrawText(gw,x,y,is,lines[i]-is,0x000000);
 		} else if ( ie>=lines[i-1]+1 && ie<lines[i] ) {
 		    x = 8+GDrawDrawText(gw,8,y,lines[i-1]+1,ie-lines[i-1]-1,0x000000);
@@ -1283,8 +1283,8 @@ exit( 0 );
     }
 
     GResourceFindFont("Splash.Font", &splash_font);
-    GResourceFindFont("Splash.MonospaceFont", &splash_mono);
-    GResourceFindFont("Splash.ItalicFont", &splash_italic);
+    GResourceFindFont("Splash.MonospaceFont", &splash_monofont);
+    GResourceFindFont("Splash.ItalicFont", &splash_italicfont);
     GDrawSetFont(splashw,splash_font.fi);
 
     SplashLayout();

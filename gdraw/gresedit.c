@@ -2327,18 +2327,25 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
     free( panes );
 }
 
-static double _GDraw_Width_cm, _GDraw_Width_Inches;
-static Color _GDraw_fg, _GDraw_bg;
-static struct resed gdrawcm_re[] = {
-    {N_("Default Background"), "Background", rt_color, &_GDraw_bg, N_("Default background color for windows"), NULL, { 0 }, 0, 0 },
-    {N_("Default Foreground"), "Foreground", rt_color, &_GDraw_fg, N_("Default foreground color for windows"), NULL, { 0 }, 0, 0 },
-    {N_("Screen Width in Centimeters"), "ScreenWidthCentimeters", rt_double, &_GDraw_Width_cm, N_("Physical screen width, measured in centimeters\nFor this to take effect you must save the resource data (press the [Save] button)\nand restart fontforge"), NULL, { 0 }, 0, 0 },
-    RESED_EMPTY
-};
-static struct resed gdrawin_re[] = {
-    {N_("Default Background"), "Background", rt_color, &_GDraw_bg, N_("Default background color for windows"), NULL, { 0 }, 0, 0 },
-    {N_("Default Foreground"), "Foreground", rt_color, &_GDraw_fg, N_("Default foreground color for windows"), NULL, { 0 }, 0, 0 },
-    {N_("Screen Width in Inches"), "ScreenWidthInches", rt_double, &_GDraw_Width_Inches, N_("Physical screen width, measured in inches\nFor this to take effect you must save the resource data (press the [Save] button)\nand restart fontforge"), NULL, { 0 }, 0, 0 },
+Color _GDraw_res_fg = COLOR_CREATE(0x00,0x00,0x00), _GDraw_res_bg = COLOR_CREATE(0xf5,0xff,0xfa);
+int _GDraw_res_res = 0, _GDraw_res_multiclicktime = 200, _GDraw_res_multiclickwiggle = 3;
+int _GDraw_res_selnottime = 2, _GDraw_res_twobuttonfixup = true, _GDraw_res_synchronize = false;
+#if __Mac
+int _GDraw_res_macosxcmd = true;
+#else
+int _GDraw_res_macosxcmd = false;
+#endif
+
+static struct resed gdraw_re[] = {
+    {N_("Default Background"), "Background", rt_color, &_GDraw_res_bg, N_("Default background color for windows"), NULL, { 0 }, 0, 0 },
+    {N_("Default Foreground"), "Foreground", rt_color, &_GDraw_res_fg, N_("Default foreground color for windows"), NULL, { 0 }, 0, 0 },
+    {N_("Screen Resolution"), "ScreenResolution", rt_int, &_GDraw_res_res, N_("Dots per inch of screen (0 for default/auto-detect)"), NULL, { 0 }, 0, 0 },
+    {N_("Multi Click Time"), "MultiClickTime", rt_int, &_GDraw_res_multiclicktime, N_("Maximum time (in ms) between clicks to be considered a double (triple, etc.) click"), NULL, { 0 }, 0, 0 },
+    {N_("Multi Click Wiggle"), "MultiClickWiggle", rt_int, &_GDraw_res_multiclickwiggle, N_("Maximum pixel distance between clicks to be considered a multi click"), NULL, { 0 }, 0, 0 },
+    {N_("Selection Notify Timeout"), "SelectionNotifyTimeout", rt_int, &_GDraw_res_selnottime, N_("Time (in secs) after making a request for a selection (ie. a Paste) to wait for a response before reporting an error"), NULL, { 0 }, 0, 0 },
+    {N_("Middle Mouse Button Fixup"), "TwoButtonFixup", rt_bool, &_GDraw_res_twobuttonfixup, N_("Use the Windows key (if present) to simulate middle mouse button"), NULL, { 0 }, 0, 0 },
+    {N_("Mac OS X Command as Ctrl"), "MacOSXCmd", rt_bool, &_GDraw_res_macosxcmd, N_("On Mac OS X use the Command key as if it were the Control key"), NULL, { 0 }, 0, 0 },
+    {N_("Synchronize"), "Synchronize", rt_bool, &_GDraw_res_synchronize, N_("Synchronize the display before raising the first window"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
 static GResInfo gdraw_ri = {
@@ -2346,7 +2353,7 @@ static GResInfo gdraw_ri = {
     NULL,
     NULL,
     NULL,
-    gdrawcm_re,
+    gdraw_re,
     N_("GDraw"),
     N_("General facts about the windowing system"),
     "",
@@ -2359,6 +2366,10 @@ static GResInfo gdraw_ri = {
     NULL,
     NULL
 };
+
+void GDrawResourceFind() {
+    GResEditFind(gdraw_re, NULL);
+}
 
 static int refresh_eh(GWindow cover,GEvent *event) {
     if ( event->type==et_expose )
@@ -2374,17 +2385,6 @@ void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_fi
 
     if ( !initted ) {
 	initted = true;
-	_GDraw_Width_Inches = screen_display->groot->pos.width / (double) screen_display->res;
-	_GDraw_Width_cm = _GDraw_Width_Inches * 2.54;
-	_GDraw_bg = GDrawGetDefaultBackground(NULL);
-	_GDraw_fg = GDrawGetDefaultForeground(NULL);
-	if ( getenv("LC_MESSAGES")!=NULL ) {
-	    if ( strstr(getenv("LC_MESSAGES"),"_US")!=NULL )
-		gdraw_ri.extras = gdrawin_re;
-	} else if ( getenv("LANG")!=NULL ) {
-	    if ( strstr(getenv("LANG"),"_US")!=NULL )
-		gdraw_ri.extras = gdrawin_re;
-	}
 	gdraw_ri.next = _GProgressRIHead();
 	for ( re_end = _GProgressRIHead(); re_end->next!=NULL; re_end = re_end->next );
 	re_end->next = _GGadgetRIHead();

@@ -61,6 +61,8 @@ GTextInfo sortby[] = {
     GTEXTINFO_EMPTY
 };
 
+GResFont combinations_font = { "400 12px " SANS_UI_FAMILIES, NULL };
+
 void SFShowLigatures(SplineFont *sf,SplineChar *searchfor) {
     int i, cnt;
     char **choices=NULL;
@@ -1092,7 +1094,6 @@ void SFShowKernPairs(SplineFont *sf,SplineChar *sc,AnchorClass *ac,int layer) {
     GTextInfo label[9];
     int as, ds, ld,i;
     static int done=false;
-    static GResFont font = { "400 12px " SANS_UI_FAMILIES, NULL };
 
     memset(&kpd,0,sizeof(kpd));
     kpd.sf = sf;
@@ -1239,8 +1240,8 @@ return;
 
     kpd.bdf = SplineFontPieceMeal(kpd.sf,kpd.layer,(intpt) (gcd[1].gd.label->userdata),72,true,NULL);
 
-    GResourceFindFont("Combinations.Font", &font);
-    kpd.font = font.fi;
+    GResourceFindFont("Combinations.Font", &combinations_font);
+    kpd.font = combinations_font.fi;
     GDrawWindowFontMetrics(gw,kpd.font,&as,&ds,&ld);
     kpd.fh = as+ds; kpd.as = as;
 

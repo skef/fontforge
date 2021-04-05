@@ -45,6 +45,8 @@ extern GBox _ggadget_Default_Box;
 #define ACTIVE_BORDER   (_ggadget_Default_Box.active_border)
 #define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
 
+GResFont bdfprop_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+
 struct bdf_dlg_font {
     int old_prop_cnt;
     BDFProperties *old_props;
@@ -716,7 +718,6 @@ void SFBdfProperties(SplineFont *sf, EncMap *map, BDFFont *thisone) {
     GWindowAttrs wattrs;
     GGadgetCreateData gcd[10];
     GTextInfo label[9];
-    static GResFont font = { "400 10pt " SANS_UI_FAMILIES, NULL };
     extern int _GScrollBar_Width;
     int sbwidth;
     static GBox small = GBOX_EMPTY;
@@ -780,8 +781,8 @@ return;
     bd.width = pos.width; bd.height = pos.height;
     bd.value_x = GDrawPointsToPixels(bd.gw,135);
 
-    GResourceFindFont("BDFProperties.Font", &font);
-    bd.font = font.fi;
+    GResourceFindFont("BDFProperties.Font", &bdfprop_font);
+    bd.font = bdfprop_font.fi;
     {
 	int as, ds, ld;
 	GDrawWindowFontMetrics(gw,bd.font,&as,&ds,&ld);

@@ -53,6 +53,9 @@ static char *aspectnames[] = {
     NULL
 };
 
+GResFont math_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
+GResFont math_boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
+
 static char *GlyphConstruction_Dlg(GGadget *g, int r, int c);
 static char *MKChange_Dlg(GGadget *g, int r, int c);
 static void extpart_finishedit(GGadget *g, int r, int c, int wasnew);
@@ -1846,8 +1849,6 @@ void MathKernDialog(SplineChar *sc,int def_layer) {
     GTabInfo aspects[3], corners[5];
     int as, ds, ld;
     int i,k;
-    static GResFont mathfont = { "400 12pt " SANS_UI_FAMILIES, NULL };
-    static GResFont mathbold = { "700 12pt " SANS_UI_FAMILIES, NULL };
 
     MathInit();
     MKDInit( &mkd, sc );
@@ -1865,10 +1866,10 @@ void MathKernDialog(SplineChar *sc,int def_layer) {
     pos.height = 400;
     mkd.gw = gw = GDrawCreateTopWindow(NULL,&pos,mkd_e_h,&mkd.cv_topright,&wattrs);
 
-    GResourceFindFont("Math.Font", &mathfont);
-    GResourceFindFont("Math.BoldFont", &mathbold);
-    mkd.plain = mathfont.fi;
-    mkd.bold = mathbold.fi;
+    GResourceFindFont("Math.Font", &math_font);
+    GResourceFindFont("Math.BoldFont", &math_boldfont);
+    mkd.plain = math_font.fi;
+    mkd.bold = math_boldfont.fi;
     GDrawWindowFontMetrics(mkd.gw,mkd.plain,&as,&ds,&ld);
     mkd.fh = as+ds; mkd.as = as;
 

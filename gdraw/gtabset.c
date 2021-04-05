@@ -37,18 +37,22 @@
 static GBox gtabset_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gvtabset_box = GBOX_EMPTY; /* Don't initialize here */
 static GResFont gtabset_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+static Color close_col = 0xff0000;
 static int gtabset_inited = false;
 
 static int GTS_TABPADDING = 25;
 
+static struct resed gtabset_re[] = {
+    {N_("Close Color"), "CloseColor", rt_color, &close_col, N_("Color of close icon in tab"), NULL, { 0 }, 0, 0 },
+    RESED_EMPTY
+};
 static GResInfo gtabset_ri, gvtabset_ri;
-
 static GResInfo gtabset_ri = {
     &gvtabset_ri, &ggadget_ri, &gvtabset_ri, NULL,
     &gtabset_box,
     &gtabset_font,
     NULL,
-    NULL,
+    gtabset_re,
     N_("TabSet"),
     N_("Tab Set"),
     "GTabSet",
@@ -183,9 +187,9 @@ static int DrawTab(GWindow pixmap, GTabSet *gts, int i, int x, int y ) {
     int nx1 = GDrawDrawText(pixmap,nx,ny,gts->tabs[i].name,-1,fg);
     if (gts->closable) {
         nx1 += (GTS_TABPADDING/2-5);
-        Color xcol = GResourceFindColor("GTabSet.CloseColor",0xff0000);
-        GDrawDrawLine(pixmap,nx+nx1,ny,nx+nx1+10,ny-10,xcol);
-        GDrawDrawLine(pixmap,nx+nx1,ny-10,nx+nx1+10,ny,xcol);
+        close_col = GResourceFindColor("GTabSet.CloseColor",0xff0000);
+        GDrawDrawLine(pixmap,nx+nx1,ny,nx+nx1+10,ny-10,close_col);
+        GDrawDrawLine(pixmap,nx+nx1,ny-10,nx+nx1+10,ny,close_col);
     }
     gts->tabs[i].x = x;
     x += gts->tabs[i].width;

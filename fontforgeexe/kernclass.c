@@ -46,6 +46,8 @@ extern GBox _ggadget_Default_Box;
 #define ACTIVE_BORDER   (_ggadget_Default_Box.active_border)
 #define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
 
+GResFont kernclass_font = { "400 12pt " MONO_UI_FAMILIES, NULL };
+
 typedef struct kernclassdlg {
     struct kernclasslistdlg *kcld;
     KernClass *orig;
@@ -2784,7 +2786,6 @@ void KernClassD(KernClass *kc, SplineFont *sf, int layer, int isv) {
     static unichar_t kernw[] = { '-', '1', '2', '3', '4', '5', 0 };
     GWindow gw;
     char titlebuf[300];
-    static GResFont font = { "400 12pt " MONO_UI_FAMILIES, NULL };
     char sepbuf[40], mkbuf[40];
     struct matrixinit firstmi, secondmi;
 
@@ -2870,8 +2871,8 @@ return;
 
     kc_width = GDrawPixelsToPoints(NULL,pos.width*100/GGadgetScale(100));
 
-    GResourceFindFont("KernClass.Font", &font);
-    kcd->font = font.fi;
+    GResourceFindFont("KernClass.Font", &kernclass_font);
+    kcd->font = kernclass_font.fi;
     GDrawWindowFontMetrics(gw,kcd->font,&as,&ds,&ld);
     kcd->fh = as+ds; kcd->as = as;
     GDrawSetFont(gw,kcd->font);

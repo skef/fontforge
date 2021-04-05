@@ -271,8 +271,15 @@ enum gcairo_flags { gc_buildpath=1,	/* Has build path commands (postscript, cair
 
 typedef int (*GDrawEH)(GWindow,GEvent *);
 
+extern Color _GDraw_res_fg, _GDraw_res_bg;
+extern int _GDraw_res_res, _GDraw_res_multiclicktime, _GDraw_res_multiclickwiggle;
+extern int _GDraw_res_selnottime, _GDraw_res_twobuttonfixup, _GDraw_res_macosxcmd;
+extern int _GDraw_res_synchronize;
+
 extern unichar_t *GDrawKeysyms[];
 extern GDisplay *screen_display;
+
+extern void GDrawResourceFind();
 
 extern void GDrawDestroyDisplays(void);
 extern void GDrawCreateDisplays(char *displayname,char *programname);

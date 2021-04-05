@@ -43,6 +43,8 @@
 /* This operations are designed to work on a single font. NOT a CID collection*/
 /*  A CID collection must be treated one sub-font at a time */
 
+GResFont histogram_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+
 struct hentry {
     int cnt, sum;
     int char_cnt, max;
@@ -742,7 +744,6 @@ void SFHistogram(SplineFont *sf,int layer, struct psdict *private, uint8 *select
     char binsize[20], barwidth[20], *primary, *secondary;
     int as, ds, ld;
     static unichar_t n9999[] = { '9', '9', '9', '9', 0 };
-    static GResFont font = { "400 10pt " SANS_UI_FAMILIES, NULL };
 
     memset(&hist,0,sizeof(hist));
     hist.sf = sf;
@@ -785,8 +786,8 @@ void SFHistogram(SplineFont *sf,int layer, struct psdict *private, uint8 *select
     pos.height = pos.width + hist.yoff;
     hist.gw = gw = GDrawCreateTopWindow(NULL,&pos,hist_e_h,&hist,&wattrs);
 
-    GResourceFindFont("Histogram.Font", &font);
-    hist.font = font.fi;
+    GResourceFindFont("Histogram.Font", &histogram_font);
+    hist.font = histogram_font.fi;
     GDrawWindowFontMetrics(gw,hist.font,&as,&ds,&ld);
     hist.fh = as+ds; hist.as = as;
 

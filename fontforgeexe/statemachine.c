@@ -81,6 +81,7 @@
 #define SMDE_WIDTH	200
 #define SMDE_HEIGHT	(SMD_DIRDROP+200)
 
+GResFont statemachine_font = { "400 12pt " MONO_UI_FAMILIES, NULL };
 extern int _GScrollBar_Width;
 
 typedef struct statemachinedlg {
@@ -1315,7 +1316,6 @@ void StateMachineEdit(SplineFont *sf,ASM *sm,struct gfi_data *d) {
     int i, k, vk;
     int as, ds, ld, sbsize;
     static unichar_t statew[] = { '1', '2', '3', '4', '5', 0 };
-    static GResFont font = { "400 12pt " MONO_UI_FAMILIES, NULL };
     struct matrix_data *md;
     struct matrixinit mi;
     static char *specialclasses[4] = { N_("{End of Text}"),
@@ -1480,8 +1480,8 @@ void StateMachineEdit(SplineFont *sf,ASM *sm,struct gfi_data *d) {
 	GMatrixEditSetColumnCompletion(list,0,SMD_GlyphListCompletion);
     }
 
-    GResourceFindFont("StateMachine.Font", &font);
-    smd.font = font.fi;
+    GResourceFindFont("StateMachine.Font", &statemachine_font);
+    smd.font = statemachine_font.fi;
     GDrawWindowFontMetrics(gw,smd.font,&as,&ds,&ld);
     smd.fh = as+ds; smd.as = as;
     GDrawSetFont(gw,smd.font);

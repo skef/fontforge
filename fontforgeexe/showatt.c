@@ -50,6 +50,9 @@ extern int _GScrollBar_Width;
 /* This file contains routines to build a dialog showing GPOS/GSUB/morx */
 /*  tables and their contents */
 
+GResFont showatt_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
+GResFont showatt_monofont = { "400 12pt " MONO_UI_FAMILIES, NULL };
+
 struct att_dlg;
 struct node {
     unsigned int open: 1;
@@ -2776,8 +2779,6 @@ static void ShowAttCreateDlg(struct att_dlg *att, SplineFont *sf, int which,
     GGadgetCreateData gcd[5];
     GTextInfo label[4];
     int sbsize = GDrawPointsToPixels(NULL,_GScrollBar_Width);
-    static GResFont monofont = { "400 12pt " MONO_UI_FAMILIES, NULL };
-    static GResFont propfont = { "400 12pt " SANS_UI_FAMILIES, NULL };
 
     if ( sf->cidmaster ) sf = sf->cidmaster;
 
@@ -2798,10 +2799,10 @@ static void ShowAttCreateDlg(struct att_dlg *att, SplineFont *sf, int which,
     pos.height = GDrawPointsToPixels(NULL,300);
     att->gw = GDrawCreateTopWindow(NULL,&pos,att_e_h,att,&wattrs);
 
-    GResourceFindFont("ShowATT.Font", &propfont);
-    GResourceFindFont("ShowATT.MonoFont", &monofont);
-    att->font = propfont.fi;
-    att->monofont = monofont.fi;
+    GResourceFindFont("ShowATT.Font", &showatt_font);
+    GResourceFindFont("ShowATT.MonoFont", &showatt_monofont);
+    att->font = showatt_font.fi;
+    att->monofont = showatt_monofont.fi;
     GDrawWindowFontMetrics(att->gw,att->font,&as,&ds,&ld);
     att->fh = as+ds; att->as = as;
 

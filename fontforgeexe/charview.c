@@ -204,10 +204,14 @@ static Color DraggingComparisonOutlineColor = 0x8800BB00;
 static Color DraggingComparisonAlphaChannelOverride = 0x88000000;
 static Color foreoutthicklinecol = 0x20707070;
 static Color backoutthicklinecol = 0x20707070;
-int prefs_cv_outline_thickness = 1;
 int cvbutton3d = 1;
 Color cvbutton3dedgelightcol = 0xe0e0e0;
 Color cvbutton3dedgedarkcol = 0x707070;
+static GResFont cv_labelfont = { "400 10pt " SANS_UI_FAMILIES, NULL };
+static GResFont cv_pointnumberfont = { "400 10px " SANS_UI_FAMILIES, NULL };
+extern GResFont cv_measuretoolfont;
+
+int prefs_cv_outline_thickness = 1;
 
 // Format is 0x AA RR GG BB.
 
@@ -247,6 +251,7 @@ static struct resed charview_re[] = {
     { N_("Hint Label Color"), "HintLabelColor", rt_color, &hintlabelcol,NULL, NULL, { 0 }, 0, 0 },
     { N_("Blue Values Color"), "BlueValuesStippledColor", rt_coloralpha, &bluevalstipplecol, N_("The color used to mark blue zones in the blue values entry of the private dictionary"), NULL, { 0 }, 0, 0 },
     { N_("Family Blue Color"), "FamilyBlueStippledColor", rt_coloralpha, &fambluestipplecol, N_("The color used to mark blue zones in the family blues entry of the private dictionary"), NULL, { 0 }, 0, 0 },
+    { N_("Minimum Distance Hint Color"), "MDHintColor", rt_coloralpha, &mdhintcol, N_("The color used to draw minimum distance hints"), NULL, { 0 }, 0, 0 },
     { N_("Diagonal Hint Color"), "DHintColor", rt_coloralpha, &dhintcol, N_("The color used to draw diagonal hints"), NULL, { 0 }, 0, 0 },
     { N_("Horiz. Hint Color"), "HHintColor", rt_coloralpha, &hhintcol, N_("The color used to draw horizontal hints"), NULL, { 0 }, 0, 0 },
     { N_("Vert. Hint Color"), "VHintColor", rt_coloralpha, &vhintcol, N_("The color used to draw vertical hints"), NULL, { 0 }, 0, 0 },
@@ -257,8 +262,15 @@ static struct resed charview_re[] = {
     { N_("VHint Active Color"), "VHintActiveColor", rt_color, &vhintactivecol, N_("The color used to draw the active vertical hint which the Review Hints dialog is examining"), NULL, { 0 }, 0, 0 },
     { N_("Dragging Comparison Outline Color"), "DraggingComparisonOutlineColor", rt_coloralpha, &DraggingComparisonOutlineColor, N_("The color used to draw the outline of the old spline when you are interactively modifying a glyph"), NULL, { 0 }, 0, 0 },
     { N_("Dragging Comparison Outline Color"), "DraggingComparisonAlphaChannelOverride", rt_coloralpha, &DraggingComparisonAlphaChannelOverride, N_("Only the alpha value is used and if non zero it will set the alpha channel for the control points, bezier information and other non spline indicators for the Dragging Comparison Outline spline"), NULL, { 0 }, 0, 0 },
+    { N_("3D Light Edge Color"), "Button3DEdgeLightColor", rt_color, &cvbutton3dedgelightcol, N_("When buttons are 3D, the light edge color"), NULL, { 0 }, 0, 0 },
+    { N_("3D Dark Edge Color"), "Button3DEdgeDarkColor", rt_color, &cvbutton3dedgedarkcol, N_("When buttons are 3D, the dark edge color"), NULL, { 0 }, 0, 0 },
+    { N_("3D Buttons"), "Button3d", rt_bool, &cvbutton3d, N_("Whether buttons on the CharView pallettes have a 3D appearance"), NULL, { 0 }, 0, 0 },
+    { N_("LabelFont"), "LabelFont", rt_font, &cv_labelfont, N_("Used for point and contour names, anchor point names, etc."), NULL, { 0 }, 0, 0 },
+    { N_("PointNumberFont"), "PointNumberFont", rt_font, &cv_pointnumberfont, N_("Used for point numbers, hints, etc."), NULL, { 0 }, 0, 0 },
+    { N_("MeasureToolFont"), "MeasureToolFont", rt_font, &cv_measuretoolfont, NULL, NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
+
 
 static struct resed charview2_re[] = {
     { N_("Width Color"), "WidthColor", rt_color, &widthcol, N_("The color of the line marking the advance width"), NULL, { 0 }, 0, 0 },
@@ -397,7 +409,7 @@ return;
   nextcpcol = GResourceFindColor("CharView.NextCPColor",0x007090);
   prevcpcol = GResourceFindColor("CharView.PointColor",0xcc00cc);
   selectedcpcol = GResourceFindColor("CharView.SelectedCPColor",0xffffff);
-  coordcol = GResourceFindColor("CharView.CoordinateColor",0x808080);
+  coordcol = GResourceFindColor("CharView.CoordinateLineColor",0x808080);
   widthcol = GResourceFindColor("CharView.WidthColor",0x000000);
   widthselcol = GResourceFindColor("CharView.WidthSelColor",0x00ff00);
   lbearingselcol = GResourceFindColor("CharView.LBearingSelColor",0x00ff00);
@@ -414,7 +426,7 @@ return;
   hintlabelcol = GResourceFindColor("CharView.HintLabelColor",0x00cccc);
   bluevalstipplecol = GResourceFindColor("CharView.BlueValuesStippledColor",0x808080ff);	/* Translucent */
   fambluestipplecol = GResourceFindColor("CharView.FamilyBlueStippledColor",0x80ff7070);	/* Translucent */
-  mdhintcol = GResourceFindColor("CharView.xxxxxx",0x80e04040);		/* Translucent */
+  mdhintcol = GResourceFindColor("CharView.MDHintColor",0x80e04040);		/* Translucent */
   dhintcol = GResourceFindColor("CharView.DHintColor",0x80d0a0a0);		/* Translucent */
   hhintcol = GResourceFindColor("CharView.HHintColor",0x80a0d0a0);		/* Translucent */
   vhintcol = GResourceFindColor("CharView.VHintColor",0x80c0c0ff);		/* Translucent */
@@ -12517,10 +12529,8 @@ static void _CharViewCreate(CharView *cv, SplineChar *sc, FontView *fv,int enc,i
     GWindowAttrs wattrs;
     GGadgetData gd;
     int sbsize;
-    FontRequest rq;
     int as, ds, ld;
     extern int updateflex;
-    static char *infofamily=NULL;
     GTextBounds textbounds;
     /* extern int cv_auto_goto; */
     extern enum cvtools cv_b1_tool, cv_cb1_tool, cv_b2_tool, cv_cb2_tool;
@@ -12621,27 +12631,15 @@ static void _CharViewCreate(CharView *cv, SplineChar *sc, FontView *fv,int enc,i
 	/* Success! They've got a wacom tablet */
     }
 
-    if ( infofamily==NULL ) {
-	infofamily = copy(GResourceFindString("CharView.InfoFamily"));
-	/* FontConfig doesn't have access to all the X11 bitmap fonts */
-	/*  so the font I used to use isn't found, and a huge monster is */
-	/*  inserted instead */
-	if ( infofamily==NULL )
-	    infofamily = SANS_UI_FAMILIES;
-    }
-
-    memset(&rq,0,sizeof(rq));
-    rq.utf8_family_name = infofamily;
-    rq.point_size = GResourceFindInt("CharView.Rulers.FontSize", -10);
-    rq.weight = 400;
-    cv->small = GDrawInstanciateFont(cv->gw,&rq);
+    GResourceFindFont("CharView.PointNumberFont", &cv_pointnumberfont);
+    cv->small = cv_pointnumberfont.fi;
     GDrawWindowFontMetrics(cv->gw,cv->small,&as,&ds,&ld);
     cv->sfh = as+ds; cv->sas = as;
     GDrawSetFont(cv->gw,cv->small);
     GDrawGetText8Bounds(cv->gw,"0123456789",10,&textbounds);
     cv->sdh = textbounds.as+textbounds.ds+1;
-    rq.point_size = 10;
-    cv->normal = GDrawInstanciateFont(cv->gw,&rq);
+    GResourceFindFont("CharView.LabelFont", &cv_labelfont);
+    cv->normal = cv_labelfont.fi;
     GDrawWindowFontMetrics(cv->gw,cv->normal,&as,&ds,&ld);
     cv->nfh = as+ds; cv->nas = as;
 

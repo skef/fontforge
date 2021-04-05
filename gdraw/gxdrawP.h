@@ -315,7 +315,7 @@ typedef struct gxdisplay /* : GDisplay */ {
 	/* So this field lets us do it right. when the pointer is grabbed the */
 	/* events go to the grab window. It seems so simple... */
     int16 desired_depth, desired_vc, desired_cm;
-    int16 xres;				/* What X Thinks the resolution is */
+    // int16 xres;				/* What X Thinks the resolution is */
     XIM im;				/* Input method for current locale */
     XFontSet def_im_fontset;
     struct inputdevices *inputdevices;

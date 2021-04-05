@@ -48,6 +48,7 @@ static int mac_menu_icons = true;
 static int mac_menu_icons = false;
 #endif
 static int menu_3d_look = 1; // The 3D look is the default/legacy setting.
+static int menu_grabs=true;
 static int mask_set=0;
 static int menumask = ksm_control|ksm_meta|ksm_shift;		/* These are the modifier masks expected in menus. Will be overridden by what's actually there */
 #ifndef _Keyboard
@@ -85,6 +86,8 @@ static GResInfo gmenubar_ri = {
 };
 static struct resed menu_re[] = {
     {N_("MacIcons"), "MacIcons", rt_bool, &mac_menu_icons, N_("Whether to use mac-like icons to indicate modifiers (for instance ^ for Control)\nor to use an abbreviation (for instance \"Cnt-\")"), NULL, { 0 }, 0, 0 },
+    {N_("3D Look"), "3DLook", rt_bool, &menu_3d_look, N_("Whether the menu is presented with a 3D appearance"), NULL, { 0 }, 0, 0 },
+    {N_("Grab"), "Grab", rt_bool, &menu_grabs, N_("Whether the menu 'grabs' the mouse pointer"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
 static GResInfo gmenu_ri = {
@@ -113,7 +116,6 @@ static void GMenuBarChangeSelection(GMenuBar *mb, int newsel,GEvent *);
 static struct gmenu *GMenuCreateSubMenu(struct gmenu *parent,GMenuItem *mi,int disable);
 static struct gmenu *GMenuCreatePulldownMenu(GMenuBar *mb,GMenuItem *mi, int disabled);
 
-static int menu_grabs=true;
 static struct gmenu *most_recent_popup_menu = NULL;
 
 static void GMenuInit() {

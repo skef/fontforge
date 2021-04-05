@@ -7064,6 +7064,72 @@ static struct resed fontview_re[] = {
     {N_("Font"), "Font", rt_font, &fv_font, N_("Font used to display small example images of glyphs over the user designed glyphs"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
+extern GResFont bdfprop_font;
+extern GResFont combinations_font;
+extern GResFont cvt_font;
+extern GResFont debugview_font;
+extern GResFont fontinfo_font;
+extern GResFont glyphinfo_font;
+extern GResFont groups_font;
+extern GResFont histogram_font;
+extern GResFont kernclass_font;
+extern GResFont kernformat_font;
+extern GResFont kernformat_boldfont;
+extern GResFont layerspalette_font;
+extern GResFont math_font;
+extern GResFont math_boldfont;
+extern GResFont searchview_font;
+extern GResFont searchview_boldfont;
+extern GResFont showatt_font;
+extern GResFont showatt_monofont;
+extern GResFont splash_font;
+extern GResFont splash_monofont;
+extern GResFont splash_italicfont;
+extern GResFont statemachine_font;
+#ifdef FONTFORGE_CONFIG_TILEPATH
+extern GResFont tilepath_font;
+extern GResFont tilepath_boldfont;
+#endif
+extern GResFont ttinstruction_font;
+extern GResFont toolspalette_font;
+extern GResFont validate_font;
+extern GResFont errfont;
+static struct resed miscfonts_re[] = {
+    {N_("BDFProperties.Font"), "BDFProperties.Font", rt_font, &bdfprop_font, N_("Font used in the BDF Info dialog"), NULL, { 0 }, 0, 0 },
+    {N_("Combinations.Font"), "Combinations.Font", rt_font, &combinations_font, N_("Font used in the View Combinations dialogs"), NULL, { 0 }, 0, 0 },
+    {N_("CVT.Font"), "CVT.Font", rt_font, &cvt_font, N_("Font used in the TTF Instruction Control Value Table dialog"), NULL, { 0 }, 0, 0 },
+    {N_("DebugView.Font"), "DebugView.Font", rt_font, &debugview_font, N_("Font used in the TTF Instruction Debug window"), NULL, { 0 }, 0, 0 },
+    {N_("FontInfo.Font"), "FontInfo.Font", rt_font, &fontinfo_font, N_("Font used in the Font Info dialog"), NULL, { 0 }, 0, 0 },
+    {N_("GlyphInfo.Font"), "GlyphInfo.Font", rt_font, &glyphinfo_font, N_("Font used in the Glyph Info dialog"), NULL, { 0 }, 0, 0 },
+    {N_("Groups.Font"), "Groups.Font", rt_font, &groups_font, N_("Font used in the Define Encoding Groups dialog"), NULL, { 0 }, 0, 0 },
+    {N_("Histogram.Font"), "Histogram.Font", rt_font, &histogram_font, N_("Font used in the Histogram dialog"), NULL, { 0 }, 0, 0 },
+    {N_("KernClass.Font"), "KernClass.Font", rt_font, &kernclass_font, N_("Font used in the Kerning Classes dialog"), NULL, { 0 }, 0, 0 },
+    {N_("KernFormat.Font"), "KernFormat.Font", rt_font, &kernformat_font, N_("Normal font used in the Kerning Format dialog"), NULL, { 0 }, 0, 0 },
+    {N_("KernFormat.BoldFont"), "KernFormat.BoldFont", rt_font, &kernformat_boldfont, N_("Bold font used in the Kerning Format dialog"), NULL, { 0 }, 0, 0 },
+    {N_("LayersPalette.Font"), "LayersPalette.Font", rt_font, &layerspalette_font, N_("Font used in the outline view layers palette"), NULL, { 0 }, 0, 0 },
+    {N_("Math.Font"), "Math.Font", rt_font, &math_font, N_("Normal font used in the Math dialog"), NULL, { 0 }, 0, 0 },
+    {N_("Math.BoldFont"), "Math.BoldFont", rt_font, &math_boldfont, N_("Bold font used in the Math dialog"), NULL, { 0 }, 0, 0 },
+    {N_("SearchView.Font"), "SearchView.Font", rt_font, &searchview_font, N_("Normal font used in the Find/Replace window"), NULL, { 0 }, 0, 0 },
+    RESED_EMPTY
+};
+static struct resed miscfonts2_re[] = {
+    {N_("SearchView.BoldFont"), "SearchView.BoldFont", rt_font, &searchview_boldfont, N_("Bold font used in the Find/Replace window"), NULL, { 0 }, 0, 0 },
+    {N_("ShowATT.Font"), "ShowATT.Font", rt_font, &showatt_font, N_("Normal font used in the Advanced Typographic Tables dialog"), NULL, { 0 }, 0, 0 },
+    {N_("ShowATT.MonoFont"), "ShowATT.MonoFont", rt_font, &showatt_monofont, N_("Monospace font used in the Advanced Typographic Tables dialog"), NULL, { 0 }, 0, 0 },
+    {N_("Splash.Font"), "Splash.Font", rt_font, &splash_font, N_("Serif font used in the About dialog"), NULL, { 0 }, 0, 0 },
+    {N_("Splash.ItalicFont"), "Splash.ItalicFont", rt_font, &splash_italicfont, N_("Italic serif font used in the About... dialog"), NULL, { 0 }, 0, 0 },
+    {N_("Splash.MonoFont"), "Splash.MonoFont", rt_font, &splash_monofont, N_("Monospace font used in the About dialog"), NULL, { 0 }, 0, 0 },
+    {N_("StateMachine.Font"), "StateMachine.Font", rt_font, &statemachine_font, N_("Font used in the MacOS kerning State Machine dialog"), NULL, { 0 }, 0, 0 },
+#ifdef FONTFORGE_CONFIG_TILEPATH
+    {N_("TilePath.Font"), "TilePath.Font", rt_font, &tilepath_font, N_("Normal font used in the Tile Path dialog"), NULL, { 0 }, 0, 0 },
+    {N_("TilePath.BoldFont"), "TilePath.BoldFont", rt_font, &tilepath_boldfont, N_("Bold font used in the Tile Path dialog"), NULL, { 0 }, 0, 0 },
+#endif
+    {N_("TTInstruction.Font"), "TTInstruction.Font", rt_font, &ttinstruction_font, N_("Font used in the Edit Instructions dialog"), NULL, { 0 }, 0, 0 },
+    {N_("ToolsPalette.Font"), "ToolsPalette.Font", rt_font, &toolspalette_font, N_("Font used in the outline view tools palette"), NULL, { 0 }, 0, 0 },
+    {N_("Validate.Font"), "Validate.Font", rt_font, &validate_font, N_("Font used in the Validate and Suggest Deltas dialogs"), NULL, { 0 }, 0, 0 },
+    {N_("Warnings.Font"), "Warnings.Font", rt_font, &errfont, N_("Font used in the Warnings dialog"), NULL, { 0 }, 0, 0 },
+    RESED_EMPTY
+};
 
 static void FVCreateInnards(FontView *fv,GRect *pos) {
     GWindow gw = fv->gw;
@@ -7392,6 +7458,43 @@ GResInfo fontview_ri = {
     N_("FontView"),
     N_("This is the main fontforge window displaying a font"),
     "FontView",
+    "fontforge",
+    false,
+    0,
+    NULL,
+    GBOX_EMPTY,
+    NULL,
+    NULL,
+    NULL
+};
+extern GResInfo sftextarea_ri;
+GResInfo miscfonts2_ri = {
+    &sftextarea_ri, NULL,NULL, NULL,
+    NULL,
+    NULL,
+    NULL,
+    miscfonts2_re,
+    N_("Misc Fonts 2"),
+    N_("Other fonts in various windows (mostly dialogs)"),
+    "",
+    "fontforge",
+    false,
+    0,
+    NULL,
+    GBOX_EMPTY,
+    NULL,
+    NULL,
+    NULL
+};
+GResInfo miscfonts_ri = {
+    &miscfonts2_ri, NULL,NULL, NULL,
+    NULL,
+    NULL,
+    NULL,
+    miscfonts_re,
+    N_("Misc Fonts"),
+    N_("Various fonts in other windows (mostly dialogs)"),
+    "",
     "fontforge",
     false,
     0,

@@ -52,6 +52,8 @@
 /* ***************************** Problems Dialog **************************** */
 /* ************************************************************************** */
 
+GResFont validate_font = { "400 11pt " SANS_UI_FAMILIES, NULL };
+
 struct mgrpl {
     char *search;
     char *rpl;		/* a rpl of "" means delete (NULL means not found) */
@@ -5322,7 +5324,6 @@ void SFValidationWindow(SplineFont *sf,int layer,enum fontformat format) {
     SplineChar *sc;
     int as, ds, ld;
     int mask, needs_blue;
-    static GResFont valfont = { "400 11pt " SANS_UI_FAMILIES, NULL };
 
     if ( sf->cidmaster )
 	sf = sf->cidmaster;
@@ -5392,8 +5393,8 @@ return;
     pos.height = GDrawPointsToPixels(NULL,300);
     valwin->gw = gw = GDrawCreateTopWindow(NULL,&pos,vw_e_h,valwin,&wattrs);
 
-    GResourceFindFont("Validate.Font", &valfont);
-    valwin->font = valfont.fi;
+    GResourceFindFont("Validate.Font", &validate_font);
+    valwin->font = validate_font.fi;
     GDrawWindowFontMetrics(valwin->gw,valwin->font,&as,&ds,&ld);
     valwin->fh = as+ds;
     valwin->as = as;
