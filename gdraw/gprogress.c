@@ -193,8 +193,9 @@ static struct resed progress_re[] = {
     {N_("Color|Background"), "Background", rt_color, &progress_background, N_("Background color for progress windows"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
-static GResInfo progress_ri = {
-    NULL, NULL, NULL,NULL,
+extern GResInfo ggadget_ri;
+GResInfo gprogress_ri = {
+    &ggadget_ri, NULL, NULL,NULL,
     NULL,	/* No box */
     &progress_font,
     NULL,
@@ -204,26 +205,14 @@ static GResInfo progress_ri = {
     "GProgress",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
-
-static void GProgressResInit(void) {
-    if ( !progress_init ) {
-	progress_foreground = GResourceFindColor("GProgress.Foreground",
-		    GDrawGetDefaultForeground(NULL));
-	progress_background = GResourceFindColor("GProgress.Background",
-		    GDrawGetDefaultBackground(NULL));
-	progress_fillcol = GResourceFindColor("GProgress.FillColor",
-		    progress_fillcol);
-	GResourceFindFont("GProgress.Font", &progress_font);
-	progress_init = true;
-    }
-}
 
 void GProgressStartIndicator(
     int delay,			/* in tenths of seconds */
@@ -246,8 +235,7 @@ void GProgressStartIndicator(
     if ( screen_display==NULL )
 return;
 
-    if ( !progress_init )
-	GProgressResInit();
+    GResEditDoInit(&gprogress_ri);
     new = calloc(1,sizeof(GProgress));
     new->line1 = u_copy(line1);
     new->line2 = u_copy(line2);
@@ -503,11 +491,4 @@ void GProgressChangeLine2_8(const char *line2) {
     unichar_t *l2 = utf82u_copy(line2);
     GProgressChangeLine2(l2);
     free(l2);
-}
-
-GResInfo *_GProgressRIHead(void) {
-
-    if ( !progress_init )
-	GProgressResInit();
-return( &progress_ri );
 }

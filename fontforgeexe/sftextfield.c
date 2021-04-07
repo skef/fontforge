@@ -41,7 +41,6 @@
 #include <math.h>
 
 static GBox sftextarea_box = GBOX_EMPTY; /* Don't initialize here */
-static int sftextarea_inited = false;
 static GResFont sftextarea_font = { "400 10pt " MONO_UI_FAMILIES, NULL };
 
 static unichar_t nullstr[] = { 0 }, 
@@ -58,8 +57,9 @@ GResInfo sftextarea_ri = {
     "SFTextArea",
     "fontforge",
     false,
-    0,
-    NULL,
+    false,
+    omf_padding|box_active_border_inner,
+    { 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -2109,16 +2109,6 @@ struct gfuncs sftextarea_funcs = {
     NULL
 };
 
-static void SFTextAreaInit() {
-    GGadgetInit();
-    _GGadgetCopyDefaultBox(&sftextarea_box);
-    sftextarea_box.padding = 3;
-    sftextarea_box.flags = box_active_border_inner;
-    _GGadgetInitDefaultBox("SFTextArea.", &sftextarea_box);
-    GResourceFindFont("SFTextArea.Font", &sftextarea_font);
-    sftextarea_inited = true;
-}
-
 static void SFTextAreaAddVSb(SFTextArea *st) {
     GGadgetData gd;
 
@@ -2229,8 +2219,7 @@ static void SFTextAreaFit(SFTextArea *st) {
 
 static SFTextArea *_SFTextAreaCreate(SFTextArea *st, struct gwindow *base, GGadgetData *gd,void *data, GBox *def) {
 
-    if ( !sftextarea_inited )
-	SFTextAreaInit();
+    GResEditDoInit(&sftextarea_ri);
     st->g.funcs = &sftextarea_funcs;
     _GGadget_Create(&st->g,base,gd,data,def);
 

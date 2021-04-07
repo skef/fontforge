@@ -204,21 +204,9 @@ static int MVGetSplineFontPieceMealFlags( MetricsView *mv )
     return ret;
 }
 
-
+GResInfo metricsview_ri;
 void MVColInit( void ) {
-    static int cinit=false;
-    GResStruct mvcolors[] = {
-	{ "AdvanceWidthColor", rt_color, &widthcol, NULL, 0 },
-	{ "ItalicAdvanceColor", rt_color, &italicwidthcol, NULL, 0 },
-	{ "SelectedGlyphColor", rt_color, &selglyphcol, NULL, 0 },
-	{ "KernLineColor", rt_color, &kernlinecol, NULL, 0 },
-	{ "SideBearingLineColor", rt_color, &rbearinglinecol, NULL, 0 },
-	GRESSTRUCT_EMPTY
-    };
-    if ( !cinit ) {
-	GResourceFind( mvcolors, "MetricsView.");
-	cinit = true;
-    }
+    GResEditDoInit(&metricsview_ri);
 }
 
 static int MVSetVSb(MetricsView *mv);
@@ -3525,7 +3513,7 @@ static GMenuItem2 fllist[] = {
     { { (unichar_t *) N_("_Print..."), (GImage *) "fileprint.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'P' }, H_("Print...|No Shortcut"), NULL, NULL, MVMenuPrint, 0 },
     { { NULL, NULL, COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 1, 0, 0, 0, '\0' }, NULL, NULL, NULL, NULL, 0 }, /* line */
     { { (unichar_t *) N_("Pr_eferences..."), (GImage *) "fileprefs.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("Preferences...|No Shortcut"), NULL, NULL, MenuPrefs, 0 },
-    { { (unichar_t *) N_("_X Resource Editor..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("X Resource Editor...|No Shortcut"), NULL, NULL, MenuXRes, 0 },
+    { { (unichar_t *) N_("Appea_rance Editor..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("Appearance Editor...|No Shortcut"), NULL, NULL, MenuXRes, 0 },
 #ifndef _NO_PYTHON
     { { (unichar_t *) N_("Config_ure Plugins..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'u' }, H_("Configure Plugins...|No Shortcut"), NULL, NULL, MenuPlug, 0 },
 #endif
@@ -5262,7 +5250,6 @@ MetricsView *MetricsViewCreate(FontView *fv,SplineChar *sc,BDFFont *bdf) {
     gd.flags = gg_visible|gg_enabled|gg_pos_in_pixels|gg_sb_vert;
     mv->vsb = GScrollBarCreate(gw,&gd,mv);
 
-    GResourceFindFont("MetricsView.Font", &mv_font);
     mv->font = mv_font.fi;
     GDrawWindowFontMetrics(gw,mv->font,&as,&ds,&ld);
     mv->fh = as+ds; mv->as = as;
@@ -5475,8 +5462,9 @@ GResInfo metricsview_ri = {
     "MetricsView",
     "fontforge",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,

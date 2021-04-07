@@ -556,7 +556,6 @@ static void GroupWCreate(struct groupdlg *grp,GRect *pos) {
     int sbsize = GDrawPointsToPixels(NULL,_GScrollBar_Width);
     GWindowAttrs wattrs;
 
-    GResourceFindFont("Groups.Font", &groups_font);
     grp->font = groups_font.fi;
     GDrawWindowFontMetrics(grp->gw,grp->font,&as,&ds,&ld);
     grp->fh = as+ds; grp->as = as;

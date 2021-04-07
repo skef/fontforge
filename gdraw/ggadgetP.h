@@ -526,7 +526,7 @@ void _GWidget_SetPopupOwner(GGadget *g);
 void _GWidget_ClearPopupOwner(GGadget *g);
 
 extern void _GGadgetCopyDefaultBox(GBox *box);
-extern void _GGadgetInitDefaultBox(char *class, GBox *box);
+extern void _GGadgetInitDefaultBox(const char *class, GBox *box);
 extern void _ggadget_underlineMnemonic(GWindow gw,int32 x,int32 y,unichar_t *label,
 	unichar_t mneumonic, Color fg,int ymax);
 extern void _ggadgetFigureSize(GWindow gw, GBox *design, GRect *r, int isdef);

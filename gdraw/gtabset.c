@@ -38,7 +38,6 @@ static GBox gtabset_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gvtabset_box = GBOX_EMPTY; /* Don't initialize here */
 static GResFont gtabset_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
 static Color close_col = 0xff0000;
-static int gtabset_inited = false;
 
 static int GTS_TABPADDING = 25;
 
@@ -46,8 +45,8 @@ static struct resed gtabset_re[] = {
     {N_("Close Color"), "CloseColor", rt_color, &close_col, N_("Color of close icon in tab"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
-static GResInfo gtabset_ri, gvtabset_ri;
-static GResInfo gtabset_ri = {
+static GResInfo gvtabset_ri;
+GResInfo gtabset_ri = {
     &gvtabset_ri, &ggadget_ri, &gvtabset_ri, NULL,
     &gtabset_box,
     &gtabset_font,
@@ -58,8 +57,9 @@ static GResInfo gtabset_ri = {
     "GTabSet",
     "Gdraw",
     false,
+    false,
     omf_border_width|omf_border_shape,
-    NULL,
+    { 0, bs_rect, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -78,8 +78,9 @@ static GResInfo gvtabset_ri = {
     "GVTabSet",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -88,22 +89,8 @@ static GResInfo gvtabset_ri = {
 #define NEST_INDENT	4
 
 static void GTabSetInit() {
-
-    if ( gtabset_inited )
-return;
-
-    GGadgetInit();
-
-    _GGadgetCopyDefaultBox(&gtabset_box);
-    gtabset_box.border_width = 1; gtabset_box.border_shape = bs_rect;
-    /*gtabset_box.flags = 0;*/
-    _GGadgetInitDefaultBox("GTabSet.", &gtabset_box);
-    GResourceFindFont("GTabSet.Font", &gtabset_font);
-
-    gvtabset_box = gtabset_box; /* needs this to figure inheritance */
-    _GGadgetInitDefaultBox("GVTabSet.",&gvtabset_box);
-
-    gtabset_inited = true;
+    GResEditDoInit(&gtabset_ri);
+    GResEditDoInit(&gvtabset_ri);
 }
 
 static void GTabSetChanged(GTabSet *gts,int oldsel) {
@@ -864,8 +851,7 @@ GGadget *GTabSetCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     childattrs.mask = wam_events;
     childattrs.event_masks = -1;
 
-    if ( !gtabset_inited )
-	GTabSetInit();
+    GTabSetInit();
     gts->g.funcs = &gtabset_funcs;
     _GGadget_Create(&gts->g,base,gd,data, gd->flags&gg_tabset_vert ? &gvtabset_box  : &gtabset_box);
     gts->font = gtabset_font.fi;
@@ -1099,10 +1085,4 @@ void GTabSetRemoveTabByName(GGadget *g, char *name) {
     }
 
     free(uname);
-}
-
-GResInfo *_GTabSetRIHead(void) {
-    if ( !gtabset_inited )
-	GTabSetInit();
-return( &gtabset_ri );
 }

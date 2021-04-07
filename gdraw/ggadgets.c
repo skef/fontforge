@@ -70,6 +70,16 @@ static int _ggadget_inited=0;
 static Color popup_foreground=0, popup_background=COLOR_CREATE(0xff,0xff,0xc0);
 static int popup_delay=1000, popup_lifetime=20000;
 
+static int GGadgetRIInit(GResInfo *ri) {
+    if ( ri->is_initialized )
+	return false;
+
+    ri->overrides.main_background = GDrawGetDefaultBackground(NULL);
+    ri->overrides.main_foreground = GDrawGetDefaultForeground(NULL);
+    _GResEditInitialize(ri);
+    return true;
+}
+
 static GResInfo popup_ri;
 static struct resed ggadget_re[] = {
     {N_("Skip"), "Skip", rt_int, &_GGadget_Skip, N_("Space (in points) to skip between gadget elements"), NULL, { 0 }, 0, 0 },
@@ -91,8 +101,9 @@ GResInfo ggadget2_ri = {
     "GGadget",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -109,11 +120,12 @@ GResInfo ggadget_ri = {
     "GGadget",
     "Gdraw",
     false,
-    0,
-    NULL,
+    false,
+    omf_main_foreground|omf_main_background,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
-    NULL,
+    GGadgetRIInit,
     NULL
 };
 static struct resed popup_re[] = {
@@ -135,8 +147,9 @@ static GResInfo popup_ri = {
     "GGadget.Popup",
     "Gdraw",
     false,
+    false,
     omf_refresh,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     popup_refresh,
     NULL,
@@ -161,8 +174,9 @@ static GGadgetCreateData droplist_gcd[] = {
 static GGadgetCreateData *dlarray[] = { GCD_Glue, &droplist_gcd[0], GCD_Glue, &droplist_gcd[1], GCD_Glue, NULL, NULL };
 static GGadgetCreateData droplistbox =
     { GHVGroupCreate, { { 2, 2, 0, 0 }, NULL, 0, 0, 0, 0, 0, NULL, { (GTextInfo *) dlarray }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL };
+extern GResInfo glabel_ri;
 GResInfo listmark_ri = {
-    NULL, &ggadget_ri, NULL,NULL,
+    &glabel_ri, &ggadget_ri, NULL,NULL,
     &_GListMark_Box,	/* No box */
     NULL,
     &droplistbox,
@@ -173,8 +187,9 @@ GResInfo listmark_ri = {
     "GListMark",
     "Gdraw",
     false,
+    false,
     omf_border_width|omf_padding,
-    NULL,
+    { 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -377,7 +392,7 @@ void _GResourceFindFont(const char *resourcename, GResFont *font, int is_value) 
     char *rstr;
     memset(&rq, 0, sizeof(rq));
     if ( is_value )
-	rstr = copy(resourcename);
+	rstr = rstr!=NULL ? copy(resourcename) : NULL;
     else
 	rstr = GResourceFindString(resourcename);
 
@@ -415,19 +430,22 @@ void _GResourceFindFont(const char *resourcename, GResFont *font, int is_value) 
     }
 }
 
-void GResourceFindFont(const char *resourcename, GResFont *font) {
-    _GResourceFindFont(resourcename, font, false);
+void GResourceFindFont(const char *resourcename, const char *elemname, GResFont *font) {
+    char *rstr;
+    if ( resourcename!=NULL )
+	rstr = smprintf("%s.%s", resourcename, elemname);
+    else
+	rstr = (char *) elemname;
+    _GResourceFindFont(rstr, font, false);
+    if ( resourcename!=NULL )
+	free(rstr);
 }
 
 void _GGadgetCopyDefaultBox(GBox *box) {
     *box = _ggadget_Default_Box;
 }
 
-void _GGadgetInitDefaultBox(char *class,GBox *box) {
-    GResStruct bordertype[] = {
-	{ "Box.BorderType", rt_string, NULL, border_type_cvt, 0 },
-	GRESSTRUCT_EMPTY
-    };
+void _GGadgetInitDefaultBox(const char *class, GBox *box) {
     GResStruct boxtypes[] = {
 	{ "Box.BorderType", rt_string, NULL, border_type_cvt, 0 },
 	{ "Box.BorderShape", rt_string, NULL, border_shape_cvt, 0 },
@@ -462,10 +480,8 @@ void _GGadgetInitDefaultBox(char *class,GBox *box) {
     };
     intpt bt, bs;
     int bw, pad, rr, inner, outer, active, depressed, def, grad, shadow;
-    char *font_rstr;
+    char *classstr = NULL;
 
-    if ( !_ggadget_inited )
-	GGadgetInit();
     bt = box->border_type;
     bs = box->border_shape;
     bw = box->border_width;
@@ -479,7 +495,6 @@ void _GGadgetInitDefaultBox(char *class,GBox *box) {
     grad = box->flags & box_gradient_bg;
     shadow = box->flags & box_foreground_shadow_outer;
 
-    bordertype[0].val = &bt;
     boxtypes[0].val = &bt;
     boxtypes[1].val = &bs;
     boxtypes[2].val = &bw;
@@ -510,12 +525,15 @@ void _GGadgetInitDefaultBox(char *class,GBox *box) {
     boxtypes[27].val = &box->border_inner;
     boxtypes[28].val = &box->border_outer;
 
-    GResourceFind( bordertype, class);
+    if ( class!=NULL )
+	classstr = smprintf("%s.", class);
+
     /* for a plain box, default to all borders being the same. they must change*/
     /*  explicitly */
     if ( bt==bt_box || bt==bt_double )
 	box->border_brightest = box->border_brighter = box->border_darker = box->border_darkest;
     GResourceFind( boxtypes, class);
+    free(classstr);
 
     box->border_type = bt;
     box->border_shape = bs;
@@ -556,44 +574,21 @@ static int localeptsize(void) {
 }
 
 void GGadgetInit(void) {
-    if ( !_ggadget_inited ) {
-	_ggadget_inited = true;
-	GGadgetSetImagePath(GResourceFindString("GGadget.ImagePath"));
-	_ggadget_Default_Box.main_background = GDrawGetDefaultBackground(NULL);
-	_ggadget_Default_Box.main_foreground = GDrawGetDefaultForeground(NULL);
-	_GGadgetInitDefaultBox("GGadget.", &_ggadget_Default_Box);
-        GResourceFindFont("GGadget.Font", &_ggadget_default_font);
-	_GGadgetCopyDefaultBox(&_GListMark_Box);
-	_GListMark_Box.border_width = _GListMark_Box.padding = 1;
-	/*_GListMark_Box.flags = 0;*/
-	_GGadgetInitDefaultBox("GListMark.",&_GListMark_Box);
-	_GListMarkSize = GResourceFindInt("GListMark.Width", _GListMarkSize);
-	_GListMark_Image = GGadgetResourceFindImage("GListMark.Image", NULL);
-	_GListMark_DisImage = GGadgetResourceFindImage("GListMark.DisabledImage", NULL);
-	if ( _GListMark_Image!=NULL && _GListMark_Image->image!=NULL ) {
-	    int size = GDrawPixelsToPoints(NULL,GImageGetWidth(_GListMark_Image->image));
-	    if ( size>_GListMarkSize )
-		_GListMarkSize=size;
-	}
-	_GGadget_FirstLine = GResourceFindInt("GGadget.FirstLine", _GGadget_FirstLine);
-	_GGadget_LeftMargin = GResourceFindInt("GGadget.LeftMargin", _GGadget_LeftMargin);
-	_GGadget_LineSkip = GResourceFindInt("GGadget.LineSkip", _GGadget_LineSkip);
-	_GGadget_Skip = GResourceFindInt("GGadget.Skip", _GGadget_Skip);
-	_GGadget_TextImageSkip = GResourceFindInt("GGadget.TextImageSkip", _GGadget_TextImageSkip);
-
-	popup_foreground = GResourceFindColor("GGadget.Popup.Foreground",popup_foreground);
-	popup_background = GResourceFindColor("GGadget.Popup.Background",popup_background);
-	popup_delay = GResourceFindInt("GGadget.Popup.Delay",popup_delay);
-	popup_lifetime = GResourceFindInt("GGadget.Popup.LifeTime",popup_lifetime);
-	char *pdstr = smprintf("400 %d %s", localeptsize(), SANS_UI_FAMILIES);
-        GResourceFindFont("GGadget.Popup.Font", &popup_font);
-	free(pdstr);
-    }
+    GResEditDoInit(&ggadget_ri);
+    GResEditDoInit(&ggadget2_ri);
+    GResEditDoInit(&popup_ri);
+    GResEditDoInit(&listmark_ri);
 }
 
 void GListMarkDraw(GWindow pixmap,int x, int y, int height, enum gadget_state state ) {
     GRect r, old;
-    int marklen = GDrawPointsToPixels(pixmap,_GListMarkSize);
+    int gmsize = GDrawPointsToPixels(pixmap,_GListMarkSize);
+    if ( _GListMark_Image!=NULL && _GListMark_Image->image!=NULL ) {
+	int size = GImageGetWidth(_GListMark_Image->image);
+	if ( size>gmsize )
+	    gmsize = size;
+    }
+    int marklen = gmsize;
 
     if ( state == gs_disabled &&
            _GListMark_DisImage!=NULL && _GListMark_DisImage->image!=NULL) {
@@ -1579,8 +1574,7 @@ void GGadgetTakesKeyboard(GGadget *g, int takes_keyboard) {
 
 GResInfo *_GGadgetRIHead(void) {
 
-    if ( !_ggadget_inited )
-	GGadgetInit();
+    GGadgetInit();
 return( &popup_ri );
 }
 

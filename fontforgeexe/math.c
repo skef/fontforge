@@ -1866,8 +1866,6 @@ void MathKernDialog(SplineChar *sc,int def_layer) {
     pos.height = 400;
     mkd.gw = gw = GDrawCreateTopWindow(NULL,&pos,mkd_e_h,&mkd.cv_topright,&wattrs);
 
-    GResourceFindFont("Math.Font", &math_font);
-    GResourceFindFont("Math.BoldFont", &math_boldfont);
     mkd.plain = math_font.fi;
     mkd.bold = math_boldfont.fi;
     GDrawWindowFontMetrics(mkd.gw,mkd.plain,&as,&ds,&ld);

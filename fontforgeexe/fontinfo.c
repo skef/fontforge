@@ -10804,7 +10804,6 @@ return;
     OS2_UnicodeChange(GWidgetGetControl(gw,CID_UnicodeRanges),NULL);
     OS2_CodePageChange(GWidgetGetControl(gw,CID_CodePageRanges),NULL);
 
-    GResourceFindFont("FontInfo.Font", &fontinfo_font);
     d->font = fontinfo_font.fi;
     GDrawWindowFontMetrics(gw,d->font,&as,&ds,&ld);
     d->as = as; d->fh = as+ds;

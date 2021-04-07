@@ -1267,6 +1267,7 @@ int fontforge_main( int argc, char **argv ) {
     wattrs.is_dlg = !listen_to_apple_events;
 #endif
     pos.x = pos.y = 200;
+    MiscFontsInit();
     SplashImageInit();
     pos.width = splashimagep->u.image->width;
     pos.height = splashimagep->u.image->height-1; // See splash_e_h:et_map
@@ -1282,9 +1283,6 @@ exit( 0 );
 	splashw = GDrawCreateTopWindow(NULL,&pos,splash_e_h,NULL,&wattrs);
     }
 
-    GResourceFindFont("Splash.Font", &splash_font);
-    GResourceFindFont("Splash.MonospaceFont", &splash_monofont);
-    GResourceFindFont("Splash.ItalicFont", &splash_italicfont);
     GDrawSetFont(splashw,splash_font.fi);
 
     SplashLayout();

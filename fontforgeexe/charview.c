@@ -145,14 +145,11 @@ struct cvshows CVShowsPrevewToggleSavedState;
 #define CID_Base	      1001
 #define CID_getValueFromUser  CID_Base + 1
 
-
-// Note that the default values supplied in CVColInit over-ride these values.
 static Color pointcol = 0xff0000;
-static Color subcol = 0xffffff;
 static Color firstpointcol = 0x707000;
 static Color selectedpointcol = 0xc8c800;
 static int selectedpointwidth = 2;
-static Color extremepointcol = 0xCAA80A;
+static Color extremepointcol = 0xc00080;
 static Color pointofinflectioncol = 0x008080;
 static Color almosthvcol = 0x00ff80;
 Color nextcpcol = 0x007090;
@@ -171,7 +168,7 @@ static Color rastergridcol = 0xffb0b0ff;
 static Color rasterdarkcol = 0xff606060;
 static Color deltagridcol = 0xcc0000;
 static Color italiccoordcol = 0x909090;
-static Color metricslabelcol = 0x00000;
+static Color metricslabelcol = 0x000000;
 static Color hintlabelcol = 0x00cccc;
 static Color bluevalstipplecol = 0x808080ff;	/* Translucent */
 static Color fambluestipplecol = 0x80ff7070;	/* Translucent */
@@ -208,7 +205,7 @@ int cvbutton3d = 1;
 Color cvbutton3dedgelightcol = 0xe0e0e0;
 Color cvbutton3dedgedarkcol = 0x707070;
 static GResFont cv_labelfont = { "400 10pt " SANS_UI_FAMILIES, NULL };
-static GResFont cv_pointnumberfont = { "400 10px " SANS_UI_FAMILIES, NULL };
+GResFont cv_pointnumberfont = { "400 10px " SANS_UI_FAMILIES, NULL };
 extern GResFont cv_measuretoolfont;
 
 int prefs_cv_outline_thickness = 1;
@@ -230,9 +227,6 @@ static void CVPreviewModeSet(GWindow gw, int checked);
 static void CVExposeRulers(CharView *cv, GWindow pixmap);
 
 static int cvcolsinited = false;
-
-// Note that the GResource names for these preferences are defined separately in CVColInit.
-// It would be wise to match any changes to these data structures with changes to the values in CVColInit.
 
 static struct resed charview_re[] = {
     { N_("Point Color"), "PointColor", rt_color, &pointcol, N_("The color of an on-curve point"), NULL, { 0 }, 0, 0 },
@@ -390,85 +384,14 @@ static int shouldShowFilledUsingCairo(CharView *cv) {
     return 0;
 }
 
+GResInfo charview_ri, charview2_ri;
 void CVColInit( void ) {
     if ( cvcolsinited )
-return;
-    GResEditFind( charview_re, "CharView.");
-    GResEditFind( charview2_re, "CharView.");
+	return;
+    GResEditDoInit(&charview_ri);
+    GResEditDoInit(&charview2_ri);
     cvcolsinited = true;
-
-  // These value over-ride the static initializers.
-  // Note that the base resource names are copied from charview_re and charview2_re.
-  pointcol = GResourceFindColor("CharView.PointColor",0xff0000);
-  firstpointcol = GResourceFindColor("CharView.FirstPointColor",0x707000);
-  selectedpointcol = GResourceFindColor("CharView.SelectedPointColor",0xc8c800);
-  selectedpointwidth = GResourceFindInt("CharView.SelectedPointWidth",2);
-  extremepointcol = GResourceFindColor("CharView.ExtremePointColor",0xc00080);
-  pointofinflectioncol = GResourceFindColor("CharView.PointOfInflectionColor",0x008080);
-  almosthvcol = GResourceFindColor("CharView.AlmostHVColor",0x00ff80);
-  nextcpcol = GResourceFindColor("CharView.NextCPColor",0x007090);
-  prevcpcol = GResourceFindColor("CharView.PointColor",0xcc00cc);
-  selectedcpcol = GResourceFindColor("CharView.SelectedCPColor",0xffffff);
-  coordcol = GResourceFindColor("CharView.CoordinateLineColor",0x808080);
-  widthcol = GResourceFindColor("CharView.WidthColor",0x000000);
-  widthselcol = GResourceFindColor("CharView.WidthSelColor",0x00ff00);
-  lbearingselcol = GResourceFindColor("CharView.LBearingSelColor",0x00ff00);
-  widthgridfitcol = GResourceFindColor("CharView.GridFitWidthColor",0x009800);
-  lcaretcol = GResourceFindColor("CharView.LigatureCaretColor",0x909040);
-  rastercol = GResourceFindColor("CharView.RasterColor",0xffa0a0a0);		/* Translucent */
-  rasternewcol = GResourceFindColor("CharView.RasterNewColor",0xff909090);
-  rasteroldcol = GResourceFindColor("CharView.RasterOldColor",0xffc0c0c0);
-  rastergridcol = GResourceFindColor("CharView.RasterGridColor",0xffb0b0ff);
-  rasterdarkcol = GResourceFindColor("CharView.RasterDarkColor",0xff606060);
-  deltagridcol = GResourceFindColor("CharView.DeltaGridColor",0xcc0000);
-  italiccoordcol = GResourceFindColor("CharView.ItalicCoordColor",0x909090);
-  metricslabelcol = GResourceFindColor("CharView.MetricsLabelColor",0x00000);
-  hintlabelcol = GResourceFindColor("CharView.HintLabelColor",0x00cccc);
-  bluevalstipplecol = GResourceFindColor("CharView.BlueValuesStippledColor",0x808080ff);	/* Translucent */
-  fambluestipplecol = GResourceFindColor("CharView.FamilyBlueStippledColor",0x80ff7070);	/* Translucent */
-  mdhintcol = GResourceFindColor("CharView.MDHintColor",0x80e04040);		/* Translucent */
-  dhintcol = GResourceFindColor("CharView.DHintColor",0x80d0a0a0);		/* Translucent */
-  hhintcol = GResourceFindColor("CharView.HHintColor",0x80a0d0a0);		/* Translucent */
-  vhintcol = GResourceFindColor("CharView.VHintColor",0x80c0c0ff);		/* Translucent */
-  hflexhintcol = GResourceFindColor("CharView.HFlexHintColor",0x00ff00);
-  vflexhintcol = GResourceFindColor("CharView.VFlexHintColor",0x00ff00);
-  conflicthintcol = GResourceFindColor("CharView.ConflictHintColor",0x00ffff);
-  hhintactivecol = GResourceFindColor("CharView.HHintActiveColor",0x00a000);
-  vhintactivecol = GResourceFindColor("CharView.VHintActiveColor",0x0000ff);
-  anchorcol = GResourceFindColor("CharView.AnchorColor",0x0040ff);
-  anchoredoutlinecol = GResourceFindColor("CharView.AnchoredOutlineColor",0x0040ff);
-  templateoutlinecol = GResourceFindColor("CharView.TemplateOutlineColor",0x009800);
-  oldoutlinecol = GResourceFindColor("CharView.OldOutlineColor",0x008000);
-  transformorigincol = GResourceFindColor("CharView.TransformOriginColor",0x000000);
-  guideoutlinecol = GResourceFindColor("CharView.GuideOutlineColor",0x808080);
-  gridfitoutlinecol = GResourceFindColor("CharView.GridFitOutlineColor",0x009800);
-  backoutlinecol = GResourceFindColor("CharView.BackgroundOutlineColor",0x009800);
-  foreoutlinecol = GResourceFindColor("CharView.ForegroundOutlineColor",0x000000);
-  clippathcol = GResourceFindColor("CharView.ClipPathColor",0x0000ff);
-  openpathcol = GResourceFindColor("CharView.OpenPathColor",0x40660000);
-  backimagecol = GResourceFindColor("CharView.BackgroundImageColor",0x707070);
-  fillcol = GResourceFindColor("CharView.FillColor",0x80707070);		/* Translucent */
-  tracecol = GResourceFindColor("CharView.TraceColor",0x008000);
-  rulerbigtickcol = GResourceFindColor("CharView.RulerBigTickColor",0x008000);
-  // previewfillcol = GResourceFindColor(,0x0f0f0f);
-  // The code below defaults differently from the static initializer (from which we copied this value).
-    if( GResourceFindColor("CharView.PreviewFillColor", COLOR_UNKNOWN) == COLOR_UNKNOWN ) {
-	// no explicit previewfillcolor
-	previewfillcol = fillcol;
-	if( GResourceFindColor("CharView.FillColor", COLOR_UNKNOWN) == COLOR_UNKNOWN ) {
-	    // no explicit fill color either
-	    previewfillcol = 0x000000;
-	}
-    }
-  DraggingComparisonOutlineColor = GResourceFindColor("CharView.DraggingComparisonOutlineColor",0x8800BB00);
-  DraggingComparisonAlphaChannelOverride = GResourceFindColor("CharView.DraggingComparisonAlphaChannelOverride",0x88000000);
-  foreoutthicklinecol = GResourceFindColor("CharView.ForegroundThickOutlineColor",0x20707070);
-  backoutthicklinecol = GResourceFindColor("CharView.BackgroundThickOutlineColor",0x20707070);
-  cvbutton3d = GResourceFindInt("CharView.Button3D", 1);
-  cvbutton3dedgelightcol = GResourceFindColor("CharView.Button3DEdgeLightColor", 0xe0e0e0);
-  cvbutton3dedgedarkcol = GResourceFindColor("CharView.Button3DEdgeDarkColor", 0x707070);
 }
-
 
 GDevEventMask input_em[] = {
 	/* Event masks for wacom devices */
@@ -922,7 +845,7 @@ static void DrawPoint( CharView *cv, GWindow pixmap, SplinePoint *sp,
     }
 
     col = MaybeMaskColorToAlphaChannelOverride( col, AlphaChannelOverride );
-    Color subcolmasked    = MaybeMaskColorToAlphaChannelOverride( subcol, AlphaChannelOverride );
+    Color subcolmasked;
     Color nextcpcolmasked = MaybeMaskColorToAlphaChannelOverride( nextcpcol, AlphaChannelOverride );
     Color prevcpcolmasked = MaybeMaskColorToAlphaChannelOverride( prevcpcol, AlphaChannelOverride );
     Color selectedpointcolmasked = MaybeMaskColorToAlphaChannelOverride( selectedpointcol, AlphaChannelOverride );
@@ -11774,7 +11697,7 @@ static GMenuItem2 fllist[] = {
     { { NULL, NULL, COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 1, 0, 0, 0, '\0' }, NULL, NULL, NULL, NULL, 0 }, /* line */
 #endif
     { { (unichar_t *) N_("Pr_eferences..."), (GImage *) "fileprefs.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("Preferences...|No Shortcut"), NULL, NULL, MenuPrefs, 0 },
-    { { (unichar_t *) N_("_X Resource Editor..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("X Resource Editor...|No Shortcut"), NULL, NULL, MenuXRes, 0 },
+    { { (unichar_t *) N_("Appearance Editor..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("Appearance Editor...|No Shortcut"), NULL, NULL, MenuXRes, 0 },
 #if !defined(_NO_PYTHON)
     { { (unichar_t *) N_("Config_ure Plugins..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'u' }, H_("Configure Plugins...|No Shortcut"), NULL, NULL, MenuPlug, 0 },
 #endif
@@ -12535,8 +12458,7 @@ static void _CharViewCreate(CharView *cv, SplineChar *sc, FontView *fv,int enc,i
     /* extern int cv_auto_goto; */
     extern enum cvtools cv_b1_tool, cv_cb1_tool, cv_b2_tool, cv_cb2_tool;
 
-    if ( !cvcolsinited )
-	CVColInit();
+    CVColInit();
 
     static int firstCharView = 1;
     if( firstCharView )
@@ -12631,14 +12553,12 @@ static void _CharViewCreate(CharView *cv, SplineChar *sc, FontView *fv,int enc,i
 	/* Success! They've got a wacom tablet */
     }
 
-    GResourceFindFont("CharView.PointNumberFont", &cv_pointnumberfont);
     cv->small = cv_pointnumberfont.fi;
     GDrawWindowFontMetrics(cv->gw,cv->small,&as,&ds,&ld);
     cv->sfh = as+ds; cv->sas = as;
     GDrawSetFont(cv->gw,cv->small);
     GDrawGetText8Bounds(cv->gw,"0123456789",10,&textbounds);
     cv->sdh = textbounds.as+textbounds.ds+1;
-    GResourceFindFont("CharView.LabelFont", &cv_labelfont);
     cv->normal = cv_labelfont.fi;
     GDrawWindowFontMetrics(cv->gw,cv->normal,&as,&ds,&ld);
     cv->nfh = as+ds; cv->nas = as;
@@ -13466,8 +13386,9 @@ GResInfo charview2_ri = {
     "CharView",
     "fontforge",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -13484,8 +13405,9 @@ GResInfo charview_ri = {
     "CharView",
     "fontforge",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,

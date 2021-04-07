@@ -41,7 +41,6 @@ static GBox menubar_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox menu_box = GBOX_EMPTY; /* Don't initialize here */
 static GResFont menu_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
 static GResFont menubar_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
-static int gmenubar_inited = false;
 #ifdef __Mac
 static int mac_menu_icons = true;
 #else
@@ -65,7 +64,25 @@ static enum { kb_ibm, kb_mac, kb_sun, kb_ppc } keyboard = _Keyboard;
 /*  While in Suse PPC X, the command key is 0x8 (meta) and option is 0x2000 */
 /*  and the standard mac option conversions are done */
 
-static GResInfo gmenu_ri;
+static int GMenuBoxRIInit(GResInfo *ri) {
+    char *keystr, *end;
+    if ( !_GResEditInitialize(ri) )
+	return false; // Already initialized
+
+    keystr = GResourceFindString("Keyboard");
+    if ( keystr!=NULL ) {
+	if ( strmatch(keystr,"mac")==0 ) keyboard = kb_mac;
+	else if ( strmatch(keystr,"sun")==0 ) keyboard = kb_sun;
+	else if ( strmatch(keystr,"ppc")==0 ) keyboard = kb_ppc;
+	else if ( strmatch(keystr,"ibm")==0 || strmatch(keystr,"pc")==0 ) keyboard = kb_ibm;
+	else if ( strtol(keystr,&end,10), *end=='\0' )
+	    keyboard = strtol(keystr,NULL,10);
+        free(keystr);
+    }
+    return true;
+}
+
+GResInfo gmenu_ri;
 static GResInfo gmenubar_ri = {
     &gmenu_ri, &ggadget_ri,&gmenu_ri, NULL,
     &menubar_box,
@@ -77,11 +94,12 @@ static GResInfo gmenubar_ri = {
     "GMenuBar",
     "Gdraw",
     false,
+    false,
     omf_border_shape|omf_border_width|box_foreground_border_outer,
-    NULL,
+    { 0, bs_rect, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
-    NULL,
+    GMenuBoxRIInit,
     NULL
 };
 static struct resed menu_re[] = {
@@ -90,8 +108,9 @@ static struct resed menu_re[] = {
     {N_("Grab"), "Grab", rt_bool, &menu_grabs, N_("Whether the menu 'grabs' the mouse pointer"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
-static GResInfo gmenu_ri = {
-    NULL, &ggadget_ri,&gmenubar_ri, NULL,
+extern GResInfo gmatrixedit_ri;
+GResInfo gmenu_ri = {
+    &gmatrixedit_ri, &ggadget_ri,&gmenubar_ri, NULL,
     &menu_box,
     &menu_font,
     NULL,
@@ -101,13 +120,19 @@ static GResInfo gmenu_ri = {
     "GMenu",
     "Gdraw",
     false,
+    false,
     omf_border_shape|omf_padding|box_foreground_border_outer,
-    NULL,
+    { 0, bs_rect, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
+
+static void GMenuInit(void) {
+    GResEditDoInit(&gmenubar_ri);
+    GResEditDoInit(&gmenu_ri);
+}
 
 char* HKTextInfoToUntranslatedText( char* text_untranslated );
 char* HKTextInfoToUntranslatedTextFromTextInfo( GTextInfo* ti );
@@ -117,39 +142,6 @@ static struct gmenu *GMenuCreateSubMenu(struct gmenu *parent,GMenuItem *mi,int d
 static struct gmenu *GMenuCreatePulldownMenu(GMenuBar *mb,GMenuItem *mi, int disabled);
 
 static struct gmenu *most_recent_popup_menu = NULL;
-
-static void GMenuInit() {
-    FontRequest rq;
-    char *keystr, *end;
-
-    GGadgetInit();
-    _GGadgetCopyDefaultBox(&menubar_box);
-    _GGadgetCopyDefaultBox(&menu_box);
-    menubar_box.border_shape = menu_box.border_shape = bs_rect;
-    menubar_box.border_width = 0;
-    menu_box.padding = 1;
-    menubar_box.flags |= box_foreground_border_outer;
-    menu_box.flags |= box_foreground_border_outer;
-    _GGadgetInitDefaultBox("GMenuBar.", &menubar_box);
-    GResourceFindFont("GMenuBar.Font", &menubar_font);
-    _GGadgetInitDefaultBox("GMenu.",&menu_box);
-    GResourceFindFont("GMenu.Font", &menu_font);
-    keystr = GResourceFindString("Keyboard");
-    if ( keystr!=NULL ) {
-	if ( strmatch(keystr,"mac")==0 ) keyboard = kb_mac;
-	else if ( strmatch(keystr,"sun")==0 ) keyboard = kb_sun;
-	else if ( strmatch(keystr,"ppc")==0 ) keyboard = kb_ppc;
-	else if ( strmatch(keystr,"ibm")==0 || strmatch(keystr,"pc")==0 ) keyboard = kb_ibm;
-	else if ( strtol(keystr,&end,10), *end=='\0' )
-	    keyboard = strtol(keystr,NULL,10);
-        free(keystr);
-    }
-    menu_grabs = GResourceFindBool("GMenu.Grab",menu_grabs);
-    mac_menu_icons = GResourceFindBool("GMenu.MacIcons",mac_menu_icons);
-    menu_3d_look = GResourceFindBool("GMenu.3DLook", menu_3d_look);
-    gmenubar_inited = true;
-    _GGroup_Init();
-}
 
 typedef struct gmenu {
     unsigned int hasticks: 1;
@@ -1666,8 +1658,7 @@ GWindow _GMenuCreatePopupMenuWithName( GWindow owner,GEvent *event, GMenuItem *m
     GMenu *m;
     GEvent e;
 
-    if ( !gmenubar_inited )
-	GMenuInit();
+    GMenuInit();
 
     p.x = event->u.mouse.x;
     p.y = event->u.mouse.y;
@@ -2299,8 +2290,7 @@ static void MenuMaskInit(GMenuItem *mi) {
 GGadget *GMenuBarCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     GMenuBar *mb = calloc(1,sizeof(GMenuBar));
 
-    if ( !gmenubar_inited )
-	GMenuInit();
+    GMenuInit();
     mb->g.funcs = &gmenubar_funcs;
     _GGadget_Create(&mb->g,base,gd,data,&menubar_box);
 
@@ -2326,8 +2316,7 @@ return( &mb->g );
 GGadget *GMenu2BarCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     GMenuBar *mb = calloc(1,sizeof(GMenuBar));
 
-    if ( !gmenubar_inited )
-	GMenuInit();
+    GMenuInit();
     mb->g.funcs = &gmenubar_funcs;
     _GGadget_Create(&mb->g,base,gd,data,&menubar_box);
 
@@ -2417,12 +2406,6 @@ return( (menumask&event->u.chr.state)==foo.short_mask && foo.shortcut == keysym 
 
 int GMenuMask(void) {
 return( menumask );
-}
-
-GResInfo *_GMenuRIHead(void) {
-    if ( !gmenubar_inited )
-	GMenuInit();
-return( &gmenubar_ri );
 }
 
 int GMenuAnyUnmaskedShortcuts(GGadget *mb1, GGadget *mb2) {

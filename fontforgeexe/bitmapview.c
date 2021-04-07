@@ -2101,6 +2101,9 @@ static void mtlistcheck(GWindow gw,struct gmenuitem *mi,GEvent *e) {
     }
 }
 
+#ifdef FREETYPE_HAS_DEBUGGER
+extern Color dv_rasterbackcol;
+#endif
 static struct resed bitmapview_re[] = {
     { N_("FG Color"), "BitmapColor", rt_color, &bitmap_color, N_("The color of the large bitmap"), NULL, { 0 }, 0, 0 },
     { N_("Overview FG Color"), "OverviewColor", rt_color, &overview_fg_color, N_("The color of the small bitmap view"), NULL, { 0 }, 0, 0 },
@@ -2114,6 +2117,9 @@ static struct resed bitmapview_re[] = {
     { N_("Selected Reference Color"), "SelectedReferenceColor", rt_color, &selected_ref_color, N_("The color of the selected reference"), NULL, { 0 }, 0, 0 },
     { N_("Reference Border Color"), "ReferenceBorderColor", rt_color, &ref_border_color, N_("The color used to outline a reference"), NULL, { 0 }, 0, 0 },
     { N_("Selected Reference Border Color"), "SelectedReferenceBorderColor", rt_color, &selected_ref_border_color, N_("The color used to outline the selected reference"), NULL, { 0 }, 0, 0 },
+#ifdef FREETYPE_HAS_DEBUGGER
+    { N_("TTF Debug View BG Color"), "DebugViewBG", rt_color, &dv_rasterbackcol, N_("The background of the TTF debugging window"), NULL, { 0 }, 0, 0 },
+#endif
     RESED_EMPTY
 };
 
@@ -2129,8 +2135,9 @@ GResInfo bitmapview_ri = {
     "BitmapView",
     "fontforge",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -2144,7 +2151,7 @@ void BVColInit(void) {
 	return;
 
     cinit = true;
-    GResEditFind(bitmapview_re, "BitmapView.");
+    GResEditFind(bitmapview_re, "BitmapView");
 }
 
 static GMenuItem2 wnmenu[] = {
@@ -2202,7 +2209,7 @@ static GMenuItem2 fllist[] = {
     { { (unichar_t *) N_("_Revert File"), (GImage *) "filerevert.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'R' }, H_("Revert File|Ctl+Shft+R"), NULL, NULL, BVMenuRevert, MID_Revert },
     { { NULL, NULL, COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 1, 0, 0, 0, '\0' }, NULL, NULL, NULL, NULL, 0 }, /* line */
     { { (unichar_t *) N_("Pr_eferences..."), (GImage *) "fileprefs.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'P' }, H_("Preferences...|No Shortcut"), NULL, NULL, MenuPrefs, 0 },
-    { { (unichar_t *) N_("_X Resource Editor..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("X Resource Editor...|No Shortcut"), NULL, NULL, MenuXRes, 0 },
+    { { (unichar_t *) N_("_Appearance Editor..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("Appearance Editor...|No Shortcut"), NULL, NULL, MenuXRes, 0 },
 #ifndef _NO_PYTHON
     { { (unichar_t *) N_("Config_ure Plugins..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'u' }, H_("Configure Plugins...|No Shortcut"), NULL, NULL, MenuPlug, 0 },
 #endif
@@ -2342,7 +2349,6 @@ BitmapView *BitmapViewCreate(BDFChar *bc, BDFFont *bdf, FontView *fv, int enc) {
     char buf[300];
     static GWindow icon = NULL;
     GTextInfo ti;
-    FontRequest rq;
     int as, ds, ld;
     static char *infofamily = NULL;
 
@@ -2447,20 +2453,8 @@ BitmapView *BitmapViewCreate(BDFChar *bc, BDFFont *bdf, FontView *fv, int enc) {
     /*bv->tools = BVMakeTools(bv);*/
     /*bv->layers = BVMakeLayers(bv);*/
 
-    if ( infofamily==NULL ) {	/* Yes, let's use the same resource name */
-	infofamily = copy(GResourceFindString("CharView.InfoFamily"));
-	/* FontConfig doesn't have access to all the X11 bitmap fonts */
-	/*  so the font I used to use isn't found, and a huge monster is */
-	/*  inserted instead */
-	if ( infofamily==NULL )
-	    infofamily = SANS_UI_FAMILIES;
-    }
-
-    memset(&rq,0,sizeof(rq));
-    rq.utf8_family_name = infofamily;
-    rq.point_size = -7;
-    rq.weight = 400;
-    bv->small = GDrawInstanciateFont(gw,&rq);
+    extern GResFont cv_pointnumberfont;
+    bv->small = cv_pointnumberfont.fi;
     GDrawWindowFontMetrics(gw,bv->small,&as,&ds,&ld);
     bv->sfh = as+ds; bv->sas = as;
 

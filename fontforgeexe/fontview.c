@@ -87,6 +87,8 @@ static int fv_fontpx;
 static GResFont fv_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
 extern void python_call_onClosingFunctions();
 
+GResInfo fontview_ri, view_ri;
+
 #define	FV_LAB_HEIGHT	15
 
 #ifdef BIGICONS
@@ -4433,7 +4435,7 @@ static GMenuItem2 fllist[] = {
     { { NULL, NULL, COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 1, 0, 0, 0, '\0' }, NULL, NULL, NULL, NULL, 0 }, /* line */
 #endif
     { { (unichar_t *) N_("Pr_eferences..."), (GImage *) "fileprefs.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("Preferences...|No Shortcut"), NULL, NULL, MenuPrefs, 0 },
-    { { (unichar_t *) N_("_X Resource Editor..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("X Resource Editor...|No Shortcut"), NULL, NULL, MenuXRes, 0 },
+    { { (unichar_t *) N_("Appearance Editor..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'e' }, H_("Appearance Editor...|No Shortcut"), NULL, NULL, MenuXRes, 0 },
 #ifndef _NO_PYTHON
     { { (unichar_t *) N_("Config_ure Plugins..."), (GImage *) "menuempty.png", COLOR_DEFAULT, COLOR_DEFAULT, NULL, NULL, 0, 1, 0, 0, 0, 0, 1, 1, 0, 'u' }, H_("Configure Plugins...|No Shortcut"), NULL, NULL, MenuPlug, 0 },
 #endif
@@ -7228,8 +7230,8 @@ static FontView *FontView_Create(SplineFont *sf, int hide) {
     GDrawSetWindowTypeName(fv->gw, "FontView");
 
     if ( !fv_fs_init ) {
-	GResEditFind( fontview_re, "FontView.");
-	GResEditFind( view_re, "View.");
+	GResEditDoInit(&fontview_ri);
+	GResEditDoInit(&view_ri);
 	fv_fs_init = true;
     }
 
@@ -7429,7 +7431,6 @@ struct fv_interface gdraw_fv_interface = {
 };
 
 extern GResInfo charview_ri;
-GResInfo fontview_ri;
 GResInfo view_ri = {
     &fontview_ri, NULL,NULL, NULL,
     NULL,
@@ -7441,8 +7442,9 @@ GResInfo view_ri = {
     "View",
     "fontforge",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -7460,8 +7462,9 @@ GResInfo fontview_ri = {
     "FontView",
     "fontforge",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -7479,8 +7482,9 @@ GResInfo miscfonts2_ri = {
     "",
     "fontforge",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -7497,13 +7501,19 @@ GResInfo miscfonts_ri = {
     "",
     "fontforge",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
+
+void MiscFontsInit(void) {
+    GResEditDoInit(&miscfonts_ri);
+    GResEditDoInit(&miscfonts2_ri);
+}
 
 /* ************************************************************************** */
 /* ***************************** Embedded FontViews ************************* */

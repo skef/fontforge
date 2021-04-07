@@ -676,8 +676,6 @@ return( NULL );
     sv->gw = gw = GDrawCreateTopWindow(NULL,&pos,sv_e_h,&sv->cv_srch,&wattrs);
     SVSetTitle(sv);
 
-    GResourceFindFont("SearchView.Font", &searchview_font);
-    GResourceFindFont("SearchView.BoldFont", &searchview_boldfont);
     sv->plain = searchview_font.fi;
     sv->bold = searchview_boldfont.fi;
     GDrawWindowFontMetrics(sv->gw,sv->plain,&as,&ds,&ld);

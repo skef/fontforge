@@ -2871,7 +2871,6 @@ return;
 
     kc_width = GDrawPixelsToPoints(NULL,pos.width*100/GGadgetScale(100));
 
-    GResourceFindFont("KernClass.Font", &kernclass_font);
     kcd->font = kernclass_font.fi;
     GDrawWindowFontMetrics(gw,kcd->font,&as,&ds,&ld);
     kcd->fh = as+ds; kcd->as = as;

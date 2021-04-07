@@ -5842,8 +5842,6 @@ static int kern_format_dlg( SplineFont *sf, int def_layer,
     pos.height = 100;
     kf.gw = GDrawCreateTopWindow(NULL,&pos,kf_e_h,&kf,&wattrs);
 
-    GResourceFindFont("KernFormat.Font", &kernformat_font);
-    GResourceFindFont("KernFormat.BoldFont", &kernformat_boldfont);
     kf.plain = kernformat_font.fi;
     kf.bold = kernformat_boldfont.fi;
     GDrawWindowFontMetrics(kf.gw,kf.plain,&as,&ds,&ld);

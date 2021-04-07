@@ -1078,8 +1078,6 @@ static int TileAsk(struct tiledata *td,SplineFont *sf) {
     pos.height = 300;
     tpd.gw = gw = GDrawCreateTopWindow(NULL,&pos,tpd_e_h,&tpd.cv_first,&wattrs);
 
-    GResourceFindFont("TilePath.Font",tilepath_font);
-    GResourceFindFont("TilePath.BoldFont",tilepath_boldfont);
     tpd.plain = tilepath_font.fi;
     tpd.bold = tilepath_boldfont.fi;
     GDrawWindowFontMetrics(tpd.gw,tpd.plain,&as,&ds,&ld);

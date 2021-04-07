@@ -5276,8 +5276,6 @@ return;
 
 	GHVBoxFitWindow(mbox[0].ret);
 
-	GResourceFindFont("GlyphInfo.Font", &glyphinfo_font);
-
 	for ( i=0; i<5; ++i )
 	    GGadgetSetFont(psgcd[i][0].ret,glyphinfo_font.fi);
 	for ( i=0; i<2; ++i ) {

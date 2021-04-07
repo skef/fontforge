@@ -1240,7 +1240,6 @@ return;
 
     kpd.bdf = SplineFontPieceMeal(kpd.sf,kpd.layer,(intpt) (gcd[1].gd.label->userdata),72,true,NULL);
 
-    GResourceFindFont("Combinations.Font", &combinations_font);
     kpd.font = combinations_font.fi;
     GDrawWindowFontMetrics(gw,kpd.font,&as,&ds,&ld);
     kpd.fh = as+ds; kpd.as = as;

@@ -781,7 +781,6 @@ return;
     bd.width = pos.width; bd.height = pos.height;
     bd.value_x = GDrawPointsToPixels(bd.gw,135);
 
-    GResourceFindFont("BDFProperties.Font", &bdfprop_font);
     bd.font = bdfprop_font.fi;
     {
 	int as, ds, ld;

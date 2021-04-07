@@ -1480,7 +1480,6 @@ void StateMachineEdit(SplineFont *sf,ASM *sm,struct gfi_data *d) {
 	GMatrixEditSetColumnCompletion(list,0,SMD_GlyphListCompletion);
     }
 
-    GResourceFindFont("StateMachine.Font", &statemachine_font);
     smd.font = statemachine_font.fi;
     GDrawWindowFontMetrics(gw,smd.font,&as,&ds,&ld);
     smd.fh = as+ds; smd.as = as;

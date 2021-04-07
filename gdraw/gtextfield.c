@@ -43,7 +43,6 @@ static GBox glistfieldmenu_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gnumericfield_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gnumericfieldspinner_box = GBOX_EMPTY; /* Don't initialize here */
 GResFont _gtextfield_font = { "400 10pt " MONO_UI_FAMILIES, NULL };
-static int gtextfield_inited = false;
 
 static GResInfo listfield_ri, listfieldmenu_ri, numericfield_ri, numericfieldspinner_ri;
 static GTextInfo text_lab[] = {
@@ -63,7 +62,7 @@ static GGadgetCreateData text_gcd[] = {
 static GGadgetCreateData *tarray[] = { GCD_Glue, &text_gcd[0], GCD_Glue, &text_gcd[1], GCD_Glue, NULL, NULL };
 static GGadgetCreateData textbox =
     { GHVGroupCreate, { { 2, 2, 0, 0 }, NULL, 0, 0, 0, 0, 0, NULL, { (GTextInfo *) tarray }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL };
-static GResInfo gtextfield_ri = {
+GResInfo gtextfield_ri = {
     &listfield_ri, &ggadget_ri,NULL, NULL,
     &_GGadget_gtextfield_box,
     &_gtextfield_font,
@@ -74,8 +73,9 @@ static GResInfo gtextfield_ri = {
     "GTextField",
     "Gdraw",
     false,
-    omf_font|omf_padding,
-    NULL,
+    false,
+    omf_padding,
+    { 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -89,7 +89,7 @@ static GGadgetCreateData *tlarray[] = { GCD_Glue, &textlist_gcd[0], GCD_Glue, &t
 static GGadgetCreateData textlistbox =
     { GHVGroupCreate, { { 2, 2, 0, 0 }, NULL, 0, 0, 0, 0, 0, NULL, { (GTextInfo *) tlarray }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL };
 static GResInfo listfield_ri = {
-    &listfieldmenu_ri, &gtextfield_ri,&listfieldmenu_ri, &listmark_ri,
+    &listfieldmenu_ri,&gtextfield_ri,&listfieldmenu_ri, &listmark_ri,
     &glistfield_box,
     NULL,
     &textlistbox,
@@ -99,8 +99,9 @@ static GResInfo listfield_ri = {
     "GComboBox",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -117,8 +118,9 @@ static GResInfo listfieldmenu_ri = {
     "GComboBoxMenu",
     "Gdraw",
     false,
+    false,
     omf_padding,
-    NULL,
+    { 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -142,15 +144,17 @@ static GResInfo numericfield_ri = {
     "GNumericField",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
     NULL
 };
+extern GResInfo glist_ri;
 static GResInfo numericfieldspinner_ri = {
-    NULL, &numericfield_ri,NULL, NULL,
+    &glist_ri, &numericfield_ri,NULL, NULL,
     &gnumericfieldspinner_box,
     NULL,
     &numbox,
@@ -160,8 +164,9 @@ static GResInfo numericfieldspinner_ri = {
     "GNumericFieldSpinner",
     "Gdraw",
     false,
+    false,
     omf_border_type|omf_border_width|omf_padding,
-    NULL,
+    { bt_none, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -2566,26 +2571,14 @@ struct gfuncs glistfield_funcs = {
 };
 
 void GTextFieldInit() {
+    static int gtextfield_inited = false;
     if ( gtextfield_inited )
 	return;
-    GGadgetInit();
-    _GGadgetCopyDefaultBox(&_GGadget_gtextfield_box);
-    _GGadget_gtextfield_box.padding = 3;
-    /*_GGadget_gtextfield_box.flags = box_active_border_inner;*/
-    _GGadgetInitDefaultBox("GTextField.", &_GGadget_gtextfield_box);
-    GResourceFindFont("GTextField.Font", &_gtextfield_font);
-    glistfield_box = _GGadget_gtextfield_box;
-    _GGadgetInitDefaultBox("GComboBox.",&glistfield_box);
-    glistfieldmenu_box = glistfield_box;
-    glistfieldmenu_box.padding = 1;
-    _GGadgetInitDefaultBox("GComboBoxMenu.",&glistfieldmenu_box);
-    gnumericfield_box = _GGadget_gtextfield_box;
-    _GGadgetInitDefaultBox("GNumericField.",&gnumericfield_box);
-    gnumericfieldspinner_box = gnumericfield_box;
-    gnumericfieldspinner_box.border_type = bt_none;
-    gnumericfieldspinner_box.border_width = 0;
-    gnumericfieldspinner_box.padding = 0;
-    _GGadgetInitDefaultBox("GNumericFieldSpinner.",&gnumericfieldspinner_box);
+    GResEditDoInit(&gtextfield_ri);
+    GResEditDoInit(&listfield_ri);
+    GResEditDoInit(&listfieldmenu_ri);
+    GResEditDoInit(&numericfield_ri);
+    GResEditDoInit(&numericfieldspinner_ri);
     gtextfield_inited = true;
 }
 
@@ -3149,10 +3142,4 @@ void GCompletionFieldSetCompletion(GGadget *g,GTextCompletionHandler completion)
 
 void GCompletionFieldSetCompletionMode(GGadget *g,int enabled) {
     ((GTextField *) g)->was_completing = enabled;
-}
-
-GResInfo *_GTextFieldRIHead(void) {
-
-    GTextFieldInit();
-return( &gtextfield_ri );
 }

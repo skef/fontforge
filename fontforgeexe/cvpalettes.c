@@ -1505,8 +1505,6 @@ return( cvtools );
 	/* Success! They've got a wacom tablet */
     }
 
-    GResourceFindFont("ToolsPalette.Font", &toolspalette_font);
-
     if ( cvvisible[1])
 	SetPaletteVisible(cv->gw, cvtools,true);
 return( cvtools );
@@ -2022,8 +2020,6 @@ return;
 
     memset(&label,0,sizeof(label));
     memset(&gcd,0,sizeof(gcd));
-
-    GResourceFindFont("LayersPalette.Font", &layerspalette_font);
 
     for ( i=0; i<sizeof(label)/sizeof(label[0]); ++i )
 	label[i].font = layerspalette_font.fi;
@@ -3251,7 +3247,6 @@ return( cvlayers );
     if ( layerinfo.clut==NULL )
 	layerinfo.clut = _BDFClut(4);
 
-    GResourceFindFont("LayersPalette.Font", &layerspalette_font);
     layerinfo.font = layerspalette_font.fi;
 
      /* Initialize palette window */
@@ -3998,7 +3993,6 @@ return(bvlayers);
     memset(&gcd,0,sizeof(gcd));
     memset(&boxes,0,sizeof(boxes));
 
-    GResourceFindFont("LayersPalette.Font", &layerspalette_font);
     for ( i=0; i<sizeof(label)/sizeof(label[0]); ++i )
 	label[i].font = layerspalette_font.fi;
 

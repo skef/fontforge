@@ -990,7 +990,6 @@ static void StartDeltaDisplay(QGData *qg) {
     qg->gw = gw = GDrawCreateTopWindow(NULL,&pos,qg_e_h,qg,&wattrs);
     qg->done = false;
 
-    GResourceFindFont("Validate.Font", &validate_font);
     qg->font = validate_font.fi;
     GDrawWindowFontMetrics(gw,qg->font,&as,&ds,&ld);
     qg->fh = as+ds;

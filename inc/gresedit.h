@@ -65,11 +65,12 @@ typedef struct gresinfo {
     char *resname;
     char *progname;
     uint8 is_button;		/* Activate default button border flag */
+    uint8 is_initialized;
     uint32 override_mask;
-    GBox *overrides;
+    GBox overrides;
     GBox orig_state;
     void (*refresh)(void);	/* Called when user OKs the resource editor dlg */
-    void *reserved_for_future_use1;
+    int (*initialize)(struct gresinfo *);
     void *reserved_for_future_use2;
 } GResInfo;
 
@@ -98,15 +99,15 @@ enum override_mask_flags {
     omf_border_brighter		= 0x800000,
     omf_border_darkest		= 0x1000000,
     omf_border_darker		= 0x2000000,
-    omf_active_border		= 0x4000000,
-
-    omf_font			= 0x80000000
+    omf_active_border		= 0x4000000
 };
 
+extern void GResEditDoInit(GResInfo *ri);
+extern int _GResEditInitialize(GResInfo *ri);
 extern void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_filename)(const char *));
 extern void GResEditFind( struct resed *resed, char *prefix);
 extern int ResStrToFontRequest(const char *resname, FontRequest *rq);
-extern void GResourceFindFont(const char *resourcename, GResFont *font);
+extern void GResourceFindFont(const char *resourcename, const char *elemname, GResFont *font);
 
 
 #endif /* FONTFORGE_GRESEDIT_H */

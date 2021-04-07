@@ -2799,8 +2799,6 @@ static void ShowAttCreateDlg(struct att_dlg *att, SplineFont *sf, int which,
     pos.height = GDrawPointsToPixels(NULL,300);
     att->gw = GDrawCreateTopWindow(NULL,&pos,att_e_h,att,&wattrs);
 
-    GResourceFindFont("ShowATT.Font", &showatt_font);
-    GResourceFindFont("ShowATT.MonoFont", &showatt_monofont);
     att->font = showatt_font.fi;
     att->monofont = showatt_monofont.fi;
     GDrawWindowFontMetrics(att->gw,att->font,&as,&ds,&ld);

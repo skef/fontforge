@@ -786,7 +786,6 @@ void SFHistogram(SplineFont *sf,int layer, struct psdict *private, uint8 *select
     pos.height = pos.width + hist.yoff;
     hist.gw = gw = GDrawCreateTopWindow(NULL,&pos,hist_e_h,&hist,&wattrs);
 
-    GResourceFindFont("Histogram.Font", &histogram_font);
     hist.font = histogram_font.fi;
     GDrawWindowFontMetrics(gw,hist.font,&as,&ds,&ld);
     hist.fh = as+ds; hist.as = as;

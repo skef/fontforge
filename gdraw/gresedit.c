@@ -676,13 +676,8 @@ static int GRE_Save(GGadget *g, GEvent *e) {
                 }
             }
             if ( res->font!=NULL ) {
-                if ( !GGadgetIsChecked( GWidgetGetControl(gre->gw,gre->tofree[i].fontcid-1))
-                      || (res->override_mask&omf_font) ) {
-                    char *ival = GGadgetGetTitle8( GWidgetGetControl(gre->gw,gre->tofree[i].fontcid));
-                    fprintf( output, "%s.%s.Font: %s\n",
-                        res->progname, res->resname, ival );
-                    free(ival);
-                }
+		char *ival = GGadgetGetTitle8( GWidgetGetControl(gre->gw,gre->tofree[i].fontcid));
+		fprintf( output, "%s.%s.Font: %s\n", res->progname, res->resname, ival ); free(ival);
             }
             if ( res->extras!=NULL )
                 for ( extras=res->extras; extras->name!=NULL; ++extras ) {
@@ -899,7 +894,7 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
     wattrs.restrict_input_to_me = 1;
     wattrs.is_dlg = true;
     wattrs.cursor = ct_pointer;
-    wattrs.utf8_window_title = _("X Resource Editor");
+    wattrs.utf8_window_title = _("FontForge Appearance Editor");
     pos.x = pos.y = 10;
     pos.width = pos.height = 100;
     gre.gw = gw = GDrawCreateTopWindow(NULL,&pos,gre_e_h,&gre,&wattrs);
@@ -2348,8 +2343,9 @@ static struct resed gdraw_re[] = {
     {N_("Synchronize"), "Synchronize", rt_bool, &_GDraw_res_synchronize, N_("Synchronize the display before raising the first window"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
+extern GResInfo gprogress_ri;
 static GResInfo gdraw_ri = {
-    NULL, NULL,NULL, NULL,
+    &gprogress_ri, NULL,NULL, NULL,
     NULL,
     NULL,
     NULL,
@@ -2359,8 +2355,9 @@ static GResInfo gdraw_ri = {
     "",
     "Gdraw",
     false,
+    false,
     0,
-    NULL,
+    GBOX_EMPTY,
     GBOX_EMPTY,
     NULL,
     NULL,
@@ -2379,39 +2376,10 @@ return( true );
     
 void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_filename)(const char *)) {
     GResInfo *re_end, *re;
-    static int initted = false;
+    static int inited = false;
     char *oldimagepath;
     extern char *_GGadget_ImagePath;
 
-    if ( !initted ) {
-	initted = true;
-	gdraw_ri.next = _GProgressRIHead();
-	for ( re_end = _GProgressRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GGadgetRIHead();
-	for ( re_end = _GGadgetRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GButtonRIHead();
-	for ( re_end = _GButtonRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GRadioRIHead();
-	for ( re_end = _GRadioRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GTextFieldRIHead();
-	for ( re_end = _GTextFieldRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GListRIHead();
-	for ( re_end = _GListRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GScrollBarRIHead();
-	for ( re_end = _GScrollBarRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GLineRIHead();
-	for ( re_end = _GLineRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GHVBoxRIHead();
-	for ( re_end = _GHVBoxRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GMenuRIHead();
-	for ( re_end = _GMenuRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GMatrixEditRIHead();
-	for ( re_end = _GMatrixEditRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GDrawableRIHead();
-	for ( re_end = _GDrawableRIHead(); re_end->next!=NULL; re_end = re_end->next );
-	re_end->next = _GTabSetRIHead();
-	for ( re_end = _GTabSetRIHead(); re_end->next!=NULL; re_end = re_end->next );
-    }
     if ( additional!=NULL ) {
 	for ( re_end=additional; re_end->next!=NULL; re_end = re_end->next );
 	re_end->next = &gdraw_ri;
@@ -2419,6 +2387,20 @@ void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_fi
 	additional = &gdraw_ri;
 	re_end = NULL;
     }
+    if ( !inited ) {
+	inited = true;
+	for ( re=additional; re!=NULL; re=re->next )
+	    GResEditDoInit(re);
+
+    }
+    {
+	extern GResFont list_font;
+	extern GGadgetCreateData *list_gcd;
+	int as, ds, ld;
+	GDrawWindowFontMetrics(GDrawGetRoot(NULL),list_font.fi,&as, &ds, &ld);
+	//XXX list_gcd[0].gd.pos.height = list_gcd[1].gd.pos.height = 2*(as+ds)+4;
+    }
+
     oldimagepath = copy( _GGadget_ImagePath );
     GResEditDlg(additional,def_res_file,change_res_filename);
     if (( oldimagepath!=NULL && _GGadget_ImagePath==NULL ) ||
@@ -2479,4 +2461,70 @@ void GResEditFind( struct resed *resed, char *prefix) {
     for ( i=0; resed[i].name!=NULL; ++i )
 	resed[i].found = info[i].found;
     free(info);
+}
+
+int _GResEditInitialize(GResInfo *ri) {
+    if ( ri->is_initialized )
+	return false;
+
+    if ( ri->inherits_from!=NULL )
+	GResEditDoInit(ri->inherits_from);
+
+    if ( ri->boxdata!=NULL ) {
+	if ( ri->inherits_from!=NULL && ri->inherits_from->boxdata!=NULL )
+	    *ri->boxdata = *ri->inherits_from->boxdata;
+
+	ri->boxdata->flags |= ri->override_mask & box_flag_mask;
+
+	if ( ri->override_mask & omf_border_type )
+	    ri->boxdata->border_type = ri->overrides.border_type;
+	if ( ri->override_mask & omf_border_shape )
+	    ri->boxdata->border_shape = ri->overrides.border_shape;
+	if ( ri->override_mask & omf_border_width )
+	    ri->boxdata->border_width = ri->overrides.border_width;
+	if ( ri->override_mask & omf_padding )
+	    ri->boxdata->padding = ri->overrides.padding;
+	if ( ri->override_mask & omf_rr_radius )
+	    ri->boxdata->rr_radius = ri->overrides.rr_radius;
+	if ( ri->override_mask & omf_main_foreground )
+	    ri->boxdata->main_foreground = ri->overrides.main_foreground;
+	if ( ri->override_mask & omf_disabled_foreground )
+	    ri->boxdata->disabled_foreground = ri->overrides.disabled_foreground;
+	if ( ri->override_mask & omf_main_background )
+	    ri->boxdata->main_background = ri->overrides.main_background;
+	if ( ri->override_mask & omf_disabled_background )
+	    ri->boxdata->disabled_background = ri->overrides.disabled_background;
+	if ( ri->override_mask & omf_depressed_background )
+	    ri->boxdata->depressed_background = ri->overrides.depressed_background;
+	if ( ri->override_mask & omf_gradient_bg_end )
+	    ri->boxdata->gradient_bg_end = ri->overrides.gradient_bg_end;
+	if ( ri->override_mask & omf_border_brightest )
+	    ri->boxdata->border_brightest = ri->overrides.border_brightest;
+	if ( ri->override_mask & omf_border_brighter )
+	    ri->boxdata->border_brighter = ri->overrides.border_brighter;
+	if ( ri->override_mask & omf_border_darkest )
+	    ri->boxdata->border_darkest = ri->overrides.border_darkest;
+	if ( ri->override_mask & omf_border_darker )
+	    ri->boxdata->border_darker = ri->overrides.border_darker;
+	if ( ri->override_mask & omf_active_border )
+	    ri->boxdata->active_border = ri->overrides.active_border;
+
+	_GGadgetInitDefaultBox(ri->resname, ri->boxdata);
+    }
+
+    if ( ri->font!=NULL )
+	GResourceFindFont(ri->resname, "Font", ri->font);
+
+    if ( ri->extras!=NULL )
+	GResEditFind(ri->extras, ri->resname);
+
+    ri->is_initialized = true;
+    return true;
+}
+
+void GResEditDoInit(GResInfo *ri) {
+    if ( ri->initialize!=NULL )
+	(*ri->initialize)(ri);
+    else
+	_GResEditInitialize(ri);
 }

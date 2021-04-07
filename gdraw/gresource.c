@@ -52,6 +52,7 @@ int _GResource_FindResName(const char *name, int do_restrict) {
     int top=do_restrict?rsummit:rcur, bottom = do_restrict?rbase:0;
     int test, cmp;
 
+    printf("rcur = %d, %s\n", rcur, name);
     if ( rcur==0 )
 return( -1 );
 
@@ -76,6 +77,7 @@ static int GResourceRestrict(const char *prefix) {
     int test, cmp;
     int plen;
     int oldtest, oldtop;
+    char *prestr;
 
     if ( prefix==NULL || *prefix=='\0' ) {
 	rbase = rskiplen = 0; rsummit = rcur;
@@ -84,31 +86,37 @@ return( rcur==0?-1:0 );
     if ( rcur==0 )
 return( -1 );
 
-    plen = strlen(prefix);
+    prestr = smprintf("%s.", prefix);
+    plen = strlen(prestr);
 
     for (;;) {
 	test = (top+bottom)/2;
-	cmp = strncmp(prefix,_GResource_Res[test].res,plen);
+	cmp = strncmp(prestr,_GResource_Res[test].res,plen);
 	if ( cmp==0 )
     break;
-	if ( test==bottom )
-return( -1 );
+	if ( test==bottom ) {
+	    free(prestr);
+	    return -1;
+	}
 	if ( cmp>0 ) {
 	    bottom=test+1;
-	    if ( bottom==top )
-return( -1 );
+	    if ( bottom==top ) {
+		free(prestr);
+		return -1;
+	    }
 	} else
 	    top = test;
     }
-    /* at this point the resource at test begins with the prefix */
+    /* at this point the resource at test begins with the prestr */
     /* we want to find the first and last resources that do */
     oldtop = top; oldtest = top = test;		/* find the first resource */
     for (;;) {
 	test = (top+bottom)/2;
-	cmp = strncmp(prefix,_GResource_Res[test].res,plen);
+	cmp = strncmp(prestr,_GResource_Res[test].res,plen);
 	if ( cmp<0 ) {
 	    GDrawIError("Resource list out of order");
-return( -1 );
+	    free(prestr);
+	    return -1;
 	}
 	if ( test==bottom ) {
 	    if ( cmp!=0 ) ++test;
@@ -128,10 +136,11 @@ return( -1 );
 	test = top;
     else for (;;) {
 	test = (top+bottom)/2;
-	cmp = strncmp(prefix,_GResource_Res[test].res,plen);
+	cmp = strncmp(prestr,_GResource_Res[test].res,plen);
 	if ( cmp>0 ) {
 	    GDrawIError("Resource list out of order");
-return( -1 );
+	    free(prestr);
+	    return -1;
 	}
 	if ( test==bottom ) {
 	    if ( cmp==0 ) ++test;
@@ -146,6 +155,7 @@ return( -1 );
     }
     rsummit = test;
     rskiplen = plen;
+    free(prestr);
 return( 0 );
 }
 
@@ -293,7 +303,7 @@ return;
 	    else
 		*(char **) (info->val) = copy( _GResource_Res[pos].val );
 	} else if ( info->type == rt_font ) {
-	    _GResourceFindFont(_GResource_Res[pos].val, (GResFont *) info->val, true);
+	    _GResourceFindFont(pos==-1 ? NULL : _GResource_Res[pos].val, (GResFont *) info->val, true);
 	} else if ( info->type == rt_color ) {
 	    Color temp = _GImage_ColourFName(_GResource_Res[pos].val );
 	    if ( temp==-1 ) {

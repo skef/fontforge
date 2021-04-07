@@ -831,7 +831,6 @@ static void InstrDlgCreate(struct instrdata *id,char *title) {
     iv->instrinfo.v = GWidgetCreateSubWindow(gw,&pos,ii_v_e_h,&iv->instrinfo,&wattrs);
     GDrawSetVisible(iv->instrinfo.v,true);
 
-    GResourceFindFont("TTInstruction.Font", &ttinstruction_font);
     iv->instrinfo.gfont = ttinstruction_font.fi;
     GDrawSetFont(iv->instrinfo.v,iv->instrinfo.gfont);
     GGadgetSetFont(iv->text,iv->instrinfo.gfont);
@@ -1514,7 +1513,6 @@ static void cvtCreateEditor(struct ttf_table *tab,SplineFont *sf,uint32 tag) {
     sv->v = GWidgetCreateSubWindow(gw,&subpos,sv_v_e_h,sv,&wattrs);
     GDrawSetVisible(sv->v,true);
 
-    GResourceFindFont("CVT.Font", &cvt_font);
     sv->gfont = cvt_font.fi;
     GDrawSetFont(sv->v,sv->gfont);
     GDrawSetFont(sv->gw,sv->gfont);

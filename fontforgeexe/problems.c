@@ -5393,7 +5393,6 @@ return;
     pos.height = GDrawPointsToPixels(NULL,300);
     valwin->gw = gw = GDrawCreateTopWindow(NULL,&pos,vw_e_h,valwin,&wattrs);
 
-    GResourceFindFont("Validate.Font", &validate_font);
     valwin->font = validate_font.fi;
     GDrawWindowFontMetrics(valwin->gw,valwin->font,&as,&ds,&ld);
     valwin->fh = as+ds;
