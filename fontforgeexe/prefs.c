@@ -35,7 +35,6 @@
 #include "gfile.h"
 #include "gkeysym.h"
 #include "gresedit.h"
-#include "gresource.h"
 #include "groups.h"
 #include "macenc.h"
 #include "namelist.h"

@@ -30,7 +30,6 @@
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "ustring.h"
 
 #include <math.h>

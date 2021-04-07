@@ -45,7 +45,6 @@
 #include "gio.h"
 #include "gkeysym.h"
 #include "gresedit.h"
-#include "gresource.h"
 #include "groups.h"
 #include "mm.h"
 #include "namelist.h"

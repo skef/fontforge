@@ -36,7 +36,6 @@
 #include "fvfonts.h"
 #include "gkeysym.h"
 #include "gresedit.h"
-#include "gresource.h"
 #include "splinefill.h"
 #include "splinesaveafm.h"
 #include "unicodelibinfo.h"
@@ -2145,13 +2144,7 @@ GResInfo bitmapview_ri = {
 };
 
 void BVColInit(void) {
-    static bool cinit = false;
-
-    if (cinit)
-	return;
-
-    cinit = true;
-    GResEditFind(bitmapview_re, "BitmapView");
+    GResEditDoInit(&bitmapview_ri);
 }
 
 static GMenuItem2 wnmenu[] = {

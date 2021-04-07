@@ -30,7 +30,6 @@
 #include "cvundoes.h"
 #include "fontforgeui.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gresedit.h"
 #include "splineorder2.h"
 #include "splineutil.h"
@@ -73,7 +72,7 @@ void CVDebugPointPopup(CharView *cv) {
 Color dv_rasterbackcol = 0xffffff;
 
 static void DebugColInit( void ) {
-    dv_rasterbackcol = GResourceFindColor("BitmapView.DebugViewBG", GDrawGetDefaultBackground(screen_display));
+    BVColInit();
 }
 
 static int DVBpCheck(struct instrinfo *ii, int ip) {
@@ -2196,8 +2195,6 @@ return;
 	pos.width -= sbsize; pos.height -= pos.y;
 	dv->ii.v = GWidgetCreateSubWindow(dv->dv,&pos,ii_v_e_h,&dv->ii,&wattrs);
 	dv->ii.instrdata = &dv->id;
-
-	GResourceFindFont("DebugView.Font", &debugview_font);
 
 	dv->ii.gfont = debugview_font.fi;
 	GDrawSetFont(dv->ii.v,dv->ii.gfont);

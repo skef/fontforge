@@ -29,7 +29,6 @@
 
 #include "gdraw.h"
 #include "ggadgetP.h"
-#include "gresource.h"
 
 GBox _GGroup_LineBox = GBOX_EMPTY; /* Don't initialize here */
 static GBox group_box = GBOX_EMPTY; /* Don't initialize here */

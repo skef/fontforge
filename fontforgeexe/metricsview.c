@@ -39,7 +39,6 @@
 #include "gfile.h"
 #include "gkeysym.h"
 #include "gresedit.h"
-#include "gresource.h"
 #include "lookups.h"
 #include "mm.h"
 #include "splinefill.h"

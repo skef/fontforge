@@ -30,7 +30,6 @@
 #include "fontforgeui.h"
 #include "gkeysym.h"
 #include "gresedit.h"
-#include "gresource.h"
 #include "ustring.h"
 #include "utype.h"
 

@@ -30,7 +30,6 @@
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gwidget.h"
 #include "ustring.h"
 
@@ -174,7 +173,6 @@ static int DrawTab(GWindow pixmap, GTabSet *gts, int i, int x, int y ) {
     int nx1 = GDrawDrawText(pixmap,nx,ny,gts->tabs[i].name,-1,fg);
     if (gts->closable) {
         nx1 += (GTS_TABPADDING/2-5);
-        close_col = GResourceFindColor("GTabSet.CloseColor",0xff0000);
         GDrawDrawLine(pixmap,nx+nx1,ny,nx+nx1+10,ny-10,close_col);
         GDrawDrawLine(pixmap,nx+nx1,ny-10,nx+nx1+10,ny,close_col);
     }

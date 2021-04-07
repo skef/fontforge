@@ -30,7 +30,6 @@
 #include "ggadget.h"
 #include "ggadgetP.h"		/* For the font family names */
 #include "gprogress.h"
-#include "gresource.h"
 #include "gwidget.h"
 #include "ustring.h"
 

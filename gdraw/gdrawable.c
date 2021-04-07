@@ -30,7 +30,6 @@
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gwidget.h"
 
 static GBox gdrawable_box = GBOX_EMPTY; /* Don't initialize here */

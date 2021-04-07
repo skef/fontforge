@@ -32,7 +32,6 @@
 #include "gdrawP.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gwidget.h"
 #include "ustring.h"
 

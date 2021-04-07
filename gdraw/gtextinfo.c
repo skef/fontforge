@@ -30,7 +30,6 @@
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "gresourceP.h"
 #include "hotkeys.h"
 #include "ustring.h"

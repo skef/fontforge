@@ -39,7 +39,6 @@
 
 #include "charview_private.h"
 #include "gkeysym.h"
-#include "gresource.h"
 #include "hotkeys.h"
 #include "splinefont.h"
 #include "ustring.h"

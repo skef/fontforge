@@ -43,7 +43,6 @@
 #include "fvfonts.h"
 #include "gkeysym.h"
 #include "gresedit.h"
-#include "gresource.h"
 #include "hotkeys.h"
 #include "lookups.h"
 #include "mm.h"

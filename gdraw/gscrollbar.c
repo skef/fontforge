@@ -29,7 +29,6 @@
 
 #include "gdraw.h"
 #include "ggadgetP.h"
-#include "gresource.h"
 #include "ustring.h"
 
 static GBox scrollbar_box = GBOX_EMPTY; /* Don't initialize here */
