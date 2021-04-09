@@ -31,6 +31,7 @@
 #include "ggadget.h"
 #include "ggadgetP.h"
 #include "gresedit.h"
+#include "gresourceP.h"
 #include "gwidget.h"
 #include "ustring.h"
 
@@ -451,38 +452,32 @@ static int GRE_ImageChanged(GGadget *g, GEvent *e) {
 
     if ( e->type==et_controlevent && e->u.control.subtype == et_buttonactivate ) {
 	GRE *gre = GDrawGetUserData(GGadgetGetWindow(g));
-	GResImage **ri = GGadgetGetUserData(g);
+	GResImage *ri = GGadgetGetUserData(g);
+	const char *path;
 	char *new;
-	GImage *newi;
-	GRect size;
+	if ( ri->bucket && ri->bucket->absname )
+	    path = ri->bucket->absname;
+	else
+	    path = ri->ini_name;
 	new = gwwv_open_filename_with_path("Find Image",
-		(*ri)==NULL?NULL: (*ri)->filename,
-		"*.{png,jpeg,jpg,tiff,bmp,xbm}",NULL,
+		path, "*.{png,jpeg,jpg,tiff,bmp,xbm}",NULL,
 		_GGadget_GetImagePath());
 	if ( new==NULL )
-return( true );
-	newi = GImageRead(new);
-	if ( newi==NULL ) {
-	    gwwv_post_error(_("Could not open image"),_("Could not open %s"), new );
-	    free( new );
-	} else if ( *ri==NULL ) {
-	    *ri = calloc(1,sizeof(GResImage));
-	    (*ri)->filename = new;
-	    (*ri)->image = newi;
-	    GGadgetSetTitle8(g,"...");
+	    return true;
+	GImageCacheBucket *newb = _GGadgetImageCache(new, false);
+	if ( newb==NULL ) {
+	    gwwv_post_error(_("Could not open image"),_("Could not open %s as image"), new );
+	    free(new);
 	} else {
-	    free( (*ri)->filename );
-	    (*ri)->filename = new;
-	    if ( !_GGadget_ImageInCache((*ri)->image ) )
-		GImageDestroy((*ri)->image);
-	    (*ri)->image = newi;
+	    ri->bucket = newb;
 	}
-	((GButton *) g)->image = newi;
+	((GButton *) g)->image = GResImageGetImage(ri);
+	GRect size;
 	GGadgetGetDesiredSize(g,&size,NULL);
 	GGadgetResize(g,size.width,size.height);
 	GRE_RefreshAll(gre);
     }
-return( true );
+    return true;
 }
 
 static void GRE_DoCancel(GRE *gre) {
@@ -491,7 +486,6 @@ static void GRE_DoCancel(GRE *gre) {
     for ( i=0; gre->tofree[i].res!=NULL; ++i ) {
 	GResInfo *res = gre->tofree[i].res;
 	struct resed *extras;
-	GResImage **_ri, *ri;
 	if ( res->boxdata!=NULL )
 	    *res->boxdata = res->orig_state;
 	if ( res->extras!=NULL ) {
@@ -510,29 +504,7 @@ static void GRE_DoCancel(GRE *gre) {
 		    *(GResFont *) (extras->val) = extras->orig.fontval;
 		  break;
 		  case rt_image:
-		    _ri = extras->val;
-		    ri = *_ri;
-		    if ( extras->orig.sval==NULL ) {
-			if ( ri!=NULL ) {
-			    free(ri->filename);
-			    if ( ri->image!=NULL )
-				GImageDestroy(ri->image);
-			    free(ri);
-			    *_ri = NULL;
-			}
-		    } else {
-			if ( strcmp(extras->orig.sval,ri->filename)!=0 ) {
-			    GImage *temp;
-			    temp = GImageRead(extras->orig.sval);
-			    if ( temp!=NULL ) {
-				if ( !_GGadget_ImageInCache(ri->image ) )
-				    GImageDestroy(ri->image);
-				ri->image = temp;
-			        free(ri->filename);
-			        ri->filename = copy(extras->orig.sval);
-			    }
-			}
-		    }
+		    *(GResImage *) (extras->val) = extras->orig.imageval;
 		  break;
 		  case rt_string: case rt_stringlong:
 		    /* These don't change dynamically */
@@ -719,32 +691,18 @@ static int GRE_Save(GGadget *g, GEvent *e) {
                         GColorButtonGetColor(g) );
                   break;
                   case rt_font: {
-                    char *fontdesc = GGadgetGetTitle8(g);
-                    if ( *fontdesc!='\0' )
+                    GResFont *rf = (GResFont *) extras->val;
+                    if ( rf!=NULL && rf->rstr!=NULL && *rf->rstr!=0 )
                         fprintf( output, "%s.%s%s%s: %s\n",
                             res->progname, res->resname, *res->resname=='\0'?"":".", extras->resname,
-                            fontdesc );
-                    free(fontdesc);
+                            rf->rstr );
                   } break;
                   case rt_image: {
-                    GResImage *ri = *((GResImage **) (extras->val));
-                    if ( ri!=NULL && ri->filename!=NULL ) {
-                        const char* const* paths = _GGadget_GetImagePath();
-                        int i;
-                        for ( i=0; paths[i]!=NULL; ++i ) {
-                            if ( strncmp(paths[i],ri->filename,strlen(paths[i]))==0 ) {
-                                char *pt = ri->filename+strlen(paths[i]);
-                                while ( *pt=='/' ) ++pt;
-                                fprintf( output, "%s.%s%s%s: %s\n",
-                                    res->progname, res->resname, *res->resname=='\0'?"":".", extras->resname,
-                                    pt );
-                                break;
-                            }
-                        }
-                        if ( paths[i]==NULL )
-                            fprintf( output, "%s.%s%s%s: %s\n",
-                                res->progname, res->resname, *res->resname=='\0'?"":".", extras->resname,
-                                ri->filename );
+                    GResImage *ri = (GResImage *) extras->val;
+                    if ( ri!=NULL && ri->bucket!=NULL && *ri->bucket->filename!=0 ) {
+			fprintf( output, "%s.%s%s%s: %s\n",
+			    res->progname, res->resname, *res->resname=='\0'?"":".", extras->resname,
+			    ri->bucket->filename );
                     }
                   } break;
                   case rt_string: case rt_stringlong: {
@@ -847,7 +805,10 @@ return( true );
 			/* We can't free the old value, because sometimes it is a */
 			/*  static string, not something allocated */
 			if ( *spec=='\0' ) { free( spec ); spec=NULL; }
-			*(char **) (extras->val) = spec;
+			if ( extras->cvt!=NULL )
+			    *(void **) (extras->val) = (extras->cvt)(spec, *(void **) (extras->val));
+			else
+			    *(char **) (extras->val) = spec;
 		      } break;
 		    }
 		}
@@ -2160,8 +2121,8 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		    base=3;
 		  break;
 		  case rt_image: {
-		    GResImage *ri = *(GResImage **) (extras->val);
-		    extras->orig.sval = copy( ri==NULL ? NULL : ri->filename );
+		    GResImage *ri = (GResImage *) extras->val;
+		    extras->orig.imageval = *ri;
 		    lab[k].text = (unichar_t *) S_(extras->name);
 		    lab[k].text_is_1byte = true;
 		    gcd[k].gd.label = &lab[k];
@@ -2171,9 +2132,10 @@ static void GResEditDlg(GResInfo *all,const char *def_res_file,void (*change_res
 		    gcd[k++].creator = GLabelCreate;
 		    tofree[i].earray[hl][base] = &gcd[k-1];
 
-		    if ( ri != NULL && ri->image!=NULL ) {
+		    GImage *timg = GResImageGetImage(ri);;
+		    if ( timg!=NULL ) {
 			lab[k].text = (unichar_t *) "...";
-			lab[k].image = ri->image;
+			lab[k].image = timg;
 		    } else
 			lab[k].text = (unichar_t *) "? ...";
 		    lab[k].text_is_1byte = true;
@@ -2343,9 +2305,9 @@ static struct resed gdraw_re[] = {
     {N_("Synchronize"), "Synchronize", rt_bool, &_GDraw_res_synchronize, N_("Synchronize the display before raising the first window"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
-extern GResInfo gprogress_ri;
+extern GResInfo gpopup_ri;
 static GResInfo gdraw_ri = {
-    &gprogress_ri, NULL,NULL, NULL,
+    &gpopup_ri, NULL,NULL, NULL,
     NULL,
     NULL,
     NULL,
@@ -2401,17 +2363,8 @@ void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_fi
 	//XXX list_gcd[0].gd.pos.height = list_gcd[1].gd.pos.height = 2*(as+ds)+4;
     }
 
-    oldimagepath = copy( _GGadget_ImagePath );
     GResEditDlg(additional,def_res_file,change_res_filename);
-    if (( oldimagepath!=NULL && _GGadget_ImagePath==NULL ) ||
-	    ( oldimagepath==NULL && _GGadget_ImagePath!=NULL ) ||
-	    ( oldimagepath!=NULL && _GGadget_ImagePath!=NULL &&
-		    strcmp(oldimagepath,_GGadget_ImagePath)!=0 )) {
-	char *new = _GGadget_ImagePath;
-	_GGadget_ImagePath = oldimagepath;
-	GGadgetSetImagePath(new);
-    } else
-	free( oldimagepath );
+
     for ( re=additional; re!=NULL; re=re->next ) {
 	if ( (re->override_mask&omf_refresh) && re->refresh!=NULL )
 	    (re->refresh)();

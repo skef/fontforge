@@ -41,7 +41,7 @@ static GBox glistfield_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox glistfieldmenu_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gnumericfield_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gnumericfieldspinner_box = GBOX_EMPTY; /* Don't initialize here */
-GResFont _gtextfield_font = { "400 10pt " MONO_UI_FAMILIES, NULL };
+GResFont _gtextfield_font = GRESFONT_INIT("400 10pt " MONO_UI_FAMILIES);
 
 static GResInfo listfield_ri, listfieldmenu_ri, numericfield_ri, numericfieldspinner_ri;
 static GTextInfo text_lab[] = {

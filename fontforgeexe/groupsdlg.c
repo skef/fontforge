@@ -40,7 +40,7 @@
 #include <math.h>
 #include <unistd.h>
 
-GResFont groups_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
+GResFont groups_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
 
 /******************************************************************************/
 /******************************** Group Widget ********************************/

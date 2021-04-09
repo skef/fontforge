@@ -37,9 +37,6 @@
 #include "ustring.h"
 #include "utype.h"
 
-#include "assert.h"
-#include "math.h"
-
 GBox _ggadget_Default_Box = { bt_raised, bs_rect, 2, 2, 0, 0, 
     COLOR_CREATE(0xd8,0xd8,0xd8),		/* border left */ /* brightest */
     COLOR_CREATE(0xd0,0xd0,0xd0),		/* border top */
@@ -56,19 +53,20 @@ GBox _ggadget_Default_Box = { bt_raised, bs_rect, 2, 2, 0, 0,
     COLOR_CREATE(0x00,0x00,0x00),		/* border outer */
 };
 GBox _GListMark_Box = GBOX_EMPTY; /* Don't initialize here */
-GResFont _ggadget_default_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
-GResFont popup_font = { "400 8pt " SANS_UI_FAMILIES, NULL };
+GResFont _ggadget_default_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
+GResFont popup_font = GRESFONT_INIT("400 8pt " SANS_UI_FAMILIES);
 int _GListMarkSize = 12;
-GResImage *_GListMark_Image = NULL, *_GListMark_DisImage;
+GResImage _GListMark_Image = GRESIMAGE_INIT("downarrow.png");
+GResImage _GListMark_DisImage = GRESIMAGE_INIT("downarrow_disabled.png");
 static int _GGadget_FirstLine = 6;
 static int _GGadget_LeftMargin = 6;
 static int _GGadget_LineSkip = 3;
 int _GGadget_Skip = 6;
 int _GGadget_TextImageSkip = 4;
-char *_GGadget_ImagePath = NULL;
 static int _ggadget_inited=0;
 static Color popup_foreground=0, popup_background=COLOR_CREATE(0xff,0xff,0xc0);
 static int popup_delay=1000, popup_lifetime=20000;
+static char *_GGadget_ImagePathRes;
 
 static int GGadgetRIInit(GResInfo *ri) {
     if ( ri->is_initialized )
@@ -80,14 +78,18 @@ static int GGadgetRIInit(GResInfo *ri) {
     return true;
 }
 
-static GResInfo popup_ri;
+static void *_GGadgetImagePathResSet(char *res, void *def) {
+    GGadgetSetImagePath(res);
+    return res;
+}
+
 static struct resed ggadget_re[] = {
     {N_("Skip"), "Skip", rt_int, &_GGadget_Skip, N_("Space (in points) to skip between gadget elements"), NULL, { 0 }, 0, 0 },
     {N_("Line Skip"), "LineSkip", rt_int, &_GGadget_LineSkip, N_("Space (in points) to skip after a line"), NULL, { 0 }, 0, 0 },
     {N_("First Line Skip"), "FirstLine", rt_int, &_GGadget_FirstLine, N_("Space (in points) before a line when it is the first element"), NULL, { 0 }, 0, 0 },
     {N_("Left Margin"), "LeftMargin", rt_int, &_GGadget_LeftMargin, N_("The default left margin (in points)"), NULL, { 0 }, 0, 0 },
     {N_("Text Image Skip"), "TextImageSkip", rt_int, &_GGadget_TextImageSkip, N_("Space (in points) left between images and text in labels, buttons, menu items, etc. which have both"), NULL, { 0 }, 0, 0 },
-    {N_("Image Path"), "ImagePath", rt_stringlong, &_GGadget_ImagePath, N_("List of directories to search for images, separated by colons"), NULL, { 0 }, 0, 0 },
+    {N_("Image Path"), "ImagePath", rt_stringlong, &_GGadget_ImagePathRes, N_("List of directories to search for images, separated by colons"), _GGadgetImagePathResSet, { 0 }, 0, 0 },
     RESED_EMPTY
 };
 GResInfo ggadget2_ri = {
@@ -136,7 +138,7 @@ static struct resed popup_re[] = {
     RESED_EMPTY
 };
 static void popup_refresh(void);
-static GResInfo popup_ri = {
+GResInfo gpopup_ri = {
     &ggadget_ri, NULL, NULL,NULL,
     NULL,	/* No box */
     &popup_font,
@@ -201,362 +203,6 @@ static GWindow popup;
 static GTimer *popup_timer, *popup_vanish_timer;
 static int popup_visible = false;
 
-static int match(char **list, char *val) {
-    int i;
-
-    for ( i=0; list[i]!=NULL; ++i )
-	if ( strmatch(val,list[i])==0 )
-return( i );
-
-return( -1 );
-}
-
-static void *border_type_cvt(char *val, void *def) {
-    static char *types[] = { "none", "box", "raised", "lowered", "engraved",
-	    "embossed", "double", NULL };
-    int ret = match(types,val);
-    if ( ret== -1 )
-return( def );
-return( (void *) (intpt) ret );
-}
-
-static void *border_shape_cvt(char *val, void *def) {
-    static char *shapes[] = { "rect", "roundrect", "elipse", "diamond", NULL };
-    int ret = match(shapes,val);
-    if ( ret== -1 )
-return( def );
-return( (void *) (intpt) ret );
-}
-
-static void GResHashFree(gpointer p) {
-    free(p);
-}
-
-/* font name may be something like:
-	bold italic extended 12pt courier
-	400 10pt small-caps
-    family name comes at the end, size must have "pt" or "px" after it
-*/
-static int _GResToFontRequest(const char *resname, FontRequest *rq, GHashTable *ht,
-                              int name_is_value, int strict) {
-    static char *styles[] = { "normal", "italic", "oblique", "small-caps",
-	    "bold", "light", "extended", "condensed", NULL };
-    char *val, *pt, *end, ch, *relname=NULL, *e;
-    int ret, top_level = false, percent = 100, adjust = 0;
-    int found_rel = false, found_style = false, found_weight = false, err = false;
-    FontRequest rel_rq;
-
-    if ( ht==NULL ) {
-	ht = g_hash_table_new_full(g_str_hash, g_str_equal, GResHashFree, NULL);
-	top_level = true;
-    }
-
-    memset(rq,0,sizeof(*rq));
-    memset(&rel_rq,0,sizeof(rel_rq));
-    rq->weight = 400;
-
-    if ( name_is_value )
-	val = copy(resname);
-    else {
-	val = GResourceFindString(resname);
-    }
-
-    if ( val==NULL ) {
-	if ( top_level )
-	    GDrawError("Missing font resource reference to '%s': cannot resolve", resname);
-	err = true;
-    }
-
-    for ( pt=val; !err && *pt && *pt!='"'; ) {
-	for ( end=pt; *end!=' ' && *end!='\0'; ++end );
-	ch = *end;
-	*end = '\0';
-	ret = match(styles,pt);
-	if ( ret==-1 && isdigit(*pt)) {
-	    ret = strtol(pt,&e,10);
-	    if ( strmatch(e,"pt")==0 )
-		rq->point_size = ret;
-	    else if ( strmatch(e,"px")==0 )
-		rq->point_size = -ret;
-	    else if ( strmatch(e,"%")==0 ) {
-		percent = ret;
-		if ( percent<0 )
-		    percent = -percent;
-	    } else if ( *e=='\0' ) {
-		found_weight = true;
-		rq->weight = ret;
-	    } else {
-		*end = ch;
-		break;
-	    }
-	} else if ( ret==-1 && *pt=='+' || *pt=='-' ) {
-	    adjust = strtol(pt,&e,10);
-	} else if ( ret==-1 && *pt=='^' ) {
-	    relname = copy(pt+1);
-	    if ( g_hash_table_contains(ht, relname) ) {
-		GDrawError("Circular font resource reference to '%s': cannot resolve", relname);
-		if ( strict ) {
-		    err = true;
-		    break;
-		} else
-		    continue;
-	    }
-	    g_hash_table_add(ht, copy(relname));
-	    if ( !_GResToFontRequest(relname, &rel_rq, ht, false, strict) ) {
-		err = true;
-		break;
-	    }
-	    found_rel = true;
-	} else if ( ret==-1 ) {
-	    *end = ch;
-	    break;
-	} else if ( ret==0 ) {
-	    found_weight = true;
-	    rq->weight = 400;
-	} else if ( ret==1 || ret==2 ) {
-	    found_style = true;
-	    rq->style |= fs_italic;
-	} else if ( ret==3 ) {
-	    found_style = true;
-	    rq->style |= fs_smallcaps;
-	} else if ( ret==4 ) {
-	    found_weight = true;
-	    rq->weight = 700;
-	} else if ( ret==5 ) {
-	    found_weight = true;
-	    rq->weight = 300;
-	} else if ( ret==6 ) {
-	    found_style = true;
-	    rq->style |= fs_extended;
-	} else {
-	    found_style = true;
-	    rq->style |= fs_condensed;
-	}
-	*end = ch;
-	pt = end;
-	while ( *pt==' ' ) ++pt;
-    }
-
-    if ( !err ) {
-	if ( *pt!='\0' )
-	    rq->utf8_family_name = copy(pt);
-	if ( found_rel && rq->utf8_family_name==NULL && rel_rq.utf8_family_name!=NULL )
-	    rq->utf8_family_name = copy(rel_rq.utf8_family_name);
-	if ( found_rel && !found_weight )
-	    rq->weight = rel_rq.weight;
-	if ( found_rel && !found_style )
-	    rq->style = rel_rq.style;
-	if ( rq->point_size==0 ) {
-	    if ( found_rel ) {
-		if ( rel_rq.point_size==0 ) {
-		    GDrawError("Point size not set for '%s': cannot calculate relative point size", relname);
-		    if ( strict )
-			err = true;
-		} else {
-		    float tmp = (float)percent * (float)rel_rq.point_size / 100.0;
-		    rq->point_size = (int) ((tmp - floor(tmp) > 0.5) ? ceil(tmp) : floor(tmp));
-		    if ( rq->point_size < 0 )
-			rq->point_size -= adjust;
-		    else
-			rq->point_size += adjust;
-		}
-	    } else if ( strict ) {
-		err = true;
-	    }
-	}
-    }
-
-    if ( top_level )
-	g_hash_table_destroy(ht);
-
-    free((char *)rel_rq.utf8_family_name);
-    free(val);
-    free(relname);
-
-    if ( err ) {
-	free((char *)rq->utf8_family_name);
-	rq->utf8_family_name = NULL;
-	return false;
-    }
-    
-    return true;
-}
-
-int ResStrToFontRequest(const char *resstr, FontRequest *rq) {
-    return _GResToFontRequest(resstr, rq, NULL, true, true);
-}
-
-void _GResourceFindFont(const char *resourcename, GResFont *font, int is_value) {
-    FontRequest rq;
-    FontInstance *fi;
-    char *rstr;
-    memset(&rq, 0, sizeof(rq));
-    if ( is_value )
-	rstr = rstr!=NULL ? copy(resourcename) : NULL;
-    else
-	rstr = GResourceFindString(resourcename);
-
-    if ( rstr!=NULL && ( font->rstr==NULL || strcmp(rstr, font->rstr)!=0 ) ) {
-	if ( ResStrToFontRequest(rstr, &rq) ) {
-	    fi = GDrawInstanciateFont(NULL, &rq);
-	    if ( fi!=NULL ) {
-		// The original resource string is likely a constant so just accept
-		// leaking in the rare double-set cases.
-		font->rstr = rstr;
-		font->fi = fi;
-	    } else {
-		GDrawError("Could not find font corresponding to resource %s '%s', using default", resourcename, rstr);
-	    }
-	} else {
-	    GDrawError("Could not convert font resource %s '%s', using default", resourcename, rstr);
-	}
-    }
-
-    if ( rstr!=font->rstr )
-	free(rstr);
-
-    if ( font->fi==NULL && font->rstr!=NULL ) {
-#ifndef NDEBUG
-	int r =
-#endif
-	ResStrToFontRequest(font->rstr, &rq);
-	assert( r );
-        font->fi = GDrawInstanciateFont(NULL, &rq);
-	free((char *) rq.utf8_family_name);
-	if ( font->fi==NULL ) {
-	    GDrawError("Could not find font corresponding to default '%s', using system default", font->rstr);
-	    font->fi = _ggadget_default_font.fi;
-	}
-    }
-}
-
-void GResourceFindFont(const char *resourcename, const char *elemname, GResFont *font) {
-    char *rstr;
-    if ( resourcename!=NULL )
-	rstr = smprintf("%s.%s", resourcename, elemname);
-    else
-	rstr = (char *) elemname;
-    _GResourceFindFont(rstr, font, false);
-    if ( resourcename!=NULL )
-	free(rstr);
-}
-
-void _GGadgetCopyDefaultBox(GBox *box) {
-    *box = _ggadget_Default_Box;
-}
-
-void _GGadgetInitDefaultBox(const char *class, GBox *box) {
-    GResStruct boxtypes[] = {
-	{ "Box.BorderType", rt_string, NULL, border_type_cvt, 0 },
-	{ "Box.BorderShape", rt_string, NULL, border_shape_cvt, 0 },
-	{ "Box.BorderWidth", rt_int, NULL, NULL, 0 },
-	{ "Box.Padding", rt_int, NULL, NULL, 0 },
-	{ "Box.Radius", rt_int, NULL, NULL, 0 },
-	{ "Box.BorderInner", rt_bool, NULL, NULL, 0 },
-	{ "Box.BorderOuter", rt_bool, NULL, NULL, 0 },
-	{ "Box.ActiveInner", rt_bool, NULL, NULL, 0 },
-	{ "Box.DoDepressedBackground", rt_bool, NULL, NULL, 0 },
-	{ "Box.DrawDefault", rt_bool, NULL, NULL, 0 },
-	{ "Box.BorderBrightest", rt_color, NULL, NULL, 0 },
-	{ "Box.BorderBrighter", rt_color, NULL, NULL, 0 },
-	{ "Box.BorderDarkest", rt_color, NULL, NULL, 0 },
-	{ "Box.BorderDarker", rt_color, NULL, NULL, 0 },
-	{ "Box.NormalBackground", rt_color, NULL, NULL, 0 },
-	{ "Box.NormalForeground", rt_color, NULL, NULL, 0 },
-	{ "Box.DisabledBackground", rt_color, NULL, NULL, 0 },
-	{ "Box.DisabledForeground", rt_color, NULL, NULL, 0 },
-	{ "Box.ActiveBorder", rt_color, NULL, NULL, 0 },
-	{ "Box.PressedBackground", rt_color, NULL, NULL, 0 },
-	{ "Box.BorderLeft", rt_color, NULL, NULL, 0 },
-	{ "Box.BorderTop", rt_color, NULL, NULL, 0 },
-	{ "Box.BorderRight", rt_color, NULL, NULL, 0 },
-	{ "Box.BorderBottom", rt_color, NULL, NULL, 0 },
-	{ "Box.GradientBG", rt_bool, NULL, NULL, 0 },
-	{ "Box.GradientStartCol", rt_color, NULL, NULL, 0 },
-	{ "Box.ShadowOuter", rt_bool, NULL, NULL, 0 },
-	{ "Box.BorderInnerCol", rt_color, NULL, NULL, 0 },
-	{ "Box.BorderOuterCol", rt_color, NULL, NULL, 0 },
-	GRESSTRUCT_EMPTY
-    };
-    intpt bt, bs;
-    int bw, pad, rr, inner, outer, active, depressed, def, grad, shadow;
-    char *classstr = NULL;
-
-    bt = box->border_type;
-    bs = box->border_shape;
-    bw = box->border_width;
-    pad = box->padding;
-    rr = box->rr_radius;
-    inner = box->flags & box_foreground_border_inner;
-    outer = box->flags & box_foreground_border_outer;
-    active = box->flags & box_active_border_inner;
-    depressed = box->flags & box_do_depressed_background;
-    def = box->flags & box_draw_default;
-    grad = box->flags & box_gradient_bg;
-    shadow = box->flags & box_foreground_shadow_outer;
-
-    boxtypes[0].val = &bt;
-    boxtypes[1].val = &bs;
-    boxtypes[2].val = &bw;
-    boxtypes[3].val = &pad;
-    boxtypes[4].val = &rr;
-    boxtypes[5].val = &inner;
-    boxtypes[6].val = &outer;
-    boxtypes[7].val = &active;
-    boxtypes[8].val = &depressed;
-    boxtypes[9].val = &def;
-    boxtypes[10].val = &box->border_brightest;
-    boxtypes[11].val = &box->border_brighter;
-    boxtypes[12].val = &box->border_darkest;
-    boxtypes[13].val = &box->border_darker;
-    boxtypes[14].val = &box->main_background;
-    boxtypes[15].val = &box->main_foreground;
-    boxtypes[16].val = &box->disabled_background;
-    boxtypes[17].val = &box->disabled_foreground;
-    boxtypes[18].val = &box->active_border;
-    boxtypes[19].val = &box->depressed_background;
-    boxtypes[20].val = &box->border_brightest;
-    boxtypes[21].val = &box->border_brighter;
-    boxtypes[22].val = &box->border_darkest;
-    boxtypes[23].val = &box->border_darker;
-    boxtypes[24].val = &grad;
-    boxtypes[25].val = &box->gradient_bg_end;
-    boxtypes[26].val = &shadow;
-    boxtypes[27].val = &box->border_inner;
-    boxtypes[28].val = &box->border_outer;
-
-    if ( class!=NULL )
-	classstr = smprintf("%s.", class);
-
-    /* for a plain box, default to all borders being the same. they must change*/
-    /*  explicitly */
-    if ( bt==bt_box || bt==bt_double )
-	box->border_brightest = box->border_brighter = box->border_darker = box->border_darkest;
-    GResourceFind( boxtypes, class);
-    free(classstr);
-
-    box->border_type = bt;
-    box->border_shape = bs;
-    box->border_width = bw;
-    box->padding = pad;
-    box->rr_radius = rr;
-    box->flags=0;
-    if ( inner )
-	box->flags |= box_foreground_border_inner;
-    if ( outer )
-	box->flags |= box_foreground_border_outer;
-    if ( active )
-	box->flags |= box_active_border_inner;
-    if ( depressed )
-	box->flags |= box_do_depressed_background;
-    if ( def )
-	box->flags |= box_draw_default;
-    if ( grad )
-	box->flags |= box_gradient_bg;
-    if ( shadow )
-	box->flags |= box_foreground_shadow_outer;
-}
-
 static int localeptsize(void) {
 /* smaller point size to squeeze these languages in */
     const char *loc = getenv("LC_ALL");
@@ -576,27 +222,27 @@ static int localeptsize(void) {
 void GGadgetInit(void) {
     GResEditDoInit(&ggadget_ri);
     GResEditDoInit(&ggadget2_ri);
-    GResEditDoInit(&popup_ri);
+    GResEditDoInit(&gpopup_ri);
     GResEditDoInit(&listmark_ri);
 }
 
 void GListMarkDraw(GWindow pixmap,int x, int y, int height, enum gadget_state state ) {
     GRect r, old;
+    GImage *mi, *mdi;
     int gmsize = GDrawPointsToPixels(pixmap,_GListMarkSize);
-    if ( _GListMark_Image!=NULL && _GListMark_Image->image!=NULL ) {
-	int size = GImageGetWidth(_GListMark_Image->image);
+    if ( (mi=GResImageGetImage(&_GListMark_Image))!=NULL ) {
+	int size = GImageGetWidth(mi);
 	if ( size>gmsize )
 	    gmsize = size;
     }
     int marklen = gmsize;
 
-    if ( state == gs_disabled &&
-           _GListMark_DisImage!=NULL && _GListMark_DisImage->image!=NULL) {
-	GDrawDrawScaledImage(pixmap,_GListMark_DisImage->image,x,
-		y + (height-GImageGetScaledHeight(pixmap,_GListMark_DisImage->image))/2);
-    } else if ( _GListMark_Image!=NULL && _GListMark_Image->image!=NULL ) {
-	GDrawDrawScaledImage(pixmap,_GListMark_Image->image,x,
-		y + (height-GImageGetScaledHeight(pixmap,_GListMark_Image->image))/2);
+    if ( state == gs_disabled && (mdi=GResImageGetImage(&_GListMark_DisImage))!=NULL) {
+	GDrawDrawScaledImage(pixmap,mdi,x,
+		y + (height-GImageGetScaledHeight(pixmap,mdi))/2);
+    } else if ( mi!=NULL ) {
+	GDrawDrawScaledImage(pixmap,mi,x,
+		y + (height-GImageGetScaledHeight(pixmap,mi))/2);
     } else {
 	r.x = x; r.width = marklen;
 	r.height = 2*GDrawPointsToPixels(pixmap,_GListMark_Box.border_width) +
@@ -1570,12 +1216,6 @@ return( false );
 
 void GGadgetTakesKeyboard(GGadget *g, int takes_keyboard) {
     g->takes_keyboard = takes_keyboard;
-}
-
-GResInfo *_GGadgetRIHead(void) {
-
-    GGadgetInit();
-return( &popup_ri );
 }
 
 void GGadgetSetSkipHotkeyProcessing( GGadget *g, int v )

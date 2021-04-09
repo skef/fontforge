@@ -83,7 +83,7 @@ int warn_script_unsaved = 0;
 int navigation_mask = 0;		/* Initialized in startui.c */
 
 static int fv_fontpx;
-static GResFont fv_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
+static GResFont fv_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
 extern void python_call_onClosingFunctions();
 
 GResInfo fontview_ri, view_ri;
@@ -7044,9 +7044,9 @@ return;
 }
 
 // These aren't used but exist to make the resource system work.
-static GResFont sans_viewfont = { "400 12pt " SANS_UI_FAMILIES, NULL };
-static GResFont mono_viewfont = { "400 12pt " MONO_UI_FAMILIES, NULL };
-static GResFont serif_viewfont = { "400 12pt " SERIF_UI_FAMILIES, NULL };
+static GResFont sans_viewfont = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
+static GResFont mono_viewfont = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
+static GResFont serif_viewfont = GRESFONT_INIT("400 12pt " SERIF_UI_FAMILIES);
 
 static struct resed view_re[] = {
     {N_("DefaultFont"), "DefaultFont", rt_font, &sans_viewfont, N_("The primary display font family (normally sans-serif) at the normal size for FontView characters"), NULL, { 0 }, 0, 0 },
@@ -7110,10 +7110,10 @@ static struct resed miscfonts_re[] = {
     {N_("LayersPalette.Font"), "LayersPalette.Font", rt_font, &layerspalette_font, N_("Font used in the outline view layers palette"), NULL, { 0 }, 0, 0 },
     {N_("Math.Font"), "Math.Font", rt_font, &math_font, N_("Normal font used in the Math dialog"), NULL, { 0 }, 0, 0 },
     {N_("Math.BoldFont"), "Math.BoldFont", rt_font, &math_boldfont, N_("Bold font used in the Math dialog"), NULL, { 0 }, 0, 0 },
-    {N_("SearchView.Font"), "SearchView.Font", rt_font, &searchview_font, N_("Normal font used in the Find/Replace window"), NULL, { 0 }, 0, 0 },
     RESED_EMPTY
 };
 static struct resed miscfonts2_re[] = {
+    {N_("SearchView.Font"), "SearchView.Font", rt_font, &searchview_font, N_("Normal font used in the Find/Replace window"), NULL, { 0 }, 0, 0 },
     {N_("SearchView.BoldFont"), "SearchView.BoldFont", rt_font, &searchview_boldfont, N_("Bold font used in the Find/Replace window"), NULL, { 0 }, 0, 0 },
     {N_("ShowATT.Font"), "ShowATT.Font", rt_font, &showatt_font, N_("Normal font used in the Advanced Typographic Tables dialog"), NULL, { 0 }, 0, 0 },
     {N_("ShowATT.MonoFont"), "ShowATT.MonoFont", rt_font, &showatt_monofont, N_("Monospace font used in the Advanced Typographic Tables dialog"), NULL, { 0 }, 0, 0 },
@@ -7192,7 +7192,6 @@ static void FVCreateInnards(FontView *fv,GRect *pos) {
 
 static FontView *FontView_Create(SplineFont *sf, int hide) {
     FontView *fv = (FontView *) __FontViewCreate(sf);
-    FontRequest rq;
     GRect pos;
     GWindow gw;
     GWindowAttrs wattrs;
@@ -7256,6 +7255,7 @@ static FontView *FontView_Create(SplineFont *sf, int hide) {
     fv->mbh = gsize.height;
 
     // Reset this static here in case fv_font has changed
+    FontRequest rq;
     GDrawDecomposeFont(fv_font.fi, &rq);
     fv_fontpx = -rq.point_size; // positive means points, negative means pixels
     if ( fv_fontpx < 0 )
@@ -7478,7 +7478,7 @@ GResInfo miscfonts2_ri = {
     miscfonts2_re,
     N_("Misc Fonts 2"),
     N_("Other fonts in various windows (mostly dialogs)"),
-    "",
+    NULL,
     "fontforge",
     false,
     false,
@@ -7497,7 +7497,7 @@ GResInfo miscfonts_ri = {
     miscfonts_re,
     N_("Misc Fonts"),
     N_("Various fonts in other windows (mostly dialogs)"),
-    "",
+    NULL,
     "fontforge",
     false,
     false,

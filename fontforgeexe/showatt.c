@@ -50,8 +50,8 @@ extern int _GScrollBar_Width;
 /* This file contains routines to build a dialog showing GPOS/GSUB/morx */
 /*  tables and their contents */
 
-GResFont showatt_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
-GResFont showatt_monofont = { "400 12pt " MONO_UI_FAMILIES, NULL };
+GResFont showatt_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
+GResFont showatt_monofont = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
 
 struct att_dlg;
 struct node {

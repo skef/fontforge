@@ -162,7 +162,7 @@ static struct errordata {
     int down;
 } errdata;
 
-GResFont errfont = { "400 10pt " SANS_UI_FAMILIES, NULL };
+GResFont errfont = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
 
 static void ErrHide(void) {
     GDrawSetVisible(errdata.gw,false);

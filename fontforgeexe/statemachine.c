@@ -81,7 +81,7 @@
 #define SMDE_WIDTH	200
 #define SMDE_HEIGHT	(SMD_DIRDROP+200)
 
-GResFont statemachine_font = { "400 12pt " MONO_UI_FAMILIES, NULL };
+GResFont statemachine_font = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
 extern int _GScrollBar_Width;
 
 typedef struct statemachinedlg {

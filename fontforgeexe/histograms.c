@@ -43,7 +43,7 @@
 /* This operations are designed to work on a single font. NOT a CID collection*/
 /*  A CID collection must be treated one sub-font at a time */
 
-GResFont histogram_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+GResFont histogram_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
 
 struct hentry {
     int cnt, sum;

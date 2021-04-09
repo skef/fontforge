@@ -41,7 +41,7 @@
 #include <math.h>
 
 static GBox sftextarea_box = GBOX_EMPTY; /* Don't initialize here */
-static GResFont sftextarea_font = { "400 10pt " MONO_UI_FAMILIES, NULL };
+static GResFont sftextarea_font = GRESFONT_INIT("400 10pt " MONO_UI_FAMILIES);
 
 static unichar_t nullstr[] = { 0 }, 
 	newlinestr[] = { '\n', 0 }, tabstr[] = { '\t', 0 };

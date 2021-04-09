@@ -599,11 +599,6 @@ GGadget *CreateFileChooser(struct gwindow *base, GGadgetData *gd,void *data);
 GGadget *CreateGadgets(struct gwindow *base, GGadgetCreateData *gcd);
 
 GTextInfo **GTextInfoArrayFromList(GTextInfo *ti, uint16 *cnt);
-typedef struct gresimage {
-    GImage *image;
-    char *filename;
-} GResImage;
-GResImage *GGadgetResourceFindImage(char *name, GImage *def);
 
 void InitImageCache();
 void ClearImageCache();

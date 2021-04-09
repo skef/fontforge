@@ -40,7 +40,7 @@
 extern GBox _ggadget_Default_Box;
 #define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
 
-GResFont debugview_font = { "400 12px " SANS_UI_FAMILIES, NULL };
+GResFont debugview_font = GRESFONT_INIT("400 12px " SANS_UI_FAMILIES);
 
 int debug_wins = dw_registers|dw_stack;
 

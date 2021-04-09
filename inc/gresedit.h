@@ -32,12 +32,7 @@
 #include "ggadget.h"
 #include "gresource.h"
 
-enum res_type2 { rt_stringlong = rt_font+1, rt_coloralpha, rt_image };
-
-typedef struct gresfont {
-    char *rstr;
-    GFont *fi;
-} GResFont;
+enum res_type2 { rt_stringlong = rt_font+1, rt_coloralpha };
 
 struct resed {
     const char *name, *resname;
@@ -45,7 +40,7 @@ struct resed {
     void *val;
     char *popup;
     void *(*cvt)(char *,void *);
-    union { int ival; double dval; char *sval; GResFont fontval; } orig;
+    union { int ival; double dval; char *sval; GResFont fontval; GResImage imageval; } orig;
     int cid;
     int found;
 };
@@ -106,8 +101,6 @@ extern void GResEditDoInit(GResInfo *ri);
 extern int _GResEditInitialize(GResInfo *ri);
 extern void GResEdit(GResInfo *additional,const char *def_res_file,void (*change_res_filename)(const char *));
 extern void GResEditFind( struct resed *resed, char *prefix);
-extern int ResStrToFontRequest(const char *resname, FontRequest *rq);
-extern void GResourceFindFont(const char *resourcename, const char *elemname, GResFont *font);
 
 
 #endif /* FONTFORGE_GRESEDIT_H */

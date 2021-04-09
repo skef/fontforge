@@ -41,8 +41,8 @@ extern GBox _ggadget_Default_Box;
 #define ACTIVE_BORDER   (_ggadget_Default_Box.active_border)
 #define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
 
-GResFont cvt_font = { "400 12px " MONO_UI_FAMILIES, NULL } ;
-GResFont ttinstruction_font = { "400 12px " MONO_UI_FAMILIES, NULL };
+GResFont cvt_font = GRESFONT_INIT("400 12px " MONO_UI_FAMILIES) ;
+GResFont ttinstruction_font = GRESFONT_INIT("400 12px " MONO_UI_FAMILIES);
 
 extern int _GScrollBar_Width;
 #define EDGE_SPACING	2

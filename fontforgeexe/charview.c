@@ -203,8 +203,8 @@ static Color backoutthicklinecol = 0x20707070;
 int cvbutton3d = 1;
 Color cvbutton3dedgelightcol = 0xe0e0e0;
 Color cvbutton3dedgedarkcol = 0x707070;
-static GResFont cv_labelfont = { "400 10pt " SANS_UI_FAMILIES, NULL };
-GResFont cv_pointnumberfont = { "400 10px " SANS_UI_FAMILIES, NULL };
+static GResFont cv_labelfont = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
+GResFont cv_pointnumberfont = GRESFONT_INIT("400 10px " SANS_UI_FAMILIES);
 extern GResFont cv_measuretoolfont;
 
 int prefs_cv_outline_thickness = 1;

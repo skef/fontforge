@@ -70,7 +70,7 @@ static Color selglyphcol = 0x909090;
 static Color kernlinecol = 0x008000;
 static Color rbearinglinecol = 0x000080;
 
-static GResFont mv_font = { "400 12px " SANS_UI_FAMILIES, NULL };
+static GResFont mv_font = GRESFONT_INIT("400 12px " SANS_UI_FAMILIES);
 
 int pref_mv_shift_and_arrow_skip = 10;
 int pref_mv_control_shift_and_arrow_skip = 5;

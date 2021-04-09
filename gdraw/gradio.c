@@ -43,9 +43,19 @@ static GBox checkbox_off_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox visibility_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox visibility_on_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox visibility_off_box = GBOX_EMPTY; /* Don't initialize here */
-static GResImage *radon, *radoff, *checkon, *checkoff, *raddison, *raddisoff, *checkdison, *checkdisoff;
-static GResImage *visibilityon, *visibilityoff, *visibilitydison, *visibilitydisoff;
-static GResFont checkbox_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+static GResImage radon = GRESIMAGE_INIT("radio_on.png");
+static GResImage radoff = GRESIMAGE_INIT("radio_off.png");
+static GResImage raddison = GRESIMAGE_INIT("radio_on_disabled.png");
+static GResImage raddisoff = GRESIMAGE_INIT("radio_off_disabled.png");
+static GResImage checkon = GRESIMAGE_INIT("check_on.png");
+static GResImage checkoff = GRESIMAGE_INIT("check_off.png");
+static GResImage checkdison = GRESIMAGE_INIT("check_on_disabled.png");
+static GResImage checkdisoff = GRESIMAGE_INIT("check_off_disabled.png");
+static GResImage visibilityon = GRESIMAGE_INIT("check_on.png");
+static GResImage visibilityoff = GRESIMAGE_INIT("check_off.png");
+static GResImage visibilitydison = GRESIMAGE_INIT("check_on_disabled.png");
+static GResImage visibilitydisoff = GRESIMAGE_INIT("check_off_disabled.png");
+static GResFont checkbox_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
 static int gradio_inited = false;
 
 GResInfo gradio_ri;
@@ -68,7 +78,7 @@ static GGadgetCreateData *rarray[] = { GCD_Glue, &radio_gcd[0], GCD_Glue, &radio
 static GGadgetCreateData radiobox =
     { GHVGroupCreate, { { 2, 2, 0, 0 }, NULL, 0, 0, 0, 0, 0, NULL, { (GTextInfo *) rarray }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL };
 GResInfo gradio_ri = {
-    &gradioon_ri, &ggadget_ri,&gradioon_ri, &gradiooff_ri,
+    &gradioon_ri, &ggadget_ri, &gradioon_ri, &gradiooff_ri,
     &radio_box,
     NULL,
     &radiobox,
@@ -221,9 +231,9 @@ static GTextInfo visibility_lab[] = {
     { (unichar_t *) "Enabled" , NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' }
 };
 static GGadgetCreateData visibility_gcd[] = {
-    { GCheckBoxCreate, { GRECT_EMPTY, NULL, 0, 0, 0, 0, 0, &visibility_lab[0], { NULL }, gg_visible, NULL, NULL }, NULL, NULL },
-    { GCheckBoxCreate, { GRECT_EMPTY, NULL, 0, 0, 0, 0, 0, &visibility_lab[1], { NULL }, gg_visible|gg_cb_on, NULL, NULL }, NULL, NULL },
-    { GCheckBoxCreate, { GRECT_EMPTY, NULL, 0, 0, 0, 0, 0, &visibility_lab[1], { NULL }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL }
+    { GVisibilityBoxCreate, { GRECT_EMPTY, NULL, 0, 0, 0, 0, 0, &visibility_lab[0], { NULL }, gg_visible, NULL, NULL }, NULL, NULL },
+    { GVisibilityBoxCreate, { GRECT_EMPTY, NULL, 0, 0, 0, 0, 0, &visibility_lab[1], { NULL }, gg_visible|gg_cb_on, NULL, NULL }, NULL, NULL },
+    { GVisibilityBoxCreate, { GRECT_EMPTY, NULL, 0, 0, 0, 0, 0, &visibility_lab[2], { NULL }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL }
 };
 static GGadgetCreateData *varray[] = { GCD_Glue, &visibility_gcd[0], GCD_Glue, &visibility_gcd[1], GCD_Glue, &visibility_gcd[2], GCD_Glue, NULL, NULL };
 static GGadgetCreateData visibilitybox =
@@ -253,14 +263,14 @@ static struct resed gvisibilityon_re[] = {
     RESED_EMPTY
 };
 static GResInfo gvisibilityon_ri = {
-    &gvisibilityoff_ri, &ggadget_ri,&gvisibilityon_ri,&gvisibilityoff_ri,
+    &gvisibilityoff_ri, &ggadget_ri,&gvisibilityoff_ri,&gvisibility_ri,
     &visibility_on_box,
     NULL,
     &visibilitybox,
     gvisibilityon_re,
     N_("Visibility Box On Mark"),
     N_("The mark showing visibliity is On (up, not selected)"),
-    "GVisibilityBoxBoxBoxBoxBoxBoxBoxBoxOn",
+    "GVisibilityBoxOn",
     "Gdraw",
     false,
     false,
@@ -278,12 +288,12 @@ static struct resed gvisibilityoff_re[] = {
 };
 extern GResInfo gtextfield_ri;
 static GResInfo gvisibilityoff_ri = {
-    &gtextfield_ri, &ggadget_ri,&gvisibilityon_ri,&gvisibilityoff_ri,
+    &gtextfield_ri, &ggadget_ri,&gvisibilityon_ri,&gvisibility_ri,
     &visibility_off_box,
     NULL,
     &visibilitybox,
     gvisibilityoff_re,
-    N_("Visibility Off Mark"),
+    N_("Visibility Box Off Mark"),
     N_("The mark showing visibility is off"),
     "GVisibilityBoxOff",
     "Gdraw",
@@ -374,13 +384,13 @@ return( false );
     mark = NULL;
     if ( g->state == gs_disabled )
 	mark = gr->ison ? gr->ondis : gr->offdis; /* note: ondis or offdis may be NULL! */
-    if ( mark==NULL || mark->image==NULL )
+    if ( mark==NULL || GResImageGetImage(mark)==NULL )
 	mark = gr->ison ? gr->on : gr->off; /* note: on or off may be NULL! */
-    if ( mark!=NULL && mark->image==NULL ) /* when there's a reference to a special image, but no actual image */
+    if ( mark!=NULL && GResImageGetImage(mark)==NULL ) /* when there's a reference to a special image, but no actual image */
 	mark = NULL;
     if ( mark!=NULL ) {
 	GDrawPushClip(pixmap,&gr->onoffinner,&old3);
-	GDrawDrawScaledImage(pixmap,mark->image,
+	GDrawDrawScaledImage(pixmap,GResImageGetImage(mark),
 		gr->onoffinner.x,gr->onoffinner.y);
 	GDrawPopClip(pixmap,&old3);
     } else if ( gr->ison && gr->onbox == &checkbox_on_box ) {
@@ -729,6 +739,7 @@ struct gfuncs gradio_funcs = {
     NULL
 };
 
+extern int GImageWriteGImage(GImage *gi, char *filename);
 static void GRadioInit() {
     if ( !gradio_inited ) {
 	GResEditDoInit(&gradio_ri);
@@ -759,16 +770,16 @@ static void GCheckBoxFit(GCheckBox *gl) {
 
     needed.x = needed.y = 0;
     needed.width = needed.height = 1;
-    if ( gl->on!=NULL && gl->on->image!=NULL ) {
-	if (( iwidth = GImageGetScaledWidth(gl->g.base,gl->on->image))>needed.width )
+    if ( gl->on!=NULL && GResImageGetImage(gl->on)!=NULL ) {
+	if (( iwidth = GImageGetScaledWidth(gl->g.base,GResImageGetImage(gl->on)))>needed.width )
 	    needed.width = iwidth;
-	if (( iheight = GImageGetScaledHeight(gl->g.base,gl->on->image))>needed.height )
+	if (( iheight = GImageGetScaledHeight(gl->g.base,GResImageGetImage(gl->on)))>needed.height )
 	    needed.height = iheight;
     }
-    if ( gl->off!=NULL && gl->off->image!=NULL ) {
-	if (( iwidth = GImageGetScaledWidth(gl->g.base,gl->off->image))>needed.width )
+    if ( gl->off!=NULL && GResImageGetImage(gl->off)!=NULL ) {
+	if (( iwidth = GImageGetScaledWidth(gl->g.base,GResImageGetImage(gl->off)))>needed.width )
 	    needed.width = iwidth;
-	if (( iheight = GImageGetScaledHeight(gl->g.base,gl->off->image))>needed.height )
+	if (( iheight = GImageGetScaledHeight(gl->g.base,GResImageGetImage(gl->off)))>needed.height )
 	    needed.height = iheight;
     }
     gl->onoffinner = needed;
@@ -816,17 +827,17 @@ static GCheckBox *_GCheckBoxCreate(GCheckBox *gl, struct gwindow *base, GGadgetD
     if ( gl->isradio ) {
 	gl->onbox = &radio_on_box;
 	gl->offbox = &radio_off_box;
-	gl->on = radon;
-	gl->off = radoff;
-	gl->ondis = raddison;
-	gl->offdis = raddisoff;
+	gl->on = &radon;
+	gl->off = &radoff;
+	gl->ondis = &raddison;
+	gl->offdis = &raddisoff;
     } else {
 	gl->onbox = &checkbox_on_box;
 	gl->offbox = &checkbox_off_box;
-	gl->on = checkon;
-	gl->off = checkoff;
-	gl->ondis = checkdison;
-	gl->offdis = checkdisoff;
+	gl->on = &checkon;
+	gl->off = &checkoff;
+	gl->ondis = &checkdison;
+	gl->offdis = &checkdisoff;
     }
     GCheckBoxFit(gl);
     _GGadget_FinalPosition(&gl->g,base,gd);
@@ -846,10 +857,10 @@ GGadget *GVisibilityBoxCreate(struct gwindow *base, GGadgetData *gd,void *data) 
     GCheckBox *gl = _GCheckBoxCreate(calloc(1,sizeof(GCheckBox)),base,gd,data,&visibility_box);
     gl->onbox = &visibility_on_box;
     gl->offbox = &visibility_off_box;
-    gl->on = visibilityon;
-    gl->off = visibilityoff;
-    gl->ondis = visibilitydison;
-    gl->offdis = visibilitydisoff;
+    gl->on = &visibilityon;
+    gl->off = &visibilityoff;
+    gl->ondis = &visibilitydison;
+    gl->offdis = &visibilitydisoff;
 
 return( &gl->g );
 }

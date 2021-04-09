@@ -58,8 +58,8 @@ void SFUntickAllPSTandKern(SplineFont *sf);
 int kernsLength( KernPair *kp );
 
 static int DEBUG = 1;
-GResFont kernformat_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
-GResFont kernformat_boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
+GResFont kernformat_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
+GResFont kernformat_boldfont = GRESFONT_INIT("700 12pt " SANS_UI_FAMILIES);
 
 /* ************************************************************************** */
 /* ******************************* UI routines ****************************** */

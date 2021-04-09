@@ -59,8 +59,8 @@
 /* Complications: */
 /*  There may not be an integral number of tiles, so we must be prepared to truncate some splines */
     
-GResFont tilepath_font = { "400 12pt " SANS_UI_FAMILIES, NULL },
-GResFont tilepath_boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
+GResFont tilepath_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES),
+GResFont tilepath_boldfont = GRESFONT_INIT("700 12pt " SANS_UI_FAMILIES);
 typedef struct tiledata {
     SplineSet *basetile;	/* Moved so that ymin==0, and x is adjusted */
 				/*  about the x-axis as implied by tilepos */

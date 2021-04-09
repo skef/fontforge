@@ -59,7 +59,7 @@ typedef struct gprogress {
 
 static Color progress_background, progress_foreground;
 static Color progress_fillcol = 0xc0c0ff;
-static GResFont progress_font = { "400 12pt "MONO_UI_FAMILIES, NULL };
+static GResFont progress_font = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
 static int progress_init = false;
 
 static GProgress *current;
@@ -222,7 +222,6 @@ void GProgressStartIndicator(
     int stages			/* Number of stages, each processing tot sub-entities */
 ) {
     GProgress *new;
-    FontRequest rq;
     GWindowAttrs wattrs;
     GWindow root;
     GGadgetData gd;

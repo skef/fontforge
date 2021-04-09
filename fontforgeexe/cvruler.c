@@ -339,7 +339,7 @@ static int ruler_linger_e_h(GWindow gw, GEvent *event) {
 return( true );
 }
 	
-GResFont cv_measuretoolfont = { "400 12px " MONO_UI_FAMILIES, NULL };
+GResFont cv_measuretoolfont = GRESFONT_INIT("400 12px " MONO_UI_FAMILIES);
 
 /*
  * Comparison function for use with qsort.

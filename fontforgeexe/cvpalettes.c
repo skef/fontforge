@@ -104,8 +104,8 @@ static GCursor tools[cvt_max+1] = { ct_pointer }, spirotools[cvt_max+1];
 enum cvtools cv_b1_tool = cvt_pointer, cv_cb1_tool = cvt_pointer,
 	     cv_b2_tool = cvt_magnify, cv_cb2_tool = cvt_ruler;
 
-GResFont toolspalette_font = { "400 10px " SANS_UI_FAMILIES, NULL };
-GResFont layerspalette_font = { "400 10px " SANS_UI_FAMILIES, NULL };
+GResFont toolspalette_font = GRESFONT_INIT("400 10px " SANS_UI_FAMILIES);
+GResFont layerspalette_font = GRESFONT_INIT("400 10px " SANS_UI_FAMILIES);
 
 #define CV_LAYERS_WIDTH		104
 #define CV_LAYERS_HEIGHT	100

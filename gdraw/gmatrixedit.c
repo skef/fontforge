@@ -39,8 +39,8 @@
 
 static GBox gmatrixedit_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gmatrixedit_button_box = GBOX_EMPTY; /* Don't initialize here */
-static GResFont gmatrixedit_font = { "400 12pt " MONO_UI_FAMILIES, NULL };
-static GResFont gmatrixedit_titfont = { "400 8pt " SANS_UI_FAMILIES, NULL };
+static GResFont gmatrixedit_font = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
+static GResFont gmatrixedit_titfont = GRESFONT_INIT("400 8pt " SANS_UI_FAMILIES);
 static Color gmatrixedit_title_bg = 0x808080, gmatrixedit_title_fg = 0x000000, gmatrixedit_title_divider = 0xffffff;
 static Color gmatrixedit_rules = 0x000000;
 static Color gmatrixedit_frozencol = 0xff0000,
@@ -59,11 +59,11 @@ static struct resed gmatrixedit_re[] = {
 };
 static GResInfo gmatrixedit2_ri;
 GResInfo gmatrixedit_ri = {
-    &gmatrixedit2_ri, &ggadget_ri, NULL,NULL,
+    &gmatrixedit2_ri, &ggadget_ri, &gmatrixedit2_ri,NULL,
     &gmatrixedit_box,
     &gmatrixedit_font,
     NULL,
-    gmatrixedit_re,
+    NULL,
     N_("Matrix Edit"),
     N_("Matrix Edit (sort of like a spreadsheet)"),
     "GMatrixEdit",

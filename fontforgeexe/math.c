@@ -53,8 +53,8 @@ static char *aspectnames[] = {
     NULL
 };
 
-GResFont math_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
-GResFont math_boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
+GResFont math_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
+GResFont math_boldfont = GRESFONT_INIT("700 12pt " SANS_UI_FAMILIES);
 
 static char *GlyphConstruction_Dlg(GGadget *g, int r, int c);
 static char *MKChange_Dlg(GGadget *g, int r, int c);

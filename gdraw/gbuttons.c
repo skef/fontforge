@@ -42,8 +42,8 @@ static GBox _GGadget_colorbutton_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox _GGadget_droplist_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox label_box = GBOX_EMPTY; /* Don't initialize here */
 static int shift_on_press = 0;
-static GResFont label_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
-static GResFont button_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+static GResFont label_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
+static GResFont button_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
 #define COLOR_BUTTON_BOX_LEN	10
 
 static GResInfo gcancel_ri, gdefault_ri, gbutton_ri, gdroplist_ri, gcolor_ri;
@@ -1166,9 +1166,4 @@ GGadget *GListButtonCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     _GLabelCreate((GLabel *) gl,base,gd,data,&_GGadget_droplist_box);
     gl->g.funcs = &glistbutton_funcs;
 return( &gl->g );
-}
-
-GResInfo *_GButtonRIHead(void) {
-    _GButtonInit();
-return( &glabel_ri );
 }

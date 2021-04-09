@@ -511,7 +511,6 @@ extern int _GListMarkSize;		/* in points, def width of popup mark in buttons */
 extern int _GGadget_Skip;		/* in points, def hor space between gadgets */
 extern int _GGadget_TextImageSkip;	/* in points, def hor space text and image */
 extern GBox _GListMark_Box, _GGroup_LineBox;
-extern GResImage *_GListMark_Image;
 extern GResFont _ggadget_default_font;
 
 void _GWidget_AddGGadget(GWindow gw,struct ggadget *g);
@@ -592,11 +591,6 @@ extern int _GGadget_ImageInCache(GImage *image);
 extern int _ggadget_use_gettext;
 
 extern GResInfo ggadget_ri, listmark_ri;
-extern GResInfo *_GGadgetRIHead(void), *_GButtonRIHead(void), *_GTextFieldRIHead(void);
-extern GResInfo *_GRadioRIHead(void), *_GScrollBarRIHead(void), *_GLineRIHead(void);
-extern GResInfo *_GMenuRIHead(void), *_GTabSetRIHead(void), *_GHVBoxRIHead(void);
-extern GResInfo *_GListRIHead(void), *_GMatrixEditRIHead(void), *_GDrawableRIHead(void);
-extern GResInfo *_GProgressRIHead(void);
 
 #define SERIF_UI_FAMILIES	"dejavu serif,times,caslon,serif,clearlyu,unifont,unifont upper"
 #define SANS_UI_FAMILIES	"dejavu sans,helvetica,caliban,sans,clearlyu,unifont,unifont upper"

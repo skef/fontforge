@@ -40,7 +40,7 @@ static GGadgetCreateData *larray[] = { GCD_Glue, &gline_gcd[0], GCD_Glue, NULL, 
 static GGadgetCreateData linebox =
     { GHVGroupCreate, { { 2, 2, 0, 0 }, NULL, 0, 0, 0, 0, 0, NULL, { (GTextInfo *) larray }, gg_visible|gg_enabled, NULL, NULL }, NULL, NULL };
 extern GResInfo ghvbox_ri;
-GResInfo gline_ri = {
+static GResInfo gline_ri = {
     &ghvbox_ri, &ggadget_ri, NULL, NULL,
     &_GGroup_LineBox,
     NULL,
@@ -292,10 +292,4 @@ GGadget *GGroupCreate(struct gwindow *base, GGadgetData *gd,void *data) {
     GGroupFit(g);
     _GGadget_FinalPosition(g,base,gd);
 return( g );
-}
-
-GResInfo *_GLineRIHead(void) {
-
-    _GGroup_Init();
-return( &gline_ri );
 }

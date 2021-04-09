@@ -35,7 +35,7 @@
 
 static GBox gtabset_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox gvtabset_box = GBOX_EMPTY; /* Don't initialize here */
-static GResFont gtabset_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+static GResFont gtabset_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
 static Color close_col = 0xff0000;
 
 static int GTS_TABPADDING = 25;

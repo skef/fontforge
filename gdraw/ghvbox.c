@@ -40,9 +40,9 @@
 static GBox hvgroup_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox hvbox_box = GBOX_EMPTY; /* Don't initialize here */
 
-extern GResInfo gmenu_ri;
+extern GResInfo gmenubar_ri;
 GResInfo ghvgroupbox_ri = {
-    &gmenu_ri, &ggadget_ri, NULL, NULL,
+    &gmenubar_ri, &ggadget_ri, NULL, NULL,
     &hvgroup_box,
     NULL,
     NULL,

@@ -52,7 +52,7 @@
 /* ***************************** Problems Dialog **************************** */
 /* ************************************************************************** */
 
-GResFont validate_font = { "400 11pt " SANS_UI_FAMILIES, NULL };
+GResFont validate_font = GRESFONT_INIT("400 11pt " SANS_UI_FAMILIES);
 
 struct mgrpl {
     char *search;

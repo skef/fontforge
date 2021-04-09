@@ -30,6 +30,7 @@
 #include "gdraw.h"
 #include "ggadgetP.h"
 #include "gkeysym.h"
+#include "gresourceP.h"
 #include "gwidget.h"
 #include "hotkeys.h"
 #include "prefs.h"
@@ -38,8 +39,8 @@
 
 static GBox menubar_box = GBOX_EMPTY; /* Don't initialize here */
 static GBox menu_box = GBOX_EMPTY; /* Don't initialize here */
-static GResFont menu_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
-static GResFont menubar_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+static GResFont menu_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
+static GResFont menubar_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
 #ifdef __Mac
 static int mac_menu_icons = true;
 #else
@@ -81,8 +82,8 @@ static int GMenuBoxRIInit(GResInfo *ri) {
     return true;
 }
 
-GResInfo gmenu_ri;
-static GResInfo gmenubar_ri = {
+static GResInfo gmenu_ri;
+GResInfo gmenubar_ri = {
     &gmenu_ri, &ggadget_ri,&gmenu_ri, NULL,
     &menubar_box,
     &menubar_font,
@@ -108,7 +109,7 @@ static struct resed menu_re[] = {
     RESED_EMPTY
 };
 extern GResInfo gmatrixedit_ri;
-GResInfo gmenu_ri = {
+static GResInfo gmenu_ri = {
     &gmatrixedit_ri, &ggadget_ri,&gmenubar_ri, NULL,
     &menu_box,
     &menu_font,

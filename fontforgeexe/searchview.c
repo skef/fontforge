@@ -55,8 +55,9 @@ static SearchView *searcher=NULL;
 #define CID_Fuzzy	1011
 #define CID_Endpoints	1012
 
-GResFont searchview_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
-GResFont searchview_boldfont = { "700 12pt " SANS_UI_FAMILIES, NULL };
+GResFont searchview_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
+GResFont searchview_boldfont = GRESFONT_INIT("700 12pt " SANS_UI_FAMILIES);
+
 static double old_fudge = .001;
 
 static void SVSelectSC(SearchView *sv) {

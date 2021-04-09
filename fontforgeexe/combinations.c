@@ -61,7 +61,7 @@ GTextInfo sortby[] = {
     GTEXTINFO_EMPTY
 };
 
-GResFont combinations_font = { "400 12px " SANS_UI_FAMILIES, NULL };
+GResFont combinations_font = GRESFONT_INIT("400 12px " SANS_UI_FAMILIES);
 
 void SFShowLigatures(SplineFont *sf,SplineChar *searchfor) {
     int i, cnt;

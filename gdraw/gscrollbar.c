@@ -87,9 +87,9 @@ GResInfo gscrollbar_ri = {
     GScrollBarRIInit,
     NULL
 };
-extern GResInfo gline_ri;
+extern GResInfo ggroup_ri;
 static GResInfo gthumb_ri = {
-    &gline_ri, &ggadget_ri,&gscrollbar_ri, NULL,
+    &ggroup_ri, &ggadget_ri,&gscrollbar_ri, NULL,
     &thumb_box,
     NULL,
     &scrollbarbox,

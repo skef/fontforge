@@ -46,7 +46,7 @@ extern GBox _ggadget_Default_Box;
 #define ACTIVE_BORDER   (_ggadget_Default_Box.active_border)
 #define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
 
-GResFont kernclass_font = { "400 12pt " MONO_UI_FAMILIES, NULL };
+GResFont kernclass_font = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
 
 typedef struct kernclassdlg {
     struct kernclasslistdlg *kcld;

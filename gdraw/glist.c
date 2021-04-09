@@ -950,7 +950,7 @@ struct gfuncs GList_funcs = {
 };
 
 static GBox list_box = GBOX_EMPTY; /* Don't initialize here */;
-GResFont list_font = { "400 10pt " SANS_UI_FAMILIES, NULL };
+GResFont list_font = GRESFONT_INIT("400 10pt " SANS_UI_FAMILIES);
 
 static GTextInfo list_choices[] = {
     { (unichar_t *) "1", NULL, 0, 0, NULL, NULL, 0, 0, 0, 0, 0, 0, 1, 0, 0, '\0' },

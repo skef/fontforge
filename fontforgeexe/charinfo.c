@@ -50,7 +50,7 @@
 
 extern int lookup_hideunused;
 
-GResFont glyphinfo_font = { "400 12pt " MONO_UI_FAMILIES, NULL };
+GResFont glyphinfo_font = GRESFONT_INIT("400 12pt " MONO_UI_FAMILIES);
 
 static int last_gi_aspect = 0;
 

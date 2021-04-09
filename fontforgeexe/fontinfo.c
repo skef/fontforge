@@ -65,7 +65,7 @@ extern GBox _ggadget_Default_Box;
 #define ACTIVE_BORDER   (_ggadget_Default_Box.active_border)
 #define MAIN_FOREGROUND (_ggadget_Default_Box.main_foreground)
 
-GResFont fontinfo_font = { "400 12pt " SANS_UI_FAMILIES, NULL };
+GResFont fontinfo_font = GRESFONT_INIT("400 12pt " SANS_UI_FAMILIES);
 
 static int last_aspect=0;
 
