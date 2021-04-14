@@ -221,8 +221,8 @@ return( NULL );
     gw = GDrawCreateTopWindow(NULL,&pos,restrict_input?d_e_h:w_e_h,d,&wattrs);
 
     GGadgetInit();
-    GDrawSetFont(gw,_ggadget_default_font.fi);
-    GDrawWindowFontMetrics(gw,_ggadget_default_font.fi,&as,&ds,&ld);
+    GDrawSetDefaultFont(gw);
+    GDrawDefaultFontMetrics(gw,&as,&ds,&ld);
     fh = as+ds;
     maxw = 0;
     for ( i=0; i<lb; ++i ) {
@@ -504,8 +504,8 @@ return( NULL );
     gw = GDrawCreateTopWindow(NULL,&pos,restrict_input?d_e_h:w_e_h,d,&wattrs);
 
     GGadgetInit();
-    GDrawSetFont(gw,_ggadget_default_font.fi);
-    GDrawWindowFontMetrics(gw,_ggadget_default_font.fi,&as,&ds,&ld);
+    GDrawSetDefaultFont(gw);
+    GDrawDefaultFontMetrics(gw,&as,&ds,&ld);
     fh = as+ds;
     maxw = 0;
     for ( i=0; i<lb; ++i ) {
@@ -519,7 +519,7 @@ return( NULL );
 	if ( _gtextfield_font.fi!=NULL ) {
 	    GDrawSetFont(gw,_gtextfield_font.fi);
 	    w = GDrawGetText8Width(gw,defstr,-1);
-	    GDrawSetFont(gw,_ggadget_default_font.fi);
+	    GDrawSetDefaultFont(gw);
 	} else
 	    w = 8*GDrawGetText8Width(gw,defstr,-1)/5;
 	w += GDrawPointsToPixels(gw,40);
@@ -900,8 +900,8 @@ static GWindow ChoiceDlgCreate8(struct dlg_info *d,const char *title,
     gw = GDrawCreateTopWindow(NULL,&pos,c_e_h,d,&wattrs);
 
     GGadgetInit();
-    GDrawSetFont(gw,_ggadget_default_font.fi);
-    GDrawWindowFontMetrics(gw,_ggadget_default_font.fi,&as,&ds,&ld);
+    GDrawSetDefaultFont(gw);
+    GDrawDefaultFontMetrics(gw,&as,&ds,&ld);
     fh = as+ds;
     maxw = 220;
     for ( i=0; i<cnt; ++i) {
